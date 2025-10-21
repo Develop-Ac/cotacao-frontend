@@ -1,14 +1,9 @@
 "use client";
 
 import {
-  FaPlusSquare,
-  FaTrash,
-  FaEdit,
   FaFilePdf,
   FaSync,
-  FaListUl,
   FaCaretDown,
-  FaFilter,
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,8 +16,8 @@ type ChecklistRow = {
   dataHoraEntrada?: string | null; // ISO
   combustivelPercentual?: number | null;
   createdAt?: string | null; // ISO
-  clienteNome?: string | null; // se você derivar de JSON no backend
-  veiculoPlaca?: string | null; // idem
+  clienteNome?: string | null; // derivado no backend
+  veiculoPlaca?: string | null; // derivado no backend
 };
 
 type PaginatedResponse<T> = {
@@ -33,86 +28,30 @@ type PaginatedResponse<T> = {
   data: T[];
 };
 
-const API_BASE = "http://localhost:8000/oficina/checklists";
+const API_BASE = "https://intranetbackend.easypanel.host/oficina/checklists";
 
 export default function ChecklistsList() {
-  // Filtros e paginação
-  const [qOsInterna, setQOsInterna] = useState("");
+  // Filtros (aplicados no front)
+  const [qOsInterna, setQOSInterna] = useState("");
   const [qPlaca, setQPlaca] = useState("");
-  const [qDataDe, setQDataDe] = useState("");
-  const [qDataAte, setQDataAte] = useState("");
+  const [qDataDe, setQDataDe] = useState("");   // YYYY-MM-DD
+  const [qDataAte, setQDataAte] = useState(""); // YYYY-MM-DD
+
+  // Paginação no front
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<10 | 20 | 50>(10);
 
   // Dados e estado
-  const [itens, setItens] = useState<ChecklistRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [rawItems, setRawItems] = useState<ChecklistRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   // Dropdown PageSize
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
   const pageSizeRef = useRef<HTMLDivElement | null>(null);
 
-    const [downloadingId, setDownloadingId] = useState<string | null>(null);
-
-  async function downloadChecklistPdf(id: string) {
-    try {
-      setDownloadingId(id);
-
-      const res = await fetch(`http://localhost:8000/oficina/checklists/${id}/pdf`, {
-        method: "GET",
-        headers: {
-          Accept: "application/pdf",
-        },
-      });
-
-      if (!res.ok) {
-        // tenta ler JSON de erro se existir
-        let msg = `Erro HTTP: ${res.status}`;
-        try {
-          const err = await res.json();
-          if (err?.message) msg = Array.isArray(err.message) ? err.message.join(", ") : err.message;
-        } catch {}
-        throw new Error(msg);
-      }
-
-      // tenta extrair o filename do Content-Disposition
-      const cd = res.headers.get("Content-Disposition") || "";
-      const match = /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i.exec(cd);
-      const filenameFromHeader = match ? decodeURIComponent(match[1]) : null;
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filenameFromHeader || `checklist-${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("Falha ao baixar PDF:", msg);
-      alert(msg || "Falha ao baixar PDF");
-    } finally {
-      setDownloadingId(null);
-    }
-  }
-
-  // === CLASSES REUTILIZÁVEIS ===
-  const BTN =
-    "h-12 px-4 inline-flex items-center justify-center gap-2 rounded text-white font-semibold " +
-    "bg-gradient-to-r from-blue-500 to-purple-600 " +
-    "hover:from-blue-600 hover:to-purple-700 " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400";
-
-  const BTN_SQUARE =
-    "h-12 w-12 inline-flex items-center justify-center rounded text-white font-semibold " +
-    "bg-gradient-to-r from-blue-500 to-purple-600 " +
-    "hover:from-blue-600 hover:to-purple-700 " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400";
+  // Abort para evitar race-condition ao recarregar tudo
+  const abortRef = useRef<AbortController | null>(null);
 
   // Fecha o dropdown ao clicar fora / Esc
   useEffect(() => {
@@ -141,87 +80,172 @@ export default function ChecklistsList() {
     return d.toLocaleString("pt-BR");
   };
 
-  const qs = useMemo(() => {
-    const p = new URLSearchParams();
-    p.set("page", String(page));
-    p.set("pageSize", String(pageSize));
-    if (qOsInterna.trim()) p.set("osInterna", qOsInterna.trim());
-    if (qPlaca.trim()) p.set("placa", qPlaca.trim());
-    if (qDataDe) p.set("dataDe", qDataDe);
-    if (qDataAte) p.set("dataAte", qDataAte);
-    return p.toString();
-  }, [page, pageSize, qOsInterna, qPlaca, qDataDe, qDataAte]);
+  // Converte ISO → 'YYYY-MM-DD'
+  const isoToYmd = (iso?: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
-  const fetchList = async () => {
+  const isDateRangeValid = useMemo(() => {
+    if (!qDataDe || !qDataAte) return true;
+    return qDataDe <= qDataAte;
+  }, [qDataDe, qDataAte]);
+
+  // ---------- CARREGAMENTO (pega TODOS os itens) ----------
+  const fetchAll = async () => {
+    // cancela requisição anterior
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}?${qs}`, {
+      // 1) tenta pegar a primeira página (ou tudo, se a API já devolver array)
+      const firstUrl = `${API_BASE}?page=1&pageSize=50`;
+      const res = await fetch(firstUrl, {
         method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
+        headers: { Accept: "application/json" },
+        signal: ctrl.signal,
       });
 
       if (!res.ok) {
         let msg = `Erro HTTP: ${res.status}`;
         try {
           const j = await res.json();
-          if (j?.message) msg = j.message;
+          if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
         } catch {}
         throw new Error(msg);
       }
 
       const text = await res.text();
       if (!text) {
-        setItens([]);
-        setTotal(0);
-        setTotalPages(1);
+        setRawItems([]);
         return;
       }
 
-      const json = JSON.parse(text);
+      const json: unknown = JSON.parse(text);
+
+      // 2) Se vier array simples, beleza — já temos tudo
       if (Array.isArray(json)) {
-        setItens(json);
-        setTotal(json.length);
-        setTotalPages(1);
-      } else {
-        const pageResp = json as PaginatedResponse<ChecklistRow>;
-        setItens(Array.isArray(pageResp.data) ? pageResp.data : []);
-        setTotal(pageResp.total ?? 0);
-        setTotalPages(pageResp.totalPages ?? 1);
+        setRawItems(json as ChecklistRow[]);
+        return;
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("Erro ao listar checklists:", msg);
-      setItens([]);
-      setTotal(0);
-      setTotalPages(1);
+
+      // 3) Se vier paginado, varre todas as páginas
+      const p1 = json as PaginatedResponse<ChecklistRow>;
+      const all: ChecklistRow[] = Array.isArray(p1.data) ? [...p1.data] : [];
+
+      const totalPages = p1.totalPages ?? 1;
+      if (totalPages > 1) {
+        // carrega as próximas páginas (2..N)
+        for (let pg = 2; pg <= totalPages; pg++) {
+          const url = `${API_BASE}?page=${pg}&pageSize=${p1.pageSize ?? 50}`;
+          const r = await fetch(url, {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            signal: ctrl.signal,
+          });
+          if (!r.ok) throw new Error(`Erro HTTP: ${r.status}`);
+          const t = await r.text();
+          if (!t) continue;
+
+          const j = JSON.parse(t);
+          if (Array.isArray(j)) {
+            all.push(...(j as ChecklistRow[]));
+          } else {
+            const px = j as PaginatedResponse<ChecklistRow>;
+            if (Array.isArray(px.data)) all.push(...px.data);
+          }
+        }
+      }
+
+      setRawItems(all);
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("Erro ao carregar checklists:", msg);
+        setRawItems([]);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // carrega ao montar
   useEffect(() => {
-    fetchList();
+    fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qs]);
+  }, []);
 
+  // ---------- FILTRAGEM NO FRONT ----------
+  const filtered = useMemo(() => {
+    if (!isDateRangeValid) return [];
+
+    const os = qOsInterna.trim().toLowerCase();
+    const placa = qPlaca.trim().toUpperCase();
+
+    return (rawItems ?? []).filter((r) => {
+      // OS Interna: contém (case-insensitive)
+      if (os) {
+        const v = String(r.osInterna ?? "").toLowerCase();
+        if (!v.includes(os)) return false;
+      }
+
+      // Placa: contém (normalizada p/ maiúsculas)
+      if (placa) {
+        const p = String(r.veiculoPlaca ?? "").toUpperCase();
+        if (!p.includes(placa)) return false;
+      }
+
+      // Datas: com base em dataHoraEntrada (ou createdAt se preferir)
+      if (qDataDe || qDataAte) {
+        const ymd = isoToYmd(r.dataHoraEntrada || r.createdAt);
+        if (!ymd) return false;
+        if (qDataDe && ymd < qDataDe) return false;
+        if (qDataAte && ymd > qDataAte) return false;
+      }
+
+      return true;
+    });
+  }, [rawItems, qOsInterna, qPlaca, qDataDe, qDataAte, isDateRangeValid]);
+
+  // paginação no front
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // se filtros mudarem ou pageSize mudar, volta para página 1 se page estourar
+  useEffect(() => {
+    setPage((p) => (p > totalPages ? totalPages : p));
+  }, [totalPages]);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
+  // ---------- Ações de filtro ----------
   const onSearch = () => {
     setPage(1);
-    fetchList();
+    // nada de fetch; tudo é client-side
   };
 
   const onClear = () => {
-    setQOsInterna("");
+    setQOSInterna("");
     setQPlaca("");
     setQDataDe("");
     setQDataAte("");
     setPage(1);
   };
 
+  // ---------- CSV ----------
   const exportCSV = () => {
-    if (!itens?.length) return;
+    if (!filtered?.length) return;
+
     const headers = [
       "ID",
       "OS Interna",
@@ -231,7 +255,7 @@ export default function ChecklistsList() {
       "Combustível (%)",
       "Criado em",
     ];
-    const rows = itens.map((r) => [
+    const rows = filtered.map((r) => [
       r.id ?? "",
       r.osInterna ?? "",
       fmtDateTime(r.dataHoraEntrada),
@@ -257,10 +281,54 @@ export default function ChecklistsList() {
     const a = document.createElement("a");
     a.href = url;
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    a.download = `checklists-${ts}.csv`;
+    a.download = `checklists-filtrado-${ts}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // ---------- Download PDF ----------
+  async function downloadChecklistPdf(id: string) {
+    try {
+      setDownloadingId(id);
+      const res = await fetch(`${API_BASE}/${id}/pdf`, {
+        method: "GET",
+        headers: { Accept: "application/pdf" },
+      });
+
+      if (!res.ok) {
+        let msg = `Erro HTTP: ${res.status}`;
+        try {
+          const err = await res.json();
+          if (err?.message)
+            msg = Array.isArray(err.message)
+              ? err.message.join(", ")
+              : err.message;
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i.exec(cd);
+      const filenameFromHeader = match ? decodeURIComponent(match[1]) : null;
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filenameFromHeader || `checklist-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("Falha ao baixar PDF:", msg);
+      alert(msg || "Falha ao baixar PDF");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   const pageSizes: (10 | 20 | 50)[] = [10, 20, 50];
 
@@ -272,33 +340,15 @@ export default function ChecklistsList() {
           <h3 className="text-2xl font-semibold mb-3 md:mb-0">
             Checklists (Oficina)
           </h3>
-
-          <div className="flex gap-6">
-            {/* Novo (placeholder) */}
-            <div className="flex flex-col items-center mr-2">
-              <button
-                id="form_new_menu"
-                className={BTN_SQUARE}
-                title="Novo"
-                onClick={() => alert("Ir para tela de criação (implemente).")}
-              >
-                <FaPlusSquare className="text-white text-xl" />
-              </button>
-              <span className="text-xs text-gray-700 mt-1">NOVO</span>
-            </div>
-
-            {/* Lixeira (placeholder) */}
-            <div className="flex flex-col items-center mr-2">
-              <button
-                id="form_trash_menu"
-                className={BTN_SQUARE}
-                title="Lixeira"
-                onClick={() => alert("Lixeira não implementada.")}
-              >
-                <FaTrash className="text-white text-xl" />
-              </button>
-              <span className="text-xs text-gray-700 mt-1">LIXEIRA</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="h-10 px-4 inline-flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200"
+              onClick={fetchAll}
+              disabled={loading}
+              title="Recarregar do servidor"
+            >
+              <FaSync className={loading ? "animate-spin" : ""} />
+            </button>
           </div>
         </div>
 
@@ -306,30 +356,20 @@ export default function ChecklistsList() {
         <div id="list">
           <div className="w-full">
             <div className="bg-white rounded-xl shadow-lg p-6">
-              {/* Action Bar */}
+              {/* Filtros */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
-                {/* Filtro avançado (placeholder) */}
-                <button
-                  className={BTN}
-                  onClick={() => alert("Filtro avançado não implementado.")}
-                >
-                  <FaFilter />
-                  <span>Filtro Avançado</span>
-                </button>
-
-                {/* Filtros rápidos */}
                 <div className="flex flex-1 max-w-5xl mx-2 gap-2 flex-wrap">
                   <input
                     type="text"
                     value={qOsInterna}
-                    onChange={(e) => setQOsInterna(e.target.value)}
+                    onChange={(e) => setQOSInterna(e.target.value)}
                     className="flex-1 min-w-[160px] h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
                     placeholder="OS Interna"
                   />
                   <input
                     type="text"
                     value={qPlaca}
-                    onChange={(e) => setQPlaca(e.target.value)}
+                    onChange={(e) => setQPlaca(e.target.value.toUpperCase().trim())}
                     className="flex-1 min-w-[140px] h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
                     placeholder="Placa"
                   />
@@ -347,9 +387,6 @@ export default function ChecklistsList() {
                     className="h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
                     placeholder="Data Até"
                   />
-                  <button className={`${BTN}`} onClick={onSearch}>
-                    Pesquisar
-                  </button>
                   <button
                     className="h-12 px-4 inline-flex items-center justify-center rounded bg-gray-200 text-gray-700"
                     onClick={onClear}
@@ -358,21 +395,11 @@ export default function ChecklistsList() {
                   </button>
                 </div>
 
-                {/* CSV, recarregar, pageSize, colunas */}
+                {/* PageSize dropdown */}
                 <div className="flex items-center gap-2">
-                  <button className={BTN} onClick={exportCSV}>
-                    <FaFilePdf />
-                    <span>CSV</span>
-                  </button>
-
-                  <button className={BTN} onClick={fetchList} disabled={loading}>
-                    <FaSync className={loading ? "animate-spin" : ""} />
-                  </button>
-
-                  {/* PageSize dropdown */}
                   <div className="relative" ref={pageSizeRef}>
                     <button
-                      className={BTN}
+                      className="h-12 px-4 inline-flex items-center justify-center gap-2 rounded bg-gray-100 hover:bg-gray-200"
                       aria-haspopup="listbox"
                       aria-expanded={pageSizeOpen}
                       onClick={() => setPageSizeOpen((v) => !v)}
@@ -386,7 +413,7 @@ export default function ChecklistsList() {
                         role="listbox"
                         tabIndex={-1}
                       >
-                        {([10, 20, 50] as const).map((n) => (
+                        {pageSizes.map((n) => (
                           <button
                             key={n}
                             role="option"
@@ -406,18 +433,18 @@ export default function ChecklistsList() {
                       </div>
                     )}
                   </div>
-
-                  {/* Colunas (placeholder) */}
-                  <div className="relative">
-                    <button
-                      className={BTN}
-                      onClick={() => alert("Seletor de colunas não implementado.")}
-                    >
-                      <FaListUl className="mr-1" />
-                      <FaCaretDown />
-                    </button>
-                  </div>
                 </div>
+              </div>
+
+              {/* Info topo */}
+              <div className="text-sm text-gray-600 mb-2">
+                Registros carregados: <b>{rawItems.length}</b> · Filtrados:{" "}
+                <b>{filtered.length}</b>
+                {!isDateRangeValid && (
+                  <span className="ml-3 text-red-600">
+                    Intervalo de datas inválido.
+                  </span>
+                )}
               </div>
 
               {/* Tabela */}
@@ -440,7 +467,7 @@ export default function ChecklistsList() {
                     </tr>
                   </thead>
                   <tbody>
-                    {itens.map((row, idx) => (
+                    {paged.map((row, idx) => (
                       <tr key={String(row.id ?? idx)} className="border-t">
                         <td className="p-4">
                           <input type="checkbox" />
@@ -454,26 +481,28 @@ export default function ChecklistsList() {
                         </td>
                         <td className="p-4">{fmtDateTime(row.createdAt)}</td>
                         <td className="p-4 text-center">
-                            <button
+                          <button
                             className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded"
                             title="Baixar PDF"
                             onClick={() => downloadChecklistPdf(String(row.id))}
-                            disabled={downloadingId === row.id}
-                            >
-                            {/* você pode usar um ícone de PDF (FaFilePdf) ou manter o FaEdit se preferir */}
+                            disabled={downloadingId === String(row.id ?? "")}
+                          >
                             <FaFilePdf
-                                style={{
-                                color: downloadingId === row.id ? "#94a3b8" : "rgb(0, 152, 196)",
+                              style={{
+                                color:
+                                  downloadingId === String(row.id ?? "")
+                                    ? "#94a3b8"
+                                    : "rgb(0, 152, 196)",
                                 minHeight: "24px",
                                 minWidth: "24px",
-                                }}
+                              }}
                             />
-                            </button>
+                          </button>
                         </td>
                       </tr>
                     ))}
 
-                    {!loading && itens.length === 0 && (
+                    {!loading && paged.length === 0 && (
                       <tr>
                         <td colSpan={8} className="p-6 text-center text-gray-500">
                           Nenhum registro encontrado.
@@ -491,10 +520,10 @@ export default function ChecklistsList() {
                 </table>
               </div>
 
-              {/* Paginação */}
+              {/* Paginação (front) */}
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-600">
-                  Total: <b>{total}</b> &middot; Página <b>{page}</b> de{" "}
+                  Total filtrado: <b>{filtered.length}</b> · Página <b>{page}</b> de{" "}
                   <b>{totalPages}</b>
                 </div>
                 <div className="flex gap-2">
@@ -507,9 +536,7 @@ export default function ChecklistsList() {
                   </button>
                   <button
                     className="h-10 px-3 inline-flex items-center justify-center rounded bg-gray-200 text-gray-700 disabled:opacity-50"
-                    onClick={() =>
-                      setPage((p) => (p < totalPages ? p + 1 : p))
-                    }
+                    onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))}
                     disabled={page >= totalPages || loading}
                   >
                     Próxima

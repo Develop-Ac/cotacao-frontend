@@ -100,12 +100,12 @@ export default function RootLayout({
                   href="index.html"
                   className="flex items-center px-4 py-2 text-gray-700 hover:bg-blue-50 rounded transition"
                 >
-                  <i className="mdi mdi-home mr-3 text-xl"></i>
-                  <span className="font-medium">Dashboard</span>
+                  {/* <i className="mdi mdi-home mr-3 text-xl"></i> */}
+                  {/* <span className="font-medium">Dashboard</span> */}
                 </a>
               </li>
               {/* Compras */}
-              <li>
+              {/* <li>
                 <details className="group">
                   <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
                     <i className="fa fa-shopping-cart mr-3 text-xl"></i>
@@ -138,7 +138,7 @@ export default function RootLayout({
                     </li>
                   </ul>
                 </details>
-              </li>
+              </li> */}
               {/* Oficina */}
               <li>
                 <details className="group">
@@ -164,7 +164,7 @@ export default function RootLayout({
                 </details>
               </li>
               {/* Sistema */}
-              <li>
+              {/* <li>
                 <details className="group">
                   <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
                     <i className="fa fa-gear mr-3 text-xl"></i>
@@ -186,7 +186,7 @@ export default function RootLayout({
                     </li>
                   </ul>
                 </details>
-              </li>
+              </li> */}
               {/* Charts */}
               {/* <li>
                 <details className="group">
