@@ -1,20 +1,34 @@
 # -------------------------------------------------
-# 1) Dependencies
+# 1) Dependencies (todas) para o build
 # -------------------------------------------------
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
-# Evita prompts e reduz ruído
 ENV CI=true \
     npm_config_audit=false \
     npm_config_fund=false
 
-# Copia apenas manifestos para cache eficiente
+# Copia só manifestos para cache eficiente
 COPY package.json package-lock.json* ./
 
-# Se houver yarn.lock ou pnpm-lock.yaml, remova do repo OU adapte os comandos
-# '--legacy-peer-deps' evita ERESOLVE em peerDependencies conflitantes
+# Evita conflitos de peer deps; mantém logs limpos
 RUN npm ci --legacy-peer-deps --loglevel=error
+
+# -------------------------------------------------
+# 1b) Dependencies (somente produção) para o runtime
+# -------------------------------------------------
+FROM node:20-bookworm-slim AS prod-deps
+WORKDIR /app
+
+ENV CI=true \
+    npm_config_audit=false \
+    npm_config_fund=false
+
+COPY package.json package-lock.json* ./
+
+# Instala SOMENTE deps de produção direto do lockfile
+# Se você precisar de postinstall (ex.: sharp), remova --ignore-scripts
+RUN npm ci --omit=dev --loglevel=error --ignore-scripts
 
 
 # -------------------------------------------------
@@ -26,19 +40,17 @@ WORKDIR /app
 ENV CI=true \
     NEXT_TELEMETRY_DISABLED=1
 
-# Copia node_modules resolvidos
+# node_modules completos para compilar
 COPY --from=deps /app/node_modules ./node_modules
-
-# Copia o resto do código do app
+# código da aplicação
 COPY . .
 
-# Garante binários do node_modules no PATH (sem NIXPACKS_PATH)
+# Binários do node_modules no PATH
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# (Opcional) Se usar sharp/libvips em Alpine; aqui (Debian) normalmente não precisa:
+# (Opcional) libs extras; em Debian geralmente não precisa para Next
 # RUN apt-get update && apt-get install -y --no-install-recommends libvips && rm -rf /var/lib/apt/lists/*
 
-# Build do Next
 RUN npm run build
 
 # Junta configs do Next (se existirem) para copiar de forma opcional no runtime
@@ -49,7 +61,7 @@ RUN mkdir -p /opt/runtime && \
 
 
 # -------------------------------------------------
-# 3) Runtime
+# 3) Runtime (somente produção)
 # -------------------------------------------------
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
@@ -58,18 +70,18 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000
 
-# Copia artefatos necessários do build
+# Artefatos do build
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 
-# Copia configs do Next se existirem (pasta pode estar vazia, não quebra build)
+# Configs opcionais do Next (não quebra se estiver vazio)
 COPY --from=builder /opt/runtime/ ./
 
-# Instala apenas deps de runtime (mantendo compatibilidade com 'next start')
-COPY --from=deps /app/node_modules ./node_modules
-RUN npm prune --omit=dev --loglevel=error
+# node_modules SOMENTE de produção (sem precisar rodar npm prune)
+COPY --from=prod-deps /app/node_modules ./node_modules
 
 EXPOSE 3000
-# Usa o bin do Next do node_modules, sem depender de PATH externo
+
+# Usa o bin do Next do node_modules
 CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
