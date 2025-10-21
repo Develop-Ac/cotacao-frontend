@@ -14,6 +14,7 @@ COPY package.json package-lock.json* ./
 # Evita conflitos de peer deps; mantém logs limpos
 RUN npm ci --legacy-peer-deps --loglevel=error
 
+
 # -------------------------------------------------
 # 1b) Dependencies (somente produção) para o runtime
 # -------------------------------------------------
@@ -27,8 +28,9 @@ ENV CI=true \
 COPY package.json package-lock.json* ./
 
 # Instala SOMENTE deps de produção direto do lockfile
+# Usa --legacy-peer-deps para ignorar conflito react 19 x react-helmet-async
 # Se você precisar de postinstall (ex.: sharp), remova --ignore-scripts
-RUN npm ci --omit=dev --loglevel=error --ignore-scripts
+RUN npm ci --omit=dev --legacy-peer-deps --loglevel=error --ignore-scripts
 
 
 # -------------------------------------------------
@@ -78,7 +80,7 @@ COPY --from=builder /app/package.json ./package.json
 # Configs opcionais do Next (não quebra se estiver vazio)
 COPY --from=builder /opt/runtime/ ./
 
-# node_modules SOMENTE de produção (sem precisar rodar npm prune)
+# node_modules SOMENTE de produção (resolvidos com legacy-peer-deps)
 COPY --from=prod-deps /app/node_modules ./node_modules
 
 EXPOSE 3000
