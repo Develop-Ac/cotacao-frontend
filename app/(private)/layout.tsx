@@ -32,10 +32,8 @@ const geistMono = Geist_Mono({
 
 export default function RootLayout({
   children,
-  auth, // <- o slot paralelo
 }: {
   children: React.ReactNode;
-  auth: React.ReactNode;
 }) {
 
   const router = useRouter();
