@@ -28,7 +28,7 @@ type PaginatedResponse<T> = {
   data: T[];
 };
 
-const API_BASE = "https://intranetbackend.easypanel.host/oficina/checklists";
+const API_BASE = "https://intranetbackend.acacessorios.local/oficina/checklists";
 
 export default function ChecklistsList() {
   // Filtros (aplicados no front)

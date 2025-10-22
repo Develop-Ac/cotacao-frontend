@@ -79,7 +79,7 @@ export default function Home() {
       headers['X-XSRF-TOKEN'] = csrfToken;
     }
 
-    await fetch('http://localhost:8000/cotacoes/' + id, {
+    await fetch('https://intranetbackend.acacessorios.local/cotacoes/' + id, {
       method: 'DELETE',
       credentials: 'include',
       headers

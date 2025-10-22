@@ -11,7 +11,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('https://intranetbackend.easypanel.host/login', {
+      const response = await fetch('https://intranetbackend.acacessorios.local/login', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
