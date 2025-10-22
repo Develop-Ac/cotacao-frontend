@@ -9,6 +9,13 @@ export default function Home() {
   const [itens, setItens] = useState<{ id: any; orcamento_compra: any }[]>([]);
   const router = useRouter();
 
+  // 🎯 NOVO CÓDIGO AQUI: Redireciona imediatamente ao carregar
+  useEffect(() => {
+    // Redireciona para a página de Check List
+    router.replace('/oficina/checkList'); 
+    // Usamos 'replace' para que a página atual não fique no histórico do navegador.
+  }, [router]); // O array de dependências vazio garante que só roda na montagem
+
   const listarOrcamentos = async () => {
     // const db = await initDB();
     // const all = await db.getAll('orcamentos');
