@@ -119,20 +119,14 @@ export default function RootLayout({
                   </summary>
                   <ul className="ml-10 mt-1 flex flex-col gap-1">
                     <li>
-                      <a
-                        href="pages/forms/basic_elements.html"
-                        className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100"
-                      >
-                        Form Elements
-                      </a>
+                     <Link href="/compras/cotacao" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                      Cotação
+                    </Link>
                     </li>
                     <li>
-                      <a
-                        href="pages/forms/basic_elements.html"
-                        className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100"
-                      >
-                        Form Elements
-                      </a>
+                     <Link href="/compras/cotacao/comparativo" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                      Comparativo
+                    </Link>
                     </li>
                   </ul>
                 </details>
