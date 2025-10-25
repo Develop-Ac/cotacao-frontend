@@ -40,9 +40,9 @@ type AvariaImage = {
   tipo: string | null;
 };
 
-const API_BASE = "http://localhost:8000/oficina/checklists";
+const API_BASE = "https://intranetbackend.acacessorios.local/oficina/checklists";
 // endpoint das imagens (controller /img/:id)
-const IMG_API_BASE = "http://localhost:8000/oficina/img";
+const IMG_API_BASE = "https://intranetbackend.acacessorios.local/oficina/img";
 
 export default function ChecklistsList() {
   // ====== PADRÕES DE BOTÃO ======
