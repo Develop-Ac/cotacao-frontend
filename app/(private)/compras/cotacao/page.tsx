@@ -167,7 +167,7 @@ export default function Tela() {
   const carregarFornecedoresSalvos = async (pedido_cotacao: number) => {
     try {
       const res = await fetch(
-        `http://localhost:8000/compras/fornecedor?pedido_cotacao=${encodeURIComponent(String(pedido_cotacao))}`,
+        `https://intranetbackend.acacessorios.local/compras/fornecedor?pedido_cotacao=${encodeURIComponent(String(pedido_cotacao))}`,
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -217,7 +217,7 @@ export default function Tela() {
         cpf_cnpj: novo.CPF_CNPJ ?? null,
         itens: [], // se quiser salvar itens também, envie aqui
       };
-      const post = await fetch("http://localhost:8000/compras/fornecedor", {
+      const post = await fetch("https://intranetbackend.acacessorios.local/compras/fornecedor", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(postBody),
