@@ -98,7 +98,7 @@ export default function Tela() {
         })),
       };
 
-      const res = await fetch("http://localhost:8000/compras/pedidos-cotacao", {
+      const res = await fetch("https://intranetbackend.acacessorios.local/compras/pedidos-cotacao", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -136,7 +136,7 @@ export default function Tela() {
     setLoadingPedidos(true);
     try {
       const res = await fetch(
-        `http://localhost:8000/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`,
+        `https://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`,
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
