@@ -248,7 +248,7 @@ export default function Tela() {
 
   const copiarLinkFornecedor = async (f: FornecedorSalvo) => {
     if (!f?.for_codigo || !pedidoSelecionado) return;
-    const url = `http://localhost:3002/cotacao?for_codigo=${encodeURIComponent(
+    const url = `https://intranet-cotacao-fornecedor.naayqg.easypanel.host/cotacao?for_codigo=${encodeURIComponent(
       String(f.for_codigo)
     )}&pedido_cotacao=${encodeURIComponent(String(pedidoSelecionado))}`;
     try {
