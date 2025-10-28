@@ -62,7 +62,7 @@ export default function Tela() {
     if (!p) return setMsgCot("Informe o pedido de cotação.");
     setLoadingCot(true);
     try {
-      const url = `http://localhost:8000/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
+      const url = `https://intranetbackend.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -199,7 +199,7 @@ export default function Tela() {
     setLoadingForn(true);
     try {
       // 1) Consulta fornecedor na OPENQUERY
-      const res = await fetch(`http://localhost:8000/compras/openquery/fornecedor/${code}`, {
+      const res = await fetch(`https://intranetbackend.acacessorios.local/compras/openquery/fornecedor/${code}`, {
         headers: { Accept: "application/json" },
       });
       if (res.status === 404) {
