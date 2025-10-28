@@ -23,7 +23,7 @@ export default function Login() {
     "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400";
 
   type Usuario = {
-    usuario_id: number;
+    id: string;
     nome: string;
     email: string;
     senha?: string;
@@ -33,7 +33,7 @@ export default function Login() {
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch("http://localhost:8000/usuarios", {
+      const response = await fetch("https://intranetbackend.acacessorios.local/usuarios", {
         method: "POST",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ nome, email, senha }),
@@ -284,7 +284,7 @@ export default function Login() {
                           <button
                             className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded"
                             title="Lixeira"
-                            onClick={() => deletarUsuario(usuario.usuario_id)}
+                            onClick={() => deletarUsuario(usuario.id)}
                           >
                             <FaTrash style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px"}}/>
                           </button>

@@ -23,7 +23,9 @@ export default function Login() {
 
       const data = await response.json();
 
-      if (true === true) {
+      console.log(data.success)
+
+      if (data.success) {
         // Login bem-sucedido → salva no localStorage
         localStorage.setItem('auth', 'true');
         router.push('/');

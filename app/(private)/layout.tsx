@@ -103,7 +103,7 @@ export default function RootLayout({
                 </a>
               </li>
               {/* Compras */}
-              {/* <li>
+              <li>
                 <details className="group">
                   <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
                     <i className="fa fa-shopping-cart mr-3 text-xl"></i>
@@ -119,18 +119,51 @@ export default function RootLayout({
                   </summary>
                   <ul className="ml-10 mt-1 flex flex-col gap-1">
                     <li>
-                     <Link href="/compras/cotacao" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
-                      Cotação
+                     <details className="group">
+                        <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
+                          <i className="fa fa-shopping-cart mr-3 text-xl"></i>
+                          <span className="font-medium">Cotação</span>
+                          <svg
+                            className="ml-auto transition-transform group-open:rotate-90 w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M9 5l7 7-7 7" />
+                          </svg>
+                        </summary>
+                        <ul className="ml-10 mt-1 flex flex-col gap-1">
+                          <li>
+                          <Link href="/compras/cotacao" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                            Criar Cotação
+                          </Link>
+                          </li>
+                          <li>
+                          <Link href="/compras/cotacao/comparativo" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                            Comparativo
+                          </Link>
+                          </li>
+                          <li>
+                          <Link href="/compras/cotacao/pedido" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                            Pedido
+                          </Link>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    {/* <li>
+                     <Link href="/compras/cotacao/comparativo" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                      2
                     </Link>
                     </li>
                     <li>
-                     <Link href="/compras/cotacao/comparativo" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
-                      Comparativo
+                     <Link href="/compras/cotacao/pedido" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                      3
                     </Link>
-                    </li>
+                    </li> */}
                   </ul>
                 </details>
-              </li> */}
+              </li>
               {/* Oficina */}
               <li>
                 <details className="group">
