@@ -410,7 +410,7 @@ export default function Tela() {
                             onClick={() => abrirModalFornecedor(p.pedido_cotacao)}
                             title="Selecionar fornecedor e gerar link"
                           >
-                            Selecionar fornecedor
+                            Fornecedor
                           </button>
                         </td>
                       </tr>

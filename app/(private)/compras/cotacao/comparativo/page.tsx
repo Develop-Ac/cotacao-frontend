@@ -555,8 +555,8 @@ export default function ComparativoPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-7xl px-6 py-10">
+    <main className="min-h-screen text-gray-900">
+      <div className="mx-auto px-6 py-10">
         <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Comparativo de Preços por Fornecedor</h1>

@@ -7,7 +7,6 @@ import logo from './assets/images/logo.svg';
 import logo_mini from './assets/images/logo-mini.svg';
 import PrivateRoute from "@/components/PrivateRoute";
 import { useRouter } from "next/navigation";
-import { HelmetProvider } from 'react-helmet-async';
 import Image from 'next/image';
 import { MdOutlineNotificationsNone } from "react-icons/md"
 import { MdFullscreen } from "react-icons/md";
@@ -151,12 +150,12 @@ export default function RootLayout({
                         </ul>
                       </details>
                     </li>
-                    {/* <li>
-                     <Link href="/compras/cotacao/comparativo" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
-                      2
+                    <li>
+                     <Link href="/compras/kanban" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                      Kanban
                     </Link>
                     </li>
-                    <li>
+                    {/* <li>
                      <Link href="/compras/cotacao/pedido" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
                       3
                     </Link>
