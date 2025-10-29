@@ -387,7 +387,8 @@ export default function Tela() {
                       <th className="p-2 text-end" style={{ width: 120 }}>Itens</th>
                       <th className="p-2 text-end" style={{ width: 130 }}>Qtd Total</th>
                       <th className="p-2 text-end" style={{ width: 160 }}>Total</th>
-                      <th className="p-2 text-end" style={{ width: 160 }}>Ações</th>
+                      {/* largura maior para dois botões */}
+                      <th className="p-2 text-end" style={{ width: 240 }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -408,16 +409,30 @@ export default function Tela() {
                           {Number(p.total_qtd).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                         </td>
                         <td className="p-3 text-end">{p.total_valor_fmt ?? "-"}</td>
-                        <td className="p-3 text-end">
-                          <a
-                            className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-                            href={`https://intranetbackend.acacessorios.local/compras/pedido/${encodeURIComponent(p.id)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Abrir PDF"
-                          >
-                            PDF
-                          </a>
+                        <td className="p-3">
+                          <div className="flex justify-end gap-2">
+                            {/* PDF com MARCA */}
+                            <a
+                              className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+                              href={`https://intranetbackend.acacessorios.local/compras/pedido/${encodeURIComponent(p.id)}?marca=true`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Abrir PDF (com marca)"
+                            >
+                              PDF c/ marca
+                            </a>
+
+                            {/* PDF sem MARCA */}
+                            <a
+                              className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                              href={`https://intranetbackend.acacessorios.local/compras/pedido/${encodeURIComponent(p.id)}?marca=false`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Abrir PDF (sem marca)"
+                            >
+                              PDF s/ marca
+                            </a>
+                          </div>
                         </td>
                       </tr>
                     ))}
