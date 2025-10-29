@@ -19,11 +19,16 @@ type Task = {
   id: string;
   title: string;
   createdAt: number;
+  // campos extras (editáveis no modal do card)
+  desc?: string;
+  responsavel?: string;
+  due?: string; // YYYY-MM-DD
+  prioridade?: "baixa" | "media" | "alta";
 };
 
+type DragData = { taskId: string; from: ColumnKey };
 type BoardState = Record<ColumnKey, Task[]>;
 
-// --- Helpers ---
 const COLS: { key: ColumnKey; label: string }[] = [
   { key: "cadastro_produto", label: "Cadastro produto" },
   { key: "criacao_pedido", label: "Criação pedido" },
@@ -38,41 +43,31 @@ const COLS: { key: ColumnKey; label: string }[] = [
   { key: "arquivo", label: "Arquivo" },
 ];
 
-const emptyBoard = (): BoardState =>
-  COLS.reduce((acc, c) => ({ ...acc, [c.key]: [] }), {} as BoardState);
-
+const STORAGE_KEY = "kanban_ac_board_v1";
+const AUTOS_KEY = "kanban_automations";
 const uid = () =>
   Math.random().toString(36).slice(2, 7) + "-" + Date.now().toString(36);
 
-const STORAGE_KEY = "kanban_ac_board_v1";
-
-// --- Drag & Drop shape ---
-type DragData = {
-  taskId: string;
-  from: ColumnKey;
-};
-
-// --- Chip for column labels ---
-function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-xs rounded-full px-2 py-1 bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700">
-      {children}
-    </span>
-  );
-}
-
-// --- Task Card ---
-function Card({ task, onDelete }: { task: Task; onDelete?: () => void }) {
+// --- Componentes ---
+function Card({
+  task,
+  onDelete,
+  onOpen,
+}: {
+  task: Task;
+  onDelete?: () => void;
+  onOpen?: () => void;
+}) {
   return (
     <div
-      className="group rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 ease-out hover:-translate-y-0.5"
+      onClick={() => onOpen && onOpen()}
+      className="rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 cursor-pointer"
       draggable
       onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
         const container = e.currentTarget.closest<HTMLElement>("[data-col]");
         const from = (container?.dataset.col || "") as ColumnKey;
-        const payload: DragData = { taskId: task.id, from };
+        const payload = { taskId: task.id, from };
         e.dataTransfer.setData("application/json", JSON.stringify(payload));
-        e.dataTransfer.effectAllowed = "move";
       }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -83,21 +78,46 @@ function Card({ task, onDelete }: { task: Task; onDelete?: () => void }) {
               ev.stopPropagation();
               onDelete();
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-xs px-2 py-1 rounded-md border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+            className="text-xs text-red-500 hover:text-red-700"
+            aria-label="Excluir"
             title="Excluir"
           >
-            excluir
+            ✕
           </button>
         )}
       </div>
-      <div className="mt-2 text-[11px] text-gray-500">
+
+      <div className="mt-1 text-[11px] text-gray-400">
         {new Date(task.createdAt).toLocaleString("pt-BR")}
       </div>
+
+      {task.responsavel && (
+        <div className="mt-2 text-[11px] text-gray-700 dark:text-gray-200 flex items-center gap-1">
+          <span>👤</span>
+          <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-neutral-700">
+            {task.responsavel}
+          </span>
+        </div>
+      )}
+
+      {(task.prioridade || task.due) && (
+        <div className="mt-2 flex items-center gap-2 text-[11px]">
+          {task.prioridade && (
+            <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-neutral-700">
+              {task.prioridade}
+            </span>
+          )}
+          {task.due && (
+            <span className="text-gray-500">
+              vence {new Date(task.due).toLocaleDateString("pt-BR")}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// --- Column ---
 function Column({
   label,
   colKey,
@@ -105,13 +125,15 @@ function Column({
   onDropTask,
   onAddTask,
   onDeleteTask,
+  onOpenTask,
 }: {
   label: string;
   colKey: ColumnKey;
   tasks: Task[];
-  onDropTask: (data: DragData, to: ColumnKey, index?: number) => void;
+  onDropTask: (data: DragData, to: ColumnKey) => void;
   onAddTask: (col: ColumnKey, title: string) => void;
   onDeleteTask: (col: ColumnKey, id: string) => void;
+  onOpenTask: (col: ColumnKey, id: string) => void;
 }) {
   const [value, setValue] = useState("");
 
@@ -122,8 +144,14 @@ function Column({
     let payload: DragData | null = null;
     try {
       const parsed = JSON.parse(raw) as unknown;
-      if (typeof parsed === "object" && parsed !== null && "taskId" in (parsed as any) && "from" in (parsed as any)) {
-        payload = parsed as DragData;
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "taskId" in (parsed as any) &&
+        "from" in (parsed as any)
+      ) {
+        const p = parsed as any;
+        payload = { taskId: String(p.taskId), from: p.from as ColumnKey };
       }
     } catch {}
     if (!payload) return;
@@ -133,84 +161,100 @@ function Column({
   return (
     <div
       data-col={colKey}
-      onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
+      onDragOver={(e: React.DragEvent<HTMLDivElement>) => e.preventDefault()}
       onDrop={handleDrop}
-      className="flex flex-col gap-3 w-[320px] md:w-[360px] 2xl:w-[380px] bg-white dark:bg-neutral-950 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm p-3 min-h-[280px]"
+      className="flex flex-col gap-3 w-[320px] md:w-[360px] bg-white dark:bg-neutral-950 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm p-3 min-h-[280px]"
     >
-      <div className="sticky top-0 z-10 bg-white/80 dark:bg-neutral-950/80 backdrop-blur rounded-xl px-2 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold">{label}</h3>
-          <Pill>{tasks.length} itens</Pill>
-        </div>
-        <button
-          className="text-xs px-2 py-1 rounded-lg border border-gray-300 dark:border-neutral-700 hover:bg-white dark:hover:bg-neutral-800"
-          onClick={() => {
-            const title = value.trim();
-            if (!title) return;
-            onAddTask(colKey, title);
-            setValue("");
-          }}
-          title="Adicionar card"
-        >
-          + adicionar
-        </button>
+      <div className="sticky top-0 bg-white/80 dark:bg-neutral-950/80 backdrop-blur rounded-xl px-2 py-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">{label}</h3>
+        <span className="text-xs text-gray-400">{tasks.length}</span>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 mt-1 max-h-[70vh] overflow-y-auto pr-1">
+        {tasks.map((t) => (
+          <Card
+            key={t.id}
+            task={t}
+            onDelete={() => onDeleteTask(colKey, t.id)}
+            onOpen={() => onOpenTask(colKey, t.id)}
+          />
+        ))}
+      </div>
+
+      <div className="flex mt-2 gap-1">
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Novo card..."
-          className="w-full text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400/40"
+          className="w-full text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1"
         />
+        <button
+          onClick={() => {
+            if (!value.trim()) return;
+            onAddTask(colKey, value);
+            setValue("");
+          }}
+          className="text-sm px-3 py-1 rounded-xl border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
+        >
+          +
+        </button>
       </div>
-
-      <div className="flex flex-col gap-2 mt-1 max-h-[70vh] overflow-y-auto pr-1">
-        
-          {tasks.map((t) => (
-            <Card key={t.id} task={t} onDelete={() => onDeleteTask(colKey, t.id)} />
-          ))}
-        
-      </div>
-
-      {tasks.length === 0 && (
-        <div className="text-xs text-gray-400 italic mt-2 select-none">Arraste itens aqui…</div>
-      )}
     </div>
   );
 }
 
 export default function Page() {
   const [board, setBoard] = useState<BoardState>(() => {
-    if (typeof window === "undefined") return emptyBoard();
+    if (typeof window === "undefined")
+      return COLS.reduce((a, c) => ({ ...a, [c.key]: [] }), {} as BoardState);
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw) as BoardState;
+      if (raw) return JSON.parse(raw);
     } catch {}
-    return emptyBoard();
+    return COLS.reduce((a, c) => ({ ...a, [c.key]: [] }), {} as BoardState);
   });
 
-  const [filter, setFilter] = useState("");
+  // --- Filtro por Responsável ---
+  const [filterResp, setFilterResp] = useState<string>("");
 
-  // Persist
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
-    } catch {}
+  // Lista única de responsáveis existentes no board (para o select)
+  const responsaveis = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(board).forEach((list) =>
+      list.forEach((t) => {
+        if (t.responsavel && t.responsavel.trim()) set.add(t.responsavel.trim());
+      })
+    );
+    return Array.from(set).sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" })
+    );
   }, [board]);
 
-  const filtered = useMemo(() => {
-    const f = filter.trim().toLowerCase();
-    if (!f) return board;
-    const clone: BoardState = emptyBoard();
-    (Object.keys(board) as ColumnKey[]).forEach((k) => {
-      clone[k] = board[k].filter((t) => t.title.toLowerCase().includes(f));
-    });
-    return clone;
-  }, [board, filter]);
+  // Modal de automação
+  const [showModal, setShowModal] = useState(false);
+  const [automation, setAutomation] = useState({
+    col: COLS[0].key,
+    title: "",
+    time: "",
+  });
+
+  // Modal de edição de card
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [selected, setSelected] = useState<{ col: ColumnKey; id: string } | null>(
+    null
+  );
+  const [taskForm, setTaskForm] = useState<{
+    title: string;
+    desc: string;
+    responsavel: string;
+    due: string;
+    prioridade: "baixa" | "media" | "alta";
+  }>({ title: "", desc: "", responsavel: "", due: "", prioridade: "media" });
+
+  // Persistência do board
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+  }, [board]);
 
   function addTask(col: ColumnKey, title: string) {
     setBoard((prev) => ({
@@ -218,121 +262,364 @@ export default function Page() {
       [col]: [{ id: uid(), title, createdAt: Date.now() }, ...prev[col]],
     }));
   }
-
   function deleteTask(col: ColumnKey, id: string) {
-    setBoard((prev) => ({ ...prev, [col]: prev[col].filter((t) => t.id !== id) }));
+    setBoard((prev) => ({
+      ...prev,
+      [col]: prev[col].filter((t) => t.id !== id),
+    }));
   }
-
   function moveTask(data: DragData, to: ColumnKey) {
     setBoard((prev) => {
-      if (!prev[data.from]) return prev;
-      const source = [...prev[data.from]];
-      const idx = source.findIndex((t) => t.id === data.taskId);
+      const src = [...prev[data.from]];
+      const idx = src.findIndex((t) => t.id === data.taskId);
       if (idx === -1) return prev;
-      const [task] = source.splice(idx, 1);
-      const target = [...prev[to]];
-      target.unshift(task);
-      return { ...prev, [data.from]: source, [to]: target } as BoardState;
+      const [task] = src.splice(idx, 1);
+      const dest = [...prev[to]];
+      dest.unshift(task);
+      return { ...prev, [data.from]: src, [to]: dest };
     });
   }
 
-  function resetBoard() {
-    if (confirm("Limpar todo o board?")) setBoard(emptyBoard());
+  // --- Automação robusta: dispara no minuto exato e evita repetição por dia ---
+  useEffect(() => {
+    type Automation = {
+      id: string;
+      title: string;
+      time: string; // HH:MM
+      col: ColumnKey;
+      lastRunDate?: string; // YYYY-MM-DD
+    };
+
+    const loadAutos = (): Automation[] => {
+      try {
+        const raw = localStorage.getItem(AUTOS_KEY);
+        return raw ? (JSON.parse(raw) as Automation[]) : [];
+      } catch {
+        return [];
+      }
+    };
+    const saveAutos = (arr: Automation[]) =>
+      localStorage.setItem(AUTOS_KEY, JSON.stringify(arr));
+    const todayStr = () => new Date().toISOString().slice(0, 10);
+    const toTodayDate = (hhmm: string) => {
+      const [h, m] = hhmm.split(":").map((x) => parseInt(x, 10));
+      const d = new Date();
+      d.setHours(h || 0, m || 0, 0, 0);
+      return d;
+    };
+
+    const runCheck = () => {
+      const now = new Date();
+      const autos = loadAutos();
+      let changed = false;
+      for (const a of autos) {
+        if (!a.time || !a.title) continue;
+        const target = toTodayDate(a.time);
+        const shouldRun = now >= target && a.lastRunDate !== todayStr();
+        if (shouldRun) {
+          setBoard((prev) => ({
+            ...prev,
+            [a.col]: [
+              {
+                id: uid(),
+                title: a.title + " (auto)",
+                createdAt: Date.now(),
+              },
+              ...prev[a.col],
+            ],
+          }));
+          a.lastRunDate = todayStr();
+          changed = true;
+        }
+      }
+      if (changed) saveAutos(autos);
+    };
+
+    // roda já na montagem (caso a aba abra depois do horário)
+    runCheck();
+
+    // alinha para o início do próximo minuto
+    const delay = 60000 - (Date.now() % 60000);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const timer = setTimeout(() => {
+      runCheck();
+      interval = setInterval(runCheck, 60000);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+      if (interval) clearInterval(interval);
+    };
+  }, []);
+
+  function saveAutomation() {
+    const t = automation.time?.trim();
+    const title = automation.title?.trim();
+    if (!title) {
+      alert("Informe um título.");
+      return;
+    }
+    if (!/^\d{2}:\d{2}$/.test(t)) {
+      alert("Informe um horário válido no formato HH:MM.");
+      return;
+    }
+    type Automation = {
+      id: string;
+      title: string;
+      time: string;
+      col: ColumnKey;
+      lastRunDate?: string;
+    };
+    const saved = localStorage.getItem(AUTOS_KEY);
+    const autos: Automation[] = saved ? JSON.parse(saved) : [];
+    autos.push({ id: uid(), title, time: t, col: automation.col });
+    localStorage.setItem(AUTOS_KEY, JSON.stringify(autos));
+    setShowModal(false);
   }
 
-  // Quick seeds
-  function seedDemo() {
-    const demo: BoardState = emptyBoard();
-    demo.cadastro_produto = [
-      { id: uid(), title: "Criar produto ABC-123", createdAt: Date.now() - 400000 },
-    ];
-    demo.criacao_pedido = [
-      { id: uid(), title: "Pedido 789 – João", createdAt: Date.now() - 350000 },
-    ];
-    demo.conferencia_pedido = [
-      { id: uid(), title: "Conferir NF 5561", createdAt: Date.now() - 300000 },
-    ];
-    demo.digitacao_pedido = [
-      { id: uid(), title: "Digitar pedido 1020", createdAt: Date.now() - 250000 },
-    ];
-    demo.acompanhamento_pedido = [
-      { id: uid(), title: "Acompanhar entrega 334", createdAt: Date.now() - 200000 },
-    ];
-    demo.conciliacao_pedido = [
-      { id: uid(), title: "Conciliar pedido 1020", createdAt: Date.now() - 150000 },
-    ];
-    demo.recebimento = [
-      { id: uid(), title: "Receber carga 45", createdAt: Date.now() - 110000 },
-    ];
-    demo.checkin = [
-      { id: uid(), title: "Check-in motorista Luis", createdAt: Date.now() - 100000 },
-    ];
-    demo.codificacao = [
-      { id: uid(), title: "Codificar lote L-99", createdAt: Date.now() - 90000 },
-    ];
-    demo.impressao_mapa = [
-      { id: uid(), title: "Imprimir mapa 12/10", createdAt: Date.now() - 80000 },
-    ];
-    demo.arquivo = [
-      { id: uid(), title: "Arquivar pedido 789", createdAt: Date.now() - 70000 },
-    ];
-    setBoard(demo);
+  // --- Modal do Card ---
+  function openTaskModal(col: ColumnKey, id: string) {
+    setSelected({ col, id });
+    // carrega dados do card para o form
+    setBoard((prev) => {
+      const t = prev[col].find((x) => x.id === id);
+      setTaskForm({
+        title: t?.title || "",
+        desc: t?.desc || "",
+        responsavel: t?.responsavel || "",
+        due: t?.due || "",
+        prioridade: (t?.prioridade as any) || "media",
+      });
+      return prev; // não altera o estado aqui
+    });
+    setShowTaskModal(true);
   }
+  function saveTaskModal() {
+    if (!selected) return;
+    setBoard((prev) => {
+      const list = prev[selected.col].map((t) =>
+        t.id === selected.id ? { ...t, ...taskForm } : t
+      );
+      return { ...prev, [selected.col]: list };
+    });
+    setShowTaskModal(false);
+  }
+
+  // Board filtrado por responsável (aplicado na renderização)
+  const filteredBoard: BoardState = useMemo(() => {
+    if (!filterResp) return board;
+    const out = {} as BoardState;
+    for (const col of COLS) {
+      out[col.key] = board[col.key].filter(
+        (t) => (t.responsavel || "").toLowerCase() === filterResp.toLowerCase()
+      );
+    }
+    return out;
+  }, [board, filterResp]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-neutral-950 dark:to-neutral-900 text-gray-900 dark:text-gray-100">
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 mb-6">
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold tracking-tight">Kanban – Fluxo Operacional</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Colunas definidas a partir das mensagens de 18/10/2025.
-            </p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold">Kanban – Fluxo Operacional</h1>
+            <p className="text-sm text-gray-500">Automatize e gerencie seu fluxo.</p>
           </div>
+
+          {/* Filtro por Responsável */}
           <div className="flex items-center gap-2">
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filtrar cards..."
-              className="text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400/40 w-56"
-            />
-            <button
-              onClick={seedDemo}
-              className="text-sm px-3 py-2 rounded-xl border border-gray-300 dark:border-neutral-700 hover:bg-white dark:hover:bg-neutral-800"
+            <label className="text-sm text-gray-600 dark:text-gray-300">Responsável</label>
+            <select
+              value={filterResp}
+              onChange={(e) => setFilterResp(e.target.value)}
+              className="text-sm rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2"
+              title="Filtrar por responsável"
             >
-              popular demo
-            </button>
+              <option value="">Todos</option>
+              {responsaveis.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+            {filterResp && (
+              <button
+                onClick={() => setFilterResp("")}
+                className="text-sm px-3 py-2 rounded-lg border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
+                title="Limpar filtro"
+              >
+                Limpar
+              </button>
+            )}
+
             <button
-              onClick={resetBoard}
-              className="text-sm px-3 py-2 rounded-xl border border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50/60 dark:hover:bg-red-950/40"
+              onClick={() => setShowModal(true)}
+              className="ml-3 px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             >
-              limpar
+              + Criar Automação
             </button>
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="hscroll overflow-x-auto">
+        <div className="overflow-x-auto">
           <div className="flex gap-4 min-w-max pb-2">
             {COLS.map((c) => (
               <Column
                 key={c.key}
                 label={c.label}
                 colKey={c.key}
-                tasks={filtered[c.key]}
+                tasks={filteredBoard[c.key]}
                 onDropTask={moveTask}
                 onAddTask={addTask}
                 onDeleteTask={deleteTask}
+                onOpenTask={openTaskModal}
               />
             ))}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-8 text-[11px] text-gray-400">
-          Dica: arraste um card para mudar de coluna. Os dados ficam no seu navegador (localStorage).
-        </div>
+        {/* Modal: Nova Automação */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[400px] shadow-lg">
+              <h2 className="text-lg font-semibold mb-4">Nova Automação</h2>
+              <label className="block text-sm mb-1">Título</label>
+              <input
+                value={automation.title}
+                onChange={(e) => setAutomation({ ...automation, title: e.target.value })}
+                className="w-full mb-3 rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+              />
+
+              <label className="block text-sm mb-1">Horário (HH:MM)</label>
+              <input
+                type="time"
+                value={automation.time}
+                onChange={(e) => setAutomation({ ...automation, time: e.target.value })}
+                className="w-full mb-3 rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+              />
+
+              <label className="block text-sm mb-1">Coluna destino</label>
+              <select
+                value={automation.col}
+                onChange={(e) =>
+                  setAutomation({ ...automation, col: e.target.value as ColumnKey })
+                }
+                className="w-full mb-4 rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+              >
+                {COLS.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-neutral-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveAutomation}
+                  className="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Detalhes/Edição do Card */}
+        {showTaskModal && selected && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[520px] shadow-lg">
+              <h2 className="text-lg font-semibold mb-4">Detalhes do Card</h2>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-sm mb-1">Título</label>
+                  <input
+                    value={taskForm.title}
+                    onChange={(e) =>
+                      setTaskForm({ ...taskForm, title: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm mb-1">Descrição</label>
+                  <textarea
+                    value={taskForm.desc}
+                    onChange={(e) =>
+                      setTaskForm({ ...taskForm, desc: e.target.value })
+                    }
+                    rows={4}
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm mb-1">Responsável</label>
+                  <input
+                    value={taskForm.responsavel}
+                    onChange={(e) =>
+                      setTaskForm({ ...taskForm, responsavel: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm mb-1">Prazo</label>
+                  <input
+                    type="date"
+                    value={taskForm.due}
+                    onChange={(e) =>
+                      setTaskForm({ ...taskForm, due: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm mb-1">Prioridade</label>
+                  <select
+                    value={taskForm.prioridade}
+                    onChange={(e) =>
+                      setTaskForm({
+                        ...taskForm,
+                        prioridade: e.target.value as "baixa" | "media" | "alta",
+                      })
+                    }
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                  >
+                    <option value="baixa">Baixa</option>
+                    <option value="media">Média</option>
+                    <option value="alta">Alta</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => setShowTaskModal(false)}
+                  className="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-neutral-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveTaskModal}
+                  className="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
