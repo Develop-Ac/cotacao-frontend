@@ -419,7 +419,7 @@ export default function Tela() {
                               rel="noopener noreferrer"
                               title="Abrir PDF (com marca)"
                             >
-                              PDF c/ marca
+                              C/ marca
                             </a>
 
                             {/* PDF sem MARCA */}
@@ -430,7 +430,7 @@ export default function Tela() {
                               rel="noopener noreferrer"
                               title="Abrir PDF (sem marca)"
                             >
-                              PDF s/ marca
+                              S/ marca
                             </a>
                           </div>
                         </td>
