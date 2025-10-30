@@ -276,7 +276,7 @@ export default function ComparativoPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
+      const res = await fetch(`https://intranetbackend.acacessorios.local/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
       if (!res.ok) {
         let emsg = `HTTP ${res.status}`;
         try {
