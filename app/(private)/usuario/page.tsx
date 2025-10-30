@@ -33,7 +33,7 @@ export default function Login() {
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch("https://intranetbackend.acacessorios.local/usuarios", {
+      const response = await fetch("${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/usuarios", {
         method: "POST",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ nome, email, senha }),

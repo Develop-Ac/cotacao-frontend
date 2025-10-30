@@ -11,7 +11,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('https://intranetbackend.acacessorios.local/login', {
+      const response = await fetch('${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/login', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',

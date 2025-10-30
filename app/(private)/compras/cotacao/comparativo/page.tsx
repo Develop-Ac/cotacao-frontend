@@ -31,7 +31,7 @@ type ApiResponseTodos = {
 };
 
 // ====== CONFIG do endpoint de salvamento ======
-const SAVE_URL = "https://intranetbackend.acacessorios.local/compras/pedido";
+const SAVE_URL = `${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/compras/pedido`;
 
 // --- utils ---
 const parseMoney = (v: string | number | null | undefined): number | null => {
@@ -112,6 +112,43 @@ export default function ComparativoPage() {
     fornecedor: string;
     value: number | null;
   } | null>(null);
+
+  // ===== Modal de observações (clicando no cabeçalho do fornecedor) =====
+  const [obsOpen, setObsOpen] = useState(false);
+  const [obsLoading, setObsLoading] = useState(false);
+  const [obsError, setObsError] = useState<string | null>(null);
+  const [obsData, setObsData] = useState<any>(null);
+  const [obsTarget, setObsTarget] = useState<{ for_codigo: number; for_nome: string } | null>(null);
+
+  const openObservacao = async (f: ApiFornecedor) => {
+    if (!pedidoCarregado) return;
+    setObsOpen(true);
+    setObsLoading(true);
+    setObsError(null);
+    setObsData(null);
+    setObsTarget({ for_codigo: f.for_codigo, for_nome: f.for_nome });
+    try {
+      const url = `${process.env.NEXT_PUBLIC_URL_APP}/api/cotacao/observacao?pedido_cotacao=${encodeURIComponent(
+        pedidoCarregado
+      )}&for_codigo=${encodeURIComponent(f.for_codigo)}`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) {
+        let emsg = `HTTP ${res.status}`;
+        try {
+          const e = await res.json();
+          if (e?.error) emsg = e.error;
+          else if (e?.message) emsg = e.message;
+        } catch {}
+        throw new Error(emsg);
+      }
+      const data = await res.json();
+      setObsData(data);
+    } catch (e: any) {
+      setObsError(e?.message || "Falha ao buscar observação.");
+    } finally {
+      setObsLoading(false);
+    }
+  };
 
   // mapa com TODOS os campos do ApiItem por produto×fornecedor (para o payload)
   const [itemDetailsByPF, setItemDetailsByPF] = useState<
@@ -239,9 +276,7 @@ export default function ComparativoPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`https://intranetbackend.acacessorios.local/compras/cotacao-sync/${encodeURIComponent(p)}`, {
-        headers: { Accept: "application/json" },
-      });
+      const res = await fetch(`${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
       if (!res.ok) {
         let emsg = `HTTP ${res.status}`;
         try {
@@ -643,10 +678,17 @@ export default function ComparativoPage() {
                     <th>Descrição</th>
                     {fornecedoresOrd.map((f) => (
                       <th key={f.for_codigo} style={{ width: 260 }} className="text-right">
-                        <div className="flex flex-col items-end">
-                          <span className="truncate max-w-[240px]" title={f.for_nome}>{f.for_nome}</span>
+                        <button
+                          type="button"
+                          onClick={() => openObservacao(f)}
+                          className="group flex w-full flex-col items-end text-right"
+                          title="Clique para ver observações do fornecedor"
+                        >
+                          <span className="truncate max-w-[240px] underline decoration-dotted underline-offset-2 group-hover:underline" title={f.for_nome}>
+                            {f.for_nome}
+                          </span>
                           <span className="text-xs text-gray-500">#{f.for_codigo}</span>
-                        </div>
+                        </button>
                       </th>
                     ))}
                   </tr>
@@ -760,6 +802,51 @@ export default function ComparativoPage() {
         )}
       </div>
 
+      {/* ===== Modal de observações do fornecedor ===== */}
+      {obsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setObsOpen(false)} />
+          <div className="relative z-10 w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
+            <div className="mb-3 flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Observações do fornecedor</h3>
+                {obsTarget && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    {obsTarget.for_nome} <span className="text-gray-500">#{obsTarget.for_codigo}</span> • Pedido {pedidoCarregado}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setObsOpen(false)}
+                className="h-9 w-9 rounded-md hover:bg-gray-100"
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+              {obsLoading && <div className="text-gray-600">Carregando...</div>}
+              {!obsLoading && obsError && (
+                <div className="text-red-700">{obsError}</div>
+              )}
+              {!obsLoading && !obsError && (
+                <ObservacaoContent data={obsData} />
+              )}
+            </div>
+
+            <div className="mt-4 flex items-center justify-end">
+              <button
+                onClick={() => setObsOpen(false)}
+                className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-gray-700 hover:bg-gray-50"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== Modal de edição de preço ===== */}
       {editOpen && editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -838,5 +925,41 @@ function Legend() {
         <span className="text-gray-600">Clique no valor para editar. O valor editado é enviado para a API.</span>
       </div>
     </div>
+  );
+}
+
+// Renderiza conteúdo da observação de forma resiliente
+function ObservacaoContent({ data }: { data: any }) {
+  if (data == null) {
+    return <div className="text-gray-500">Sem observações.</div>;
+  }
+  if (typeof data === "string") {
+    return <div className="whitespace-pre-wrap">{data || "Sem observações."}</div>;
+  }
+  if (Array.isArray(data)) {
+    if (data.length === 0) return <div className="text-gray-500">Sem observações.</div>;
+    // Tenta extrair campos comuns
+    return (
+      <ul className="list-disc pl-5 space-y-1">
+        {data.map((it, idx) => {
+          const txt =
+            typeof it === "string"
+              ? it
+              : it?.observacao ?? it?.obs ?? it?.descricao ?? JSON.stringify(it, null, 2);
+          return <li key={idx} className="whitespace-pre-wrap">{txt}</li>;
+        })}
+      </ul>
+    );
+  }
+  // Objeto genérico
+  const guess =
+    data?.observacao ?? data?.obs ?? data?.descricao ?? null;
+  if (guess) {
+    return <div className="whitespace-pre-wrap">{String(guess)}</div>;
+  }
+  return (
+    <pre className="whitespace-pre-wrap text-xs text-gray-700">
+      {JSON.stringify(data, null, 2)}
+    </pre>
   );
 }

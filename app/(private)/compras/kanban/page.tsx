@@ -61,7 +61,7 @@ function Card({
   return (
     <div
       onClick={() => onOpen && onOpen()}
-      className="rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 cursor-pointer"
+      className="rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 cursor-pointer"
       draggable
       onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
         const container = e.currentTarget.closest<HTMLElement>("[data-col]");
@@ -163,9 +163,9 @@ function Column({
       data-col={colKey}
       onDragOver={(e: React.DragEvent<HTMLDivElement>) => e.preventDefault()}
       onDrop={handleDrop}
-      className="flex flex-col gap-3 w-[320px] md:w-[360px] bg-white dark:bg-neutral-950 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm p-3 min-h-[280px]"
+      className="flex flex-col gap-3 w-[320px] md:w-[360px dark:bg-neutral-950 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm p-3 min-h-[280px]"
     >
-      <div className="sticky top-0 bg-white/80 dark:bg-neutral-950/80 backdrop-blur rounded-xl px-2 py-2 flex items-center justify-between">
+      <div className="sticky top-0  dark:bg-neutral-950/80 backdrop-blur rounded-xl px-2 py-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold">{label}</h3>
         <span className="text-xs text-gray-400">{tasks.length}</span>
       </div>
