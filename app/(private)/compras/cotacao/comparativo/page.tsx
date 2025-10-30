@@ -128,7 +128,7 @@ export default function ComparativoPage() {
     setObsData(null);
     setObsTarget({ for_codigo: f.for_codigo, for_nome: f.for_nome });
     try {
-      const url = `https://intranetbackend.acacessorios.local=https://intranet-cotacao-fornecedor.naayqg.easypanel.host/api/cotacao/observacao?pedido_cotacao=${encodeURIComponent(
+      const url = `https://intranet-cotacao-fornecedor.naayqg.easypanel.host/api/cotacao/observacao?pedido_cotacao=${encodeURIComponent(
         pedidoCarregado
       )}&for_codigo=${encodeURIComponent(f.for_codigo)}`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
