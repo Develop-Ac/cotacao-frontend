@@ -34,15 +34,23 @@ type PaginatedResponse<T> = {
 };
 
 type AvariaImage = {
-  fotoBase64: string;      // "data:image/...;base64,...." ou somente base64
+  fotoKey: string;      // Nova propriedade: key da imagem
   peca: string | null;
   observacoes: string | null;
   tipo: string | null;
+  imageUrl?: string;    // URL temporária da imagem
+};
+
+type ImageUrlResponse = {
+  ok: boolean;
+  url: string;
 };
 
 const API_BASE = "https://intranetbackend.acacessorios.local/oficina/checklists";
 // endpoint das imagens (controller /img/:id)
 const IMG_API_BASE = "https://intranetbackend.acacessorios.local/oficina/img";
+// nova URL para buscar URLs das imagens
+const UPLOADS_API_BASE = "https://intranetbackend.acacessorios.local/oficina/uploads/avarias/url";
 
 export default function ChecklistsList() {
   // ====== PADRÕES DE BOTÃO ======
@@ -363,6 +371,27 @@ export default function ChecklistsList() {
     }
   }
 
+  // ---------- Nova função para buscar URL da imagem ----------
+  async function fetchImageUrl(key: string, signal?: AbortSignal): Promise<string | null> {
+    try {
+      const res = await fetch(`${UPLOADS_API_BASE}?key=${encodeURIComponent(key)}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Erro HTTP: ${res.status}`);
+      }
+
+      const json: ImageUrlResponse = await res.json();
+      return json.ok ? json.url : null;
+    } catch (e) {
+      console.error("Erro ao buscar URL da imagem:", e);
+      return null;
+    }
+  }
+
   // ---------- Galeria: abrir/fechar/navegar/baixar ----------
   async function openGallery(checklistId: string) {
     // abort anterior
@@ -393,14 +422,31 @@ export default function ChecklistsList() {
       }
       const json = await res.json();
       const data = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
+      
+      // Mapear os itens usando a nova estrutura
       const items: AvariaImage[] = (data as any[]).map((x) => ({
-        fotoBase64: x.fotoBase64,
+        fotoKey: x.fotoBase64 || x.fotoKey, // Aceita ambos os nomes por compatibilidade
         peca: x.peca ?? null,
         observacoes: x.observacoes ?? null,
         tipo: x.tipo ?? null,
       }));
+      
       setGalleryItems(items);
       setGalleryIndex(0);
+
+      // Buscar URLs das imagens
+      for (let i = 0; i < items.length; i++) {
+        if (ctrl.signal.aborted) break;
+        
+        const imageUrl = await fetchImageUrl(items[i].fotoKey, ctrl.signal);
+        if (imageUrl && !ctrl.signal.aborted) {
+          setGalleryItems(currentItems => 
+            currentItems.map((item, index) => 
+              index === i ? { ...item, imageUrl } : item
+            )
+          );
+        }
+      }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         setGalleryError(e?.message || "Falha ao carregar imagens");
@@ -425,26 +471,44 @@ export default function ChecklistsList() {
     setGalleryIndex((i) => (i >= galleryItems.length - 1 ? 0 : i + 1));
   }
 
-  function normalizeDataUrl(fotoBase64: string): string {
-    if (!fotoBase64) return "";
-    if (fotoBase64.startsWith("data:image/")) return fotoBase64;
-    // se vier só o base64 puro, assuma jpeg
-    return `data:image/jpeg;base64,${fotoBase64}`;
-  }
-
-  function downloadCurrentImage() {
+  async function downloadCurrentImage() {
     const cur = galleryItems[galleryIndex];
-    if (!cur?.fotoBase64) return;
-    const dataUrl = normalizeDataUrl(cur.fotoBase64);
+    if (!cur?.fotoKey) return;
 
-    // gera arquivo
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
-    a.download = `avaria-${ts}-${galleryIndex + 1}.jpg`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    try {
+      // Se já temos a URL, usa ela
+      let imageUrl = cur.imageUrl;
+      
+      // Se não temos a URL, busca
+      if (!imageUrl) {
+        const fetchedUrl = await fetchImageUrl(cur.fotoKey);
+        if (!fetchedUrl) {
+          alert("Não foi possível obter a URL da imagem");
+          return;
+        }
+        imageUrl = fetchedUrl;
+      }
+
+      // Baixa a imagem
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement("a");
+      a.href = url;
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      a.download = `avaria-${ts}-${galleryIndex + 1}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("Erro ao baixar imagem:", msg);
+      alert("Erro ao baixar imagem: " + msg);
+    }
   }
 
   const pageSizes: (10 | 20 | 50)[] = [10, 20, 50];
@@ -729,11 +793,15 @@ export default function ChecklistsList() {
                       </button>
 
                       {/* imagem */}
-                      <img
-                        src={normalizeDataUrl(galleryItems[galleryIndex].fotoBase64)}
-                        alt="Avaria"
-                        className="max-h-full max-w-full object-contain"
-                      />
+                      {galleryItems[galleryIndex]?.imageUrl ? (
+                        <img
+                          src={galleryItems[galleryIndex].imageUrl}
+                          alt="Avaria"
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-gray-500">Carregando imagem...</div>
+                      )}
 
                       {/* seta direita */}
                       <button
@@ -768,14 +836,14 @@ export default function ChecklistsList() {
                       <div className="text-sm text-gray-600 mb-2">Informações da avaria</div>
                       <dl className="text-sm">
                         <dt className="font-semibold">Tipo</dt>
-                        <dd className="mb-2">{galleryItems[galleryIndex].tipo ?? "—"}</dd>
+                        <dd className="mb-2">{galleryItems[galleryIndex]?.tipo ?? "—"}</dd>
 
                         <dt className="font-semibold">Peça</dt>
-                        <dd className="mb-2">{galleryItems[galleryIndex].peca ?? "—"}</dd>
+                        <dd className="mb-2">{galleryItems[galleryIndex]?.peca ?? "—"}</dd>
 
                         <dt className="font-semibold">Observações</dt>
                         <dd className="mb-2 whitespace-pre-wrap break-words">
-                          {galleryItems[galleryIndex].observacoes ?? "—"}
+                          {galleryItems[galleryIndex]?.observacoes ?? "—"}
                         </dd>
                       </dl>
                     </div>
@@ -785,6 +853,7 @@ export default function ChecklistsList() {
                         className={BTN + " w-full"}
                         onClick={downloadCurrentImage}
                         title="Baixar esta imagem"
+                        disabled={!galleryItems[galleryIndex]?.imageUrl}
                       >
                         <FaDownload />
                         Baixar imagem
