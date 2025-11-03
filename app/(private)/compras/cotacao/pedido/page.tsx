@@ -47,7 +47,7 @@ export default function Tela() {
     if (!p) return setMsgCot("Informe o pedido de cotação.");
     setLoadingCot(true);
     try {
-      const url = `${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
+      const url = `https://intranetbackend.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
