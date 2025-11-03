@@ -437,6 +437,8 @@ export default function ChecklistsList() {
       // Buscar URLs das imagens
       for (let i = 0; i < items.length; i++) {
         if (ctrl.signal.aborted) break;
+
+        console.log("Buscando URL para fotoKey:", items[i].fotoKey);
         
         const imageUrl = await fetchImageUrl(items[i].fotoKey, ctrl.signal);
         if (imageUrl && !ctrl.signal.aborted) {
