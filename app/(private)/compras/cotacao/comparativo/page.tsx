@@ -31,7 +31,7 @@ type ApiResponseTodos = {
 };
 
 // ====== CONFIG do endpoint de salvamento ======
-const SAVE_URL = `${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/compras/pedido`;
+const SAVE_URL = `https://intranetbackend.acacessorios.local/compras/pedido`;
 
 // --- utils ---
 const parseMoney = (v: string | number | null | undefined): number | null => {

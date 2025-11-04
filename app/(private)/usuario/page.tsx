@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 export default function Login() {
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [setor, setSetor] = useState("");
   const [senha, setSenha] = useState("");
 
   // === CLASSES REUTILIZÁVEIS ===
@@ -25,19 +26,48 @@ export default function Login() {
   type Usuario = {
     id: string;
     nome: string;
-    email: string;
+    codigo?: string;
+    setor: string;
     senha?: string;
   };
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
 
+  // Função para carregar usuários
+  const carregarUsuarios = async () => {
+    try {
+      const response = await fetch("https://intranetbackend.acacessorios.local/usuarios", {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setUsuarios(data);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error("Erro ao carregar usuários:", msg);
+      alert("Erro ao carregar usuários: " + msg);
+    }
+  };
+
+  // Carregar usuários ao montar o componente
+  useEffect(() => {
+    carregarUsuarios();
+  }, []);
+
   const handleSubmit = async () => {
     try {
-      const response = await fetch("${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/usuarios", {
+      const response = await fetch("https://intranetbackend.acacessorios.local/usuarios", {
         method: "POST",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, email, senha }),
+        body: JSON.stringify({ nome, codigo, setor, senha }),
       });
+
+      console.log(JSON.stringify({ nome, codigo, setor, senha }))
 
       if (!response.ok) {
         let msg = `Erro HTTP: ${response.status}`;
@@ -50,8 +80,11 @@ export default function Login() {
 
       try { await response.json(); } catch {}
 
-      setNome(""); setEmail(""); setSenha("");
+      setNome(""); setCodigo(""); setSetor(""); setSenha("");
       setFormularioAberto(false);
+      
+      // Recarregar a lista de usuários após criar um novo
+      await carregarUsuarios();
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error("Erro ao criar usuário:", msg);
@@ -59,42 +92,9 @@ export default function Login() {
     }
   };
 
-  async function listarUsuarios(): Promise<any[]> {
+  const deletarUsuario = async (id: string) => {
     try {
-      const response = await fetch("http://localhost:8000/usuarios", {
-        method: "GET",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        let msg = `Erro HTTP: ${response.status}`;
-        try {
-          const errJson = await response.json();
-          if (errJson?.message) msg = errJson.message;
-        } catch {}
-        throw new Error(msg);
-      }
-
-      const text = await response.text();
-      if (!text) return [];
-      return JSON.parse(text);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error("Erro ao listar usuários:", msg);
-      return [];
-    }
-  }
-
-  useEffect(() => {
-    (async () => {
-      const usuarios = await listarUsuarios();
-      setUsuarios(Array.isArray(usuarios) ? usuarios : []);
-    })();
-  }, []);
-
-  async function deletarUsuario(usuario_id: any) {
-    try {
-      const response = await fetch(`http://localhost:8000/usuarios/${usuario_id}`, {
+      const response = await fetch(`https://intranetbackend.acacessorios.local/usuarios/${id}`, {
         method: "DELETE",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
       });
@@ -108,27 +108,24 @@ export default function Login() {
         throw new Error(msg);
       }
 
-      try { await response.json(); } catch {}
-      alert("Usuário deletado com sucesso!");
-      return true;
+      // Remove o usuário da lista local
+      setUsuarios(usuarios.filter(usuario => usuario.id !== id));
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error("Erro ao deletar usuário:", msg);
       alert(msg || "Erro ao deletar usuário");
-      return false;
     }
-  }
+  };
 
   return (
     <div className="main-panel min-h-screen text-black">
       <div className="content-wrapper p-2">
 
-        {/* Page header */}
+        {/* Page header - permanece igual */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <h3 className="text-2xl font-semibold mb-3 md:mb-0">Cadastro de Usuários</h3>
 
           <div className="flex gap-6">
-            {/* Novo */}
             <div className="flex flex-col items-center mr-2">
               <button
                 id="form_new_menu"
@@ -141,7 +138,6 @@ export default function Login() {
               <span className="text-xs text-gray-700 mt-1">NOVO</span>
             </div>
 
-            {/* Lixeira */}
             <div className="flex flex-col items-center mr-2">
               <button
                 id="form_trash_menu"
@@ -155,40 +151,57 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Cadastro */}
+        {/* Cadastro - MODIFICADO */}
         {formularioAberto && (
           <div id="screen" className="mb-10">
             <div className="w-full">
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <form className="space-y-4">
                   <div>
-                    <label htmlFor="name" className="block font-medium">Name</label>
+                    <label htmlFor="name" className="block font-medium">Nome</label>
                     <input
                       type="text"
                       id="name"
-                      placeholder="Name"
+                      placeholder="Nome"
                       value={nome}
                       onChange={e => setNome(e.target.value)}
                       className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label htmlFor="email" className="block font-medium">Email address</label>
+                    <label htmlFor="codigo" className="block font-medium">Código de Usuário</label>
                     <input
-                      type="email"
-                      id="email"
-                      placeholder="Email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
+                      type="text"
+                      id="codigo"
+                      placeholder="Código de Usuário"
+                      value={codigo}
+                      onChange={e => setCodigo(e.target.value)}
                       className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label htmlFor="password" className="block font-medium">Password</label>
+                    <label htmlFor="setor" className="block font-medium">Setor</label>
+                    <select
+                      id="setor"
+                      value={setor}
+                      onChange={e => setSetor(e.target.value)}
+                      className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Selecione um setor</option>
+                      <option value="Estoque">Estoque</option>
+                      <option value="Oficina">Oficina</option>
+                      <option value="Compras">Compras</option>
+                      <option value="Administrativo">Administrativo</option>
+                      <option value="Admin">Admin</option>
+                      <option value="TI">TI</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="password" className="block font-medium">Senha</label>
                     <input
                       type="password"
                       id="password"
-                      placeholder="Password"
+                      placeholder="Senha"
                       value={senha}
                       onChange={e => setSenha(e.target.value)}
                       className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
@@ -196,8 +209,8 @@ export default function Login() {
                   </div>
 
                   <div className="flex gap-2">
-                    <button type="button" className={BTN} onClick={handleSubmit}>Submit</button>
-                    <button type="button" className="h-12 px-6 inline-flex items-center justify-center rounded bg-gray-200 text-gray-700">Cancel</button>
+                    <button type="button" className={BTN} onClick={handleSubmit}>Salvar</button>
+                    <button type="button" className="h-12 px-6 inline-flex items-center justify-center rounded bg-gray-200 text-gray-700">Cancelar</button>
                   </div>
                 </form>
               </div>
@@ -205,20 +218,18 @@ export default function Login() {
           </div>
         )}
 
-        {/* Listagem */}
+        {/* Listagem - atualizada para mostrar código e setor */}
         <div id="list">
           <div className="w-full">
             <div className="bg-white rounded-xl shadow-lg p-6">
 
-              {/* Action Bar */}
+              {/* Action Bar - permanece igual */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
-                {/* Filtro */}
                 <button className={BTN}>
                   <FaFilter />
                   <span>Filtro Avançado</span>
                 </button>
 
-                {/* Busca */}
                 <div className="flex flex-1 max-w-xl mx-2">
                   <input
                     type="text"
@@ -228,17 +239,15 @@ export default function Login() {
                   <button className={`${BTN} rounded-l-none`}>Pesquisar</button>
                 </div>
 
-                {/* PDF e recarregar */}
                 <div className="flex items-center gap-2">
                   <button className={BTN}>
                     <FaFilePdf />
                     <span>PDF</span>
                   </button>
-                  <button className={BTN}>
+                  <button className={BTN} onClick={carregarUsuarios}>
                     <FaSync />
                   </button>
 
-                  {/* Paginação */}
                   <div className="relative">
                     <button className={BTN}>
                       <span className="mr-1">10</span>
@@ -246,7 +255,6 @@ export default function Login() {
                     </button>
                   </div>
 
-                  {/* Colunas */}
                   <div className="relative">
                     <button className={BTN}>
                       <FaListUl className="mr-1" />
@@ -256,7 +264,7 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Table */}
+              {/* Table - MODIFICADA */}
               <div className="overflow-x-auto">
                 <table className="min-w-full">
                   <thead>
@@ -265,32 +273,42 @@ export default function Login() {
                         <input type="checkbox" />
                       </th>
                       <th className="p-2 text-start">Nome</th>
-                      <th className="p-2 text-start">Email</th>
+                      <th className="p-2 text-start">Código</th>
+                      <th className="p-2 text-start">Setor</th>
                       <th className="p-2 text-center" style={{ width: "100px" }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {usuarios.map((usuario, idx) => (
-                      <tr key={idx} className="border-t">
-                        <td className="p-4">
-                          <input type="checkbox" />
-                        </td>
-                        <td className="p-4">{usuario.nome}</td>
-                        <td className="p-4">{usuario.email}</td>
-                        <td className="p-4 text-center">
-                          <button className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded" title="Editar">
-                            <FaEdit style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px"}}/>
-                          </button>
-                          <button
-                            className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded"
-                            title="Lixeira"
-                            onClick={() => deletarUsuario(usuario.id)}
-                          >
-                            <FaTrash style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px"}}/>
-                          </button>
+                    {usuarios.length > 0 ? (
+                      usuarios.map((usuario, idx) => (
+                        <tr key={usuario.id} className="border-t">
+                          <td className="p-4">
+                            <input type="checkbox" />
+                          </td>
+                          <td className="p-4">{usuario.nome}</td>
+                          <td className="p-4">{usuario.codigo || "-"}</td>
+                          <td className="p-4">{usuario.setor}</td>
+                          <td className="p-4 text-center">
+                            <button className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded" title="Editar">
+                              <FaEdit style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px"}}/>
+                            </button>
+                            <button
+                              className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded"
+                              title="Lixeira"
+                              onClick={() => deletarUsuario(usuario.id)}
+                            >
+                              <FaTrash style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px"}}/>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center text-gray-500">
+                          Nenhum usuário encontrado
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
