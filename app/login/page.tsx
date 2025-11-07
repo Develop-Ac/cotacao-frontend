@@ -5,29 +5,30 @@ import logo from '../logo.svg';
 import Image from 'next/image';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [codigo, setCodigo] = useState('');
   const [senha, setSenha] = useState('');
   const router = useRouter();
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('${(process.env as any).URL_API || process.env.NEXT_PUBLIC_URL_API}/login', {
+      const response = await fetch('https://intranetbackend.acacessorios.local/login', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ email, senha }), // senha deve ter o mesmo nome que o backend espera
+        body: JSON.stringify({ codigo, senha }), // senha deve ter o mesmo nome que o backend espera
       });
 
       const data = await response.json();
 
-      console.log(data.success)
+      console.log("Login response:", data.success)
 
       if (data.success) {
         // Login bem-sucedido → salva no localStorage
         localStorage.setItem('auth', 'true');
+        localStorage.setItem('userData', JSON.stringify(data));
         router.push('/');
       } else {
         alert(data.message || 'Login inválido');
@@ -55,9 +56,9 @@ export default function Login() {
     <h6 className="text-gray-500 font-light mb-6 text-center">Entre com sua conta</h6>
     <form className="flex flex-col items-center gap-3">
       <input
-        type="email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
+        type="text"
+        value={codigo}
+        onChange={e => setCodigo(e.target.value)}
         placeholder="Email"
         className="rounded border border-gray-300 px-4 py-3 text-base w-80 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />

@@ -13,6 +13,7 @@ import { MdFullscreen } from "react-icons/md";
 import { MdPowerSettingsNew } from "react-icons/md";
 import { MdMenu } from "react-icons/md";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,34 @@ export default function RootLayout({
 }) {
 
   const router = useRouter();
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    // Carrega os dados do usuário do localStorage
+    const userDataFromStorage = localStorage.getItem('userData');
+    if (userDataFromStorage) {
+      setUserData(JSON.parse(userDataFromStorage));
+    }
+  }, []);
+
+  const hasAccessToModule = (module: string): boolean => {
+    if (!userData || !userData.setor) return false;
+    
+    // Admin tem acesso a tudo
+    if (userData.setor === 'Admin') return true;
+    
+    // Mapear módulos por setor
+    const moduleAccess: { [key: string]: string[] } = {
+      'Compras': ['Compras'],
+      'Oficina': ['Oficina'],
+      'Estoque': ['Estoque'],
+      'Expedição': ['Expedição'],
+      'Expedicao': ['Expedição'], // Variação de escrita
+    };
+    
+    const userModules = moduleAccess[userData.setor] || [];
+    return userModules.includes(module);
+  };
 
   function deslogar() {
           localStorage.setItem('auth', 'false');
@@ -54,6 +83,13 @@ export default function RootLayout({
             <a href="index.html" className="block lg:hidden">
               <Image src={logo_mini.src} alt="logo-mini" className="h-8" width={64} height={64} />
             </a>
+            {userData && (
+              <div className="hidden md:block">
+                <span className="text-gray-700 font-medium">
+                  Olá, {userData.usuario?.split(' ')[0] || 'Usuário'}!
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button className="p-2 hover:bg-gray-100 rounded transition">
@@ -102,6 +138,7 @@ export default function RootLayout({
                 </a>
               </li>
               {/* Compras */}
+              {hasAccessToModule('Compras') && (
               <li>
                 <details className="group">
                   <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
@@ -119,8 +156,8 @@ export default function RootLayout({
                   <ul className="ml-10 mt-1 flex flex-col gap-1">
                     <li>
                      <details className="group">
-                        <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
-                          <i className="fa fa-shopping-cart mr-3 text-xl"></i>
+                        <summary className="flex items-center px-4 py-2 cursor-pointer pl-2 text-gray-700 hover:bg-blue-50 rounded transition">
+                          {/* <i className="fa fa-shopping-cart mr-3 text-xl"></i> */}
                           <span className="font-medium">Cotação</span>
                           <svg
                             className="ml-auto transition-transform group-open:rotate-90 w-4 h-4"
@@ -163,7 +200,9 @@ export default function RootLayout({
                   </ul>
                 </details>
               </li>
+              )}
               {/* Oficina */}
+              {hasAccessToModule('Oficina') && (
               <li>
                 <details className="group">
                   <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
@@ -187,6 +226,8 @@ export default function RootLayout({
                   </ul>
                 </details>
               </li>
+              )}
+               {hasAccessToModule('Estoque') && (
                <li>
                 <details className="group">
                   <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
@@ -210,8 +251,35 @@ export default function RootLayout({
                   </ul>
                 </details>
               </li>
-              {/* Sistema */}
-              {/* <li>
+              )}
+              {hasAccessToModule('Expedição') && (
+              <li>
+                <details className="group">
+                  <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
+                    <i className="fa fa-shopping-cart mr-3 text-xl"></i>
+                    <span className="font-medium">Expedição</span>
+                    <svg
+                      className="ml-auto transition-transform group-open:rotate-90 w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M9 5l7 7-7 7" />
+                    </svg>
+                  </summary>
+                  <ul className="ml-10 mt-1 flex flex-col gap-1">
+                    <li>
+                     <Link href="/expedicao/entregas" className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100">
+                      Entregas
+                    </Link>
+                    </li>
+                  </ul>
+                </details>
+              </li>
+              )}
+              {/* Sistema - Admin tem acesso sempre */}
+              {userData?.setor === 'Admin' && (
+              <li>
                 <details className="group">
                   <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
                     <i className="fa fa-gear mr-3 text-xl"></i>
@@ -233,34 +301,8 @@ export default function RootLayout({
                     </li>
                   </ul>
                 </details>
-              </li> */}
-              {/* Charts */}
-              {/* <li>
-                <details className="group">
-                  <summary className="flex items-center px-4 py-2 cursor-pointer text-gray-700 hover:bg-blue-50 rounded transition">
-                    <i className="mdi mdi-chart-bar mr-3 text-xl"></i>
-                    <span className="font-medium">Charts</span>
-                    <svg
-                      className="ml-auto transition-transform group-open:rotate-90 w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M9 5l7 7-7 7" />
-                    </svg>
-                  </summary>
-                  <ul className="ml-10 mt-1 flex flex-col gap-1">
-                    <li>
-                      <a
-                        href="pages/charts/chartjs.html"
-                        className="text-gray-600 py-1 px-2 rounded hover:bg-blue-100"
-                      >
-                        ChartJs
-                      </a>
-                    </li>
-                  </ul>
-                </details>
-              </li> */}
+              </li>
+              )}
             </ul>
           </aside>
 

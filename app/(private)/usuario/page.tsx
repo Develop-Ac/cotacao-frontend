@@ -46,6 +46,8 @@ export default function Login() {
       }
 
       const data = await response.json();
+
+      console.log("Usuários carregados:", data);
       setUsuarios(data);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -194,6 +196,7 @@ export default function Login() {
                       <option value="Administrativo">Administrativo</option>
                       <option value="Admin">Admin</option>
                       <option value="TI">TI</option>
+                      <option value="Expedição">Expedição</option>
                     </select>
                   </div>
                   <div>

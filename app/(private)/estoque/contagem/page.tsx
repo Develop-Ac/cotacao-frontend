@@ -124,7 +124,7 @@ export default function Tela() {
         
         setLoadingContagem(true);
         try {
-            const url = `http://localhost:8000/estoque/contagem?data_inicial=${encodeURIComponent(dataInicial)}&data_final=${encodeURIComponent(dataFinal)}&empresa=3`;
+            const url = `https://intranetbackend.acacessorios.local/estoque/contagem?data_inicial=${encodeURIComponent(dataInicial)}&data_final=${encodeURIComponent(dataFinal)}&empresa=3`;
             
             const res = await fetch(url, { headers: { Accept: "application/json" } });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -183,6 +183,8 @@ export default function Tela() {
 
     const salvarContagem = async () => {
         const produtosSelecionados = Array.from(itensSelecionados).map(index => itensFiltrados[index]);
+
+        const contagem_cuid = crypto.randomUUID();
         
         try {
             if (contagem1) {
@@ -190,6 +192,7 @@ export default function Tela() {
                 const payload1 = {
                     contagem: 1,
                     colaborador: usuario1?.nome,
+                    contagem_cuid: contagem_cuid,
                     produtos: produtosSelecionados
                 };
                 
@@ -208,6 +211,7 @@ export default function Tela() {
                 const payload2 = {
                     contagem: 2,
                     colaborador: usuario2?.nome,
+                    contagem_cuid: contagem_cuid,
                     produtos: produtosSelecionados
                 };
                 
@@ -226,6 +230,7 @@ export default function Tela() {
                 const payload3 = {
                     contagem: 3,
                     colaborador: usuario3?.nome,
+                    contagem_cuid: contagem_cuid,
                     produtos: produtosSelecionados
                 };
                 
@@ -637,7 +642,7 @@ export default function Tela() {
                                                 </div>
                                                 
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contagem 3:</label>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Auditoria:</label>
                                                     <select
                                                         value={contagem3}
                                                         onChange={(e) => setContagem3(e.target.value)}
