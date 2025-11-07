@@ -9,7 +9,7 @@ function makeEmbedUrl(dashboardId: number, params: Record<string, any> = {}) {
     const payload = {
         resource: { dashboard: dashboardId },
         params,              // { vendedor: "ALISSON", ... } se quiser pré-filtros
-        exp: Math.floor(Date.now()/1000) + 60*10 // expira em 10min
+        exp: Math.floor(Date.now()/1000) + 60*100000000 // expira em 10min
     };
     const token = jwt.sign(payload, METABASE_SECRET);
     return `${METABASE_SITE_URL}/embed/dashboard/${token}#bordered=true&titled=true`;
