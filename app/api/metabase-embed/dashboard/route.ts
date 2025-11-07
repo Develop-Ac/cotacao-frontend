@@ -1,29 +1,32 @@
+// app/api/metabase-embed/dashboard/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
-const METABASE_SITE_URL = "https://intranet-metabase.naayqg.easypanel.host";
-const METABASE_SECRET = "123123123"; // NUNCA hardcode
+const METABASE_SITE_URL = "https://bi.acacessorios.local";
+const METABASE_SECRET = 'cmhp8xpyq0000356orleqfl9x'; // defina no .env do servidor
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const id = Number(url.searchParams.get("id") || "0");
-  if (!id) return NextResponse.json({ error: "id inválido" }, { status: 400 });
-
-  // Pegue seus filtros por querystring e mapeie para os nomes de filtros do dashboard
-  const data = url.searchParams.get("data") || undefined;
-  const vendedor = url.searchParams.getAll("vendedor"); // múltiplos
-
-  const params: Record<string, any> = {};
-  if (data) params.data = data;
-  if (vendedor?.length) params.vendedor = vendedor;
+  // Filtros fixos conforme seu exemplo
+  const params = {
+    data: "2025-09-26~2025-10-07",
+    vendedor: [
+      "ALISSON",
+      "FERNANDO",
+      "GABRIEL",
+      "KAUA JOSE GONCALVES DA ROSA",
+      "LUCAS BARRADA",
+      "YURI",
+    ],
+    tab: "14-painel-de-vendas", // só inclua se existir filtro com esse nome no dashboard
+  };
 
   const payload = {
-    resource: { dashboard: id },
-    params,
-    exp: Math.floor(Date.now() / 1000) + 60 * 10000000, // expiração do token
+    resource: { dashboard: 18 }, // ID do dashboard
+    params,                      // os nomes DEVEM bater com os filtros do dashboard
+    exp: Math.floor(Date.now() / 1000) + 60 * 10, // 10 min
   };
 
   const token = jwt.sign(payload, METABASE_SECRET);
-  const embedUrl = `${METABASE_SITE_URL}/embed/dashboard/${token}#bordered=true&titled=true`;
-  return NextResponse.json({ url: embedUrl });
+  const url = `${METABASE_SITE_URL}/embed/dashboard/${token}#bordered=true&titled=true`;
+  return NextResponse.json({ url });
 }
