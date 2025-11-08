@@ -2,20 +2,13 @@
 import { useEffect, useState } from "react";
 
 export default function VendasAtacadoPage() {
-  const [src, setSrc] = useState<string>("");
+  const [src, setSrc] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams({
-      id: "18",                                  // ID do DASHBOARD normal
-      data: "2025-10-26~2025-11-07",
-    });
-    // múltiplos vendedores
-    ["KAUA JOSE GONCALVES DA ROSA","ALISSON","FERNANDO","GABRIEL","LUCAS BARRADA","YURI"]
-      .forEach(v => params.append("vendedor", v));
-
-    fetch(`/api/metabase-embed/dashboard?` + params.toString())
+    fetch("/api/metabase-embed/dashboard")
       .then(r => r.json())
-      .then(({ url }) => setSrc(url));
+      .then(({ url }) => setSrc(url))
+      .catch(console.error);
   }, []);
 
   if (!src) return null;
@@ -26,7 +19,6 @@ export default function VendasAtacadoPage() {
         src={src}
         className="w-full h-full border-0"
         title="Vendas Atacado"
-        // normalmente não usar sandbox para signed embed
       />
     </div>
   );
