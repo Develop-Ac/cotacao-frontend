@@ -12,6 +12,7 @@ type CotacaoItem = {
   REFERENCIA: string;
   UNIDADE: string;
   QUANTIDADE: number;
+  DT_ULTIMA_COMPRA: string | null;
 };
 
 type PedidoResumo = {
@@ -95,6 +96,7 @@ export default function Tela() {
           REFERENCIA: it.REFERENCIA ?? null,
           UNIDADE: it.UNIDADE ?? null,
           QUANTIDADE: Number(it.QUANTIDADE),
+          DT_ULTIMA_COMPRA: it.DT_ULTIMA_COMPRA ?? null,
         })),
       };
 
