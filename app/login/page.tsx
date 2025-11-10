@@ -13,27 +13,19 @@ export default function Login() {
     try {
       const response = await fetch('https://intranetbackend.acacessorios.local/login', {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ codigo, senha }), // senha deve ter o mesmo nome que o backend espera
+        body: JSON.stringify({ codigo, senha }),
       });
 
       const data = await response.json();
-
-      console.log("Login response:", data.success)
-
       if (data.success) {
-        // Login bem-sucedido → salva no localStorage
         localStorage.setItem('auth', 'true');
         localStorage.setItem('userData', JSON.stringify(data));
         router.push('/');
       } else {
         alert(data.message || 'Login inválido');
       }
-
     } catch (error) {
       console.error('Erro no login:', error);
       alert('Erro ao conectar ao servidor');
@@ -41,57 +33,64 @@ export default function Login() {
   };
 
   return (
-  <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-  <div className="bg-white shadow rounded-lg px-8 py-10" style={{ minWidth: 340, maxWidth: 400 }}>
-    <div className="flex justify-center mb-6">
-      <Image
-        src={logo.src}
-        alt="icon"
-        width={240}
-        height={120}
-        className="w-3/4"
-      />
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--background)" }}>
+      <div className="card elevated overflow-hidden w-full max-w-5xl">
+        <div className="flex flex-col md:flex-row min-h-[520px]">
+          {/* Left gradient panel (desktop) */}
+          <div className="hidden md:flex md:w-1/2 gradient-header items-center justify-center p-10">
+            <div className="text-center">
+              <div className="flex justify-center mb-6">
+                <Image src={logo.src} alt="logo" width={200} height={100} />
+              </div>
+              <h2 className="text-2xl font-bold leading-snug">Bem-vindo ao Intranet</h2>
+              <p className="opacity-90 mt-2">Acesse com suas credenciais</p>
+            </div>
+          </div>
+          {/* Right form panel */}
+          <div className="flex-1 flex items-center justify-center p-8 md:p-12 bg-white">
+            <div className="w-full max-w-sm">
+              <div className="md:hidden flex justify-center mb-6">
+                <Image src={logo.src} alt="logo" width={200} height={100} />
+              </div>
+              <h4 className="text-xl font-semibold mb-1 text-center" style={{ color: "var(--primary-800)" }}>Vamos iniciar</h4>
+              <p className="text-gray-500 text-center mb-6">Entre com sua conta</p>
+              <form className="flex flex-col gap-4">
+                <input
+                  type="text"
+                  value={codigo}
+                  onChange={e => setCodigo(e.target.value)}
+                  placeholder="Código de Usuário"
+                  className="rounded-lg border border-gray-300 px-4 py-3 text-base w-full focus:outline-none focus:ring-2 focus:ring-[color:var(--primary-600)]"
+                />
+                <input
+                  type="password"
+                  value={senha}
+                  onChange={e => setSenha(e.target.value)}
+                  placeholder="Senha"
+                  className="rounded-lg border border-gray-300 px-4 py-3 text-base w-full focus:outline-none focus:ring-2 focus:ring-[color:var(--primary-600)]"
+                />
+                <button
+                  type="button"
+                  onClick={handleLogin}
+                  className="btn-primary w-full rounded-xl mt-2 shadow-sm"
+                >
+                  Entrar
+                </button>
+              </form>
+              {/* <div className="flex justify-between items-center mt-4">
+                <label className="flex items-center text-gray-500 text-sm">
+                  <input type="checkbox" className="form-checkbox mr-2 accent-[color:var(--primary-600)]" />
+                  Manter-me conectado
+                </label>
+                <a href="#" onClick={() => alert('Recuperar senha')} className="text-[color:var(--primary-600)] hover:underline text-sm">
+                  Esqueceu a senha?
+                </a>
+              </div> */}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <h4 className="text-xl font-semibold mb-2 text-center">Olá! Vamos iniciar.</h4>
-    <h6 className="text-gray-500 font-light mb-6 text-center">Entre com sua conta</h6>
-    <form className="flex flex-col items-center gap-3">
-      <input
-        type="text"
-        value={codigo}
-        onChange={e => setCodigo(e.target.value)}
-        placeholder="Email"
-        className="rounded border border-gray-300 px-4 py-3 text-base w-80 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <input
-        type="password"
-        value={senha}
-        onChange={e => setSenha(e.target.value)}
-        placeholder="Senha"
-        className="rounded border border-gray-300 px-4 py-3 text-base w-80 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <button
-        type="button"
-        onClick={handleLogin}
-        className="w-80 bg-blue-600 hover:bg-blue-700 text-white rounded py-3 font-semibold text-base mt-2 shadow-sm transition"
-      >
-        Entrar
-      </button>
-    </form>
-    <div className="flex justify-between items-center mt-4 w-80 mx-auto">
-      <label className="flex items-center text-gray-500 text-sm">
-        <input
-          type="checkbox"
-          className="form-checkbox mr-2 accent-blue-600"
-        />
-        Manter-me conectado
-      </label>
-      <a href="#" onClick={() => alert('Recuperar senha')} className="text-blue-600 hover:underline text-sm">
-        Esqueceu a senha?
-      </a>
-    </div>
-  </div>
-</div>
-
-
   );
 }
+

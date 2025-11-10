@@ -1,25 +1,147 @@
 @import "tailwindcss";
 
+/* Base design tokens*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --background: #f7f7f8;             
+  --surface: #ffffff;
+  --foreground: #111827;             
+
+  /* Brand palette */
+  --primary-600: #3067C5;            
+  --primary-800: #0D47A1;            
+  --secondary-500: #B6C947;          
+  --success-500: #22C55E;            
+  --warning-500: #F59E0B;            
+  --danger-500: #DC2626;             
+
+  /* Shapes/spacing */
+  --radius-card: 16px;               
+  --radius-button: 9999px;           
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary-600);
+  --color-primary-dark: var(--primary-800);
+  --color-secondary: var(--secondary-500);
+  --color-success: var(--success-500);
+  --color-warning: var(--warning-500);
+  --color-danger: var(--danger-500);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground: #ededed;
+    --foreground: #e5e7eb;
+    --background: #0b0b0c;
+    --surface: #111113;
   }
 }
 
+/* Global body defaults */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Utility classes aligned with Flutter look */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: 0 6px 16px rgba(17, 24, 39, 0.06);
+}
+
+.btn-primary {
+  background: var(--primary-600);
+  color: #fff;
+  border-radius: var(--radius-button);
+  padding: 0.75rem 1.25rem;
+  font-weight: 700;
+  transition: background-color 0.15s ease, transform 0.05s ease;
+}
+.btn-primary:hover { background: var(--primary-800); }
+.btn-primary:active { transform: translateY(1px); }
+.btn-primary:disabled {
+  background: #d1d5db; /* gray-300 */
+  color: #64748b;      /* gray-500 */
+}
+
+.btn-warning { background: var(--warning-500); color: #fff; }
+.btn-success { background: var(--success-500); color: #fff; }
+
+.gradient-header {
+  background-image: linear-gradient(135deg, var(--primary-600), var(--secondary-500));
+  color: #fff;
+}
+
+.elevated {
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.12);
+}
+
+/* Collapsed sidebar behavior */
+/* Hide only text labels, keep icon wrappers visible */
+aside.collapsed summary .menu-label { display: none; }
+aside.collapsed details > ul { display: none; }
+
+/* Soft sidebar background to match logistics app */
+.sidebar-soft { background-color: #f7f5fb; }
+
+/* Global button styling override: blue background, white bold text/icons */
+/* Opt-out by adding .keep-color on the element */
+button:not(.keep-color),
+.btn:not(.keep-color),
+.btn-primary:not(.keep-color),
+.btn-success:not(.keep-color),
+.btn-warning:not(.keep-color),
+input[type="submit"]:not(.keep-color),
+a.btn:not(.keep-color),
+[role="button"]:not(.keep-color),
+/* Common anchor-as-button patterns */
+a.button:not(.keep-color),
+.button:not(.keep-color),
+a[aria-disabled][role="button"]:not(.keep-color),
+a[class*="btn"]:not(.keep-color),
+a[class*="button"]:not(.keep-color) {
+  background-color: var(--primary-600) !important; /* #3067C5 */
+  background-image: none !important; /* override tailwind gradients */
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-color: var(--primary-600) !important;
+}
+
+button:hover:not(:disabled):not(.keep-color),
+.btn:hover:not(.keep-color),
+input[type="submit"]:hover:not(.keep-color),
+a.btn:hover:not(.keep-color),
+[role="button"]:hover:not(.keep-color),
+a.button:hover:not(.keep-color),
+.button:hover:not(.keep-color),
+a[class*="btn"]:hover:not(.keep-color),
+a[class*="button"]:hover:not(.keep-color) {
+  background-color: var(--primary-800) !important; /* deeper blue */
+}
+
+button:disabled,
+input[type="submit"]:disabled,
+.btn:disabled,
+a[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Ensure icons inside buttons inherit white */
+button svg,
+.btn svg,
+input[type="submit"] svg,
+a.btn svg,
+[role="button"] svg,
+a.button svg,
+.button svg,
+a[class*="btn"] svg,
+a[class*="button"] svg {
+  color: #ffffff !important;
 }
