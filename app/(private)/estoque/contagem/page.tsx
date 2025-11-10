@@ -32,6 +32,15 @@ type ContagemListaItem = {
         nome: string;
         codigo: string;
     };
+    logs?: Array<{
+        id: string;
+        contagem_id: string;
+        usuario_id: string;
+        item_id: string;
+        estoque: number;
+        contado: number;
+        created_at: string;
+    }>;
 };
 
 type FornecedorResp = {
@@ -363,6 +372,12 @@ export default function Tela() {
     const [pageSize, setPageSize] = useState<number>(10);
     const page = 1;
 
+    // ===== Estados do modal de logs =====
+    const [modalLogsAberto, setModalLogsAberto] = useState(false);
+    const [contagemSelecionada, setContagemSelecionada] = useState<ContagemListaItem | null>(null);
+    const [logsDetalhes, setLogsDetalhes] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+
     const carregarContagensLista = async () => {
         setMsgContagensLista(null);
         setLoadingContagensLista(true);
@@ -388,6 +403,40 @@ export default function Tela() {
     useEffect(() => {
         carregarContagensLista();
     }, [pageSize]);
+
+    // ===== Função para abrir modal de logs =====
+    const abrirModalLogs = async (contagem: ContagemListaItem) => {
+        setContagemSelecionada(contagem);
+        setModalLogsAberto(true);
+        setLoadingLogs(true);
+        
+        try {
+            // Se os logs já estão na contagem (conforme o exemplo que você mostrou)
+            if ((contagem as any).logs) {
+                setLogsDetalhes((contagem as any).logs);
+            } else {
+                // Caso precise fazer uma requisição separada para buscar os logs
+                const res = await fetch(
+                    `https://intranetbackend.acacessorios.local/estoque/contagem/logs/${contagem.id}`,
+                    { headers: { Accept: "application/json" } }
+                );
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                setLogsDetalhes(data.logs || []);
+            }
+        } catch (error) {
+            console.error("Erro ao carregar logs:", error);
+            setLogsDetalhes([]);
+        } finally {
+            setLoadingLogs(false);
+        }
+    };
+
+    const fecharModalLogs = () => {
+        setModalLogsAberto(false);
+        setContagemSelecionada(null);
+        setLogsDetalhes([]);
+    };
 
     // ===== Modal fornecedor - Removido pois não é necessário para contagem de estoque =====
 
@@ -687,7 +736,7 @@ export default function Tela() {
                                             </tr>
                                         )}
                                         {contagensLista.map((item, idx) => (
-                                            <tr key={idx} className="border-t hover:bg-gray-50">
+                                            <tr key={idx} className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => abrirModalLogs(item)}>
                                                 <td className="p-3">{item.contagem}</td>
                                                 <td className="p-3">{item.usuario.nome}</td>
                                                 <td className="p-3">{item.liberado_contagem ? "Sim" : "Não"}</td>
@@ -701,6 +750,74 @@ export default function Tela() {
                     </div>
                 </div>
             </div>
+
+            {/* MODAL DE LOGS */}
+            {modalLogsAberto && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold">
+                                Logs da Contagem {contagemSelecionada?.contagem} - {contagemSelecionada?.usuario.nome}
+                            </h3>
+                            <button
+                                onClick={fecharModalLogs}
+                                className="text-gray-500 hover:text-gray-700 text-2xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {loadingLogs ? (
+                            <div className="text-center py-8">Carregando logs...</div>
+                        ) : logsDetalhes.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">Nenhum log encontrado</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50">
+                                            <th className="border border-gray-300 p-2 text-sm">Código</th>
+                                            <th className="border border-gray-300 p-2 text-sm">Descrição</th>
+                                            <th className="border border-gray-300 p-2 text-sm">Estoque</th>
+                                            <th className="border border-gray-300 p-2 text-sm">Contado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {logsDetalhes.map((log, idx) => {
+                                            const iguais = log.estoque === log.contado;
+                                            return (
+                                                <tr key={idx} className={iguais ? "bg-green-100" : "bg-red-100"}>
+                                                    <td className="border border-gray-300 p-2 text-center font-semibold">
+                                                        {log.item?.cod_produto ?? "-"}
+                                                    </td>
+                                                    <td className="border border-gray-300 p-2 text-left font-semibold">
+                                                        {log.item?.desc_produto ?? "-"}
+                                                    </td>
+                                                    <td className="border border-gray-300 p-2 text-center font-semibold">
+                                                        {log.estoque ?? "-"}
+                                                    </td>
+                                                    <td className="border border-gray-300 p-2 text-center font-semibold">
+                                                        {log.contado ?? "-"}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end mt-4">
+                            <button
+                                onClick={fecharModalLogs}
+                                className={BTN}
+                            >
+                                Fechar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL Fornecedor - Removido pois não é necessário para contagem de estoque */}
         </div>

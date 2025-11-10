@@ -34,11 +34,11 @@ type PaginatedResponse<T> = {
 };
 
 type AvariaImage = {
-  fotoKey: string;      // Nova propriedade: key da imagem
+  fotoKey: string; // Nova propriedade: key da imagem
   peca: string | null;
   observacoes: string | null;
   tipo: string | null;
-  imageUrl?: string;    // URL temporária da imagem
+  imageUrl?: string; // URL temporária da imagem
 };
 
 type ImageUrlResponse = {
@@ -71,7 +71,7 @@ export default function ChecklistsList() {
   // Filtros (aplicados no front)
   const [qOsInterna, setQOSInterna] = useState("");
   const [qPlaca, setQPlaca] = useState("");
-  const [qDataDe, setQDataDe] = useState("");   // YYYY-MM-DD
+  const [qDataDe, setQDataDe] = useState(""); // YYYY-MM-DD
   const [qDataAte, setQDataAte] = useState(""); // YYYY-MM-DD
 
   // Paginação no front
@@ -98,6 +98,12 @@ export default function ChecklistsList() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const galleryAbortRef = useRef<AbortController | null>(null);
 
+  // ====== MODAL DE EDIÇÃO CHECKLIST ======
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editData, setEditData] = useState<any | null>(null);
+
   // Fecha o dropdown ao clicar fora / Esc
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -110,6 +116,7 @@ export default function ChecklistsList() {
       if (e.key === "Escape") {
         setPageSizeOpen(false);
         if (galleryOpen) closeGallery();
+        if (editModalOpen) closeEditModal();
       }
       if (!galleryOpen) return;
       if (e.key === "ArrowLeft") prevImage();
@@ -121,7 +128,7 @@ export default function ChecklistsList() {
       document.removeEventListener("mousedown", onDocClick);
       document.removeEventListener("keydown", onKey);
     };
-  }, [galleryOpen, galleryIndex, galleryItems.length]);
+  }, [galleryOpen, galleryIndex, galleryItems.length, editModalOpen]);
 
   // Helpers
   const fmtDateTime = (iso?: string | null) => {
@@ -141,6 +148,16 @@ export default function ChecklistsList() {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   };
+
+  // 👉 helper: converte "YYYY-MM-DDTHH:mm" para ISO, se necessário
+  function toIsoIfLocal(dt?: string | null) {
+    if (!dt) return dt;
+    // já parece ISO com timezone?
+    if (/Z$|[+-]\d{2}:\d{2}$/.test(dt)) return dt;
+    // datetime-local (sem timezone)
+    const d = new Date(dt);
+    return isNaN(d.getTime()) ? dt : d.toISOString();
+  }
 
   const isDateRangeValid = useMemo(() => {
     if (!qDataDe || !qDataAte) return true;
@@ -327,7 +344,53 @@ export default function ChecklistsList() {
     URL.revokeObjectURL(url);
   };
 
-  // ---------- Download PDF ----------
+  // Função para abrir modal e buscar dados
+  async function openEditModal(osInterna: string) {
+    setEditModalOpen(true);
+    setEditLoading(true);
+    setEditError(null);
+    setEditData(null);
+    try {
+      const res = await fetch(`${API_BASE}/${encodeURIComponent(osInterna)}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+      const data = await res.json();
+      setEditData(data);
+    } catch (e: any) {
+      setEditError(e?.message || "Falha ao buscar dados");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  function closeEditModal() {
+    setEditModalOpen(false);
+    setEditData(null);
+    setEditError(null);
+  }
+
+  // Função para atualizar campo do checklist
+  function handleEditChange(field: string, value: any) {
+    setEditData((prev: any) => ({ ...prev, [field]: value }));
+  }
+
+  // Função para atualizar item do array
+  function handleEditArrayChange(
+    arrayName: string,
+    idx: number,
+    field: string,
+    value: any
+  ) {
+    setEditData((prev: any) => ({
+      ...prev,
+      [arrayName]: prev[arrayName].map((item: any, i: number) =>
+        i === idx ? { ...item, [field]: value } : item
+      ),
+    }));
+  }
+
   async function downloadChecklistPdf(id: string) {
     try {
       setDownloadingId(id);
@@ -341,9 +404,7 @@ export default function ChecklistsList() {
         try {
           const err = await res.json();
           if (err?.message)
-            msg = Array.isArray(err.message)
-              ? err.message.join(", ")
-              : err.message;
+            msg = Array.isArray(err.message) ? err.message.join(", ") : err.message;
         } catch {}
         throw new Error(msg);
       }
@@ -422,7 +483,7 @@ export default function ChecklistsList() {
       }
       const json = await res.json();
       const data = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
-      
+
       // Mapear os itens usando a nova estrutura
       const items: AvariaImage[] = (data as any[]).map((x) => ({
         fotoKey: x.fotoBase64 || x.fotoKey, // Aceita ambos os nomes por compatibilidade
@@ -430,22 +491,17 @@ export default function ChecklistsList() {
         observacoes: x.observacoes ?? null,
         tipo: x.tipo ?? null,
       }));
-      
+
       setGalleryItems(items);
       setGalleryIndex(0);
 
-      // Buscar URLs das imagens
+      // Buscar URLs das imagens (sequencial, respeitando abort)
       for (let i = 0; i < items.length; i++) {
         if (ctrl.signal.aborted) break;
-
-        console.log("Buscando URL para fotoKey:", items[i].fotoKey);
-        
         const imageUrl = await fetchImageUrl(items[i].fotoKey, ctrl.signal);
         if (imageUrl && !ctrl.signal.aborted) {
-          setGalleryItems(currentItems => 
-            currentItems.map((item, index) => 
-              index === i ? { ...item, imageUrl } : item
-            )
+          setGalleryItems((currentItems) =>
+            currentItems.map((item, index) => (index === i ? { ...item, imageUrl } : item))
           );
         }
       }
@@ -480,7 +536,7 @@ export default function ChecklistsList() {
     try {
       // Se já temos a URL, usa ela
       let imageUrl = cur.imageUrl;
-      
+
       // Se não temos a URL, busca
       if (!imageUrl) {
         const fetchedUrl = await fetchImageUrl(cur.fotoKey);
@@ -494,10 +550,10 @@ export default function ChecklistsList() {
       // Baixa a imagem
       const response = await fetch(imageUrl);
       if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
-      
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      
+
       const a = document.createElement("a");
       a.href = url;
       const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
@@ -513,6 +569,38 @@ export default function ChecklistsList() {
     }
   }
 
+  // ---------- Salvar edição (PUT) ----------
+  async function saveEditData() {
+    if (!editData?.id) return;
+    try {
+      setEditLoading(true);
+      setEditError(null);
+
+      console.log("Payload enviado no PUT:", editData);
+
+      const res = await fetch(`${API_BASE}/${encodeURIComponent(editData.id)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(editData),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Erro HTTP: ${res.status}`);
+      }
+
+      alert("Checklist atualizado com sucesso!");
+      closeEditModal();
+      fetchAll(); // Recarrega a lista após salvar
+    } catch (e: any) {
+      setEditError(e?.message || "Falha ao salvar dados");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
   const pageSizes: (10 | 20 | 50)[] = [10, 20, 50];
 
   return (
@@ -520,17 +608,10 @@ export default function ChecklistsList() {
       <div className="content-wrapper p-2">
         {/* Page header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h3 className="text-2xl font-semibold mb-3 md:mb-0">
-            Checklists (Oficina)
-          </h3>
+          <h3 className="text-2xl font-semibold mb-3 md:mb-0">Checklists (Oficina)</h3>
           <div className="flex items-center gap-2">
             {/* Recarregar */}
-            <button
-              className={BTN_SQUARE}
-              onClick={fetchAll}
-              disabled={loading}
-              title="Recarregar do servidor"
-            >
+            <button className={BTN_SQUARE} onClick={fetchAll} disabled={loading} title="Recarregar do servidor">
               <FaSync className={loading ? "animate-spin" : ""} />
             </button>
           </div>
@@ -589,21 +670,17 @@ export default function ChecklistsList() {
                       <FaCaretDown />
                     </button>
                     {pageSizeOpen && (
-                      <div
-                        className="absolute right-0 mt-2 w-28 bg-white border rounded shadow z-10"
-                        role="listbox"
-                        tabIndex={-1}
-                      >
-                        {pageSizes.map((n) => (
+                      <div className="absolute right-0 mt-2 w-28 bg-white border rounded shadow z-10" role="listbox" tabIndex={-1}>
+                        {[10, 20, 50].map((n) => (
                           <button
                             key={n}
                             role="option"
-                            aria-selected={pageSize === n}
+                            aria-selected={pageSize === (n as 10 | 20 | 50)}
                             className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${
                               pageSize === n ? "bg-gray-50 font-semibold" : ""
                             }`}
                             onClick={() => {
-                              setPageSize(n);
+                              setPageSize(n as 10 | 20 | 50);
                               setPage(1);
                               setPageSizeOpen(false);
                             }}
@@ -619,13 +696,8 @@ export default function ChecklistsList() {
 
               {/* Info topo */}
               <div className="text-sm text-gray-600 mb-2">
-                Registros carregados: <b>{rawItems.length}</b> · Filtrados:{" "}
-                <b>{filtered.length}</b>
-                {!isDateRangeValid && (
-                  <span className="ml-3 text-red-600">
-                    Intervalo de datas inválido.
-                  </span>
-                )}
+                Registros carregados: <b>{rawItems.length}</b> · Filtrados: <b>{filtered.length}</b>
+                {!isDateRangeValid && <span className="ml-3 text-red-600">Intervalo de datas inválido.</span>}
               </div>
 
               {/* Tabela */}
@@ -657,12 +729,18 @@ export default function ChecklistsList() {
                         <td className="p-4">{fmtDateTime(row.dataHoraEntrada)}</td>
                         <td className="p-4">{row.clienteNome ?? "-"}</td>
                         <td className="p-4">{row.veiculoPlaca ?? "-"}</td>
-                        <td className="p-4">
-                          {row.combustivelPercentual ?? "-"}
-                        </td>
+                        <td className="p-4">{row.combustivelPercentual ?? "-"}</td>
                         <td className="p-4">{fmtDateTime(row.createdAt)}</td>
                         <td className="p-4">
                           <div className="flex items-center justify-center gap-2">
+                            {/* VER (modal de edição) */}
+                            <button
+                              className={BTN_SQUARE}
+                              title="Ver/Editar"
+                              onClick={() => openEditModal(String(row.osInterna))}
+                            >
+                              Ver
+                            </button>
                             {/* PDF */}
                             <button
                               className={BTN_SQUARE}
@@ -670,18 +748,10 @@ export default function ChecklistsList() {
                               onClick={() => downloadChecklistPdf(String(row.id))}
                               disabled={downloadingId === String(row.id ?? "")}
                             >
-                              <FaFilePdf
-                                className={downloadingId === String(row.id ?? "") ? "opacity-60" : ""}
-                                style={{ minHeight: "24px", minWidth: "24px" }}
-                              />
+                              <FaFilePdf className={downloadingId === String(row.id ?? "") ? "opacity-60" : ""} style={{ minHeight: "24px", minWidth: "24px" }} />
                             </button>
-
                             {/* FOTOS (Galeria) */}
-                            <button
-                              className={BTN_SQUARE}
-                              title="Fotos (avarias)"
-                              onClick={() => openGallery(String(row.id))}
-                            >
+                            <button className={BTN_SQUARE} title="Fotos (avarias)" onClick={() => openGallery(String(row.id))}>
                               <FaImages style={{ minHeight: "24px", minWidth: "24px" }} />
                             </button>
                           </div>
@@ -710,22 +780,13 @@ export default function ChecklistsList() {
               {/* Paginação (front) */}
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-600">
-                  Total filtrado: <b>{filtered.length}</b> · Página <b>{page}</b> de{" "}
-                  <b>{totalPages}</b>
+                  Total filtrado: <b>{filtered.length}</b> · Página <b>{page}</b> de <b>{totalPages}</b>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    className={BTN}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1 || loading}
-                  >
+                  <button className={BTN} onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading}>
                     Anterior
                   </button>
-                  <button
-                    className={BTN}
-                    onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))}
-                    disabled={page >= totalPages || loading}
-                  >
+                  <button className={BTN} onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))} disabled={page >= totalPages || loading}>
                     Próxima
                   </button>
                 </div>
@@ -738,46 +799,27 @@ export default function ChecklistsList() {
 
       {/* ====== MODAL GALERIA ====== */}
       {galleryOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          aria-modal="true"
-          role="dialog"
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
           {/* overlay */}
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={closeGallery}
-          />
+          <div className="absolute inset-0 bg-black/60" onClick={closeGallery} />
 
           {/* content */}
           <div className="relative z-10 w-full max-w-5xl mx-4 rounded-xl bg-white shadow-2xl">
             {/* header */}
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <div className="font-semibold">
-                Galeria de fotos {galleryItems.length ? `(${galleryIndex + 1}/${galleryItems.length})` : ""}
-              </div>
-              <button
-                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100"
-                onClick={closeGallery}
-                title="Fechar"
-              >
+              <div className="font-semibold">Galeria de fotos {galleryItems.length ? `(${galleryIndex + 1}/${galleryItems.length})` : ""}</div>
+              <button className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100" onClick={closeGallery} title="Fechar">
                 <FaTimes />
               </button>
             </div>
 
             {/* body */}
             <div className="p-4">
-              {galleryLoading && (
-                <div className="py-16 text-center text-gray-600">Carregando imagens...</div>
-              )}
-              {galleryError && (
-                <div className="py-16 text-center text-red-600">{galleryError}</div>
-              )}
+              {galleryLoading && <div className="py-16 text-center text-gray-600">Carregando imagens...</div>}
+              {galleryError && <div className="py-16 text-center text-red-600">{galleryError}</div>}
 
               {!galleryLoading && !galleryError && galleryItems.length === 0 && (
-                <div className="py-16 text-center text-gray-600">
-                  Nenhuma imagem encontrada para este checklist.
-                </div>
+                <div className="py-16 text-center text-gray-600">Nenhuma imagem encontrada para este checklist.</div>
               )}
 
               {!galleryLoading && !galleryError && galleryItems.length > 0 && (
@@ -786,31 +828,19 @@ export default function ChecklistsList() {
                   <div className="lg:col-span-8">
                     <div className="relative w-full aspect-[4/3] bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center">
                       {/* seta esquerda */}
-                      <button
-                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100"
-                        onClick={prevImage}
-                        title="Anterior"
-                      >
+                      <button className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100" onClick={prevImage} title="Anterior">
                         <FaChevronLeft />
                       </button>
 
                       {/* imagem */}
                       {galleryItems[galleryIndex]?.imageUrl ? (
-                        <img
-                          src={galleryItems[galleryIndex].imageUrl}
-                          alt="Avaria"
-                          className="max-h-full max-w-full object-contain"
-                        />
+                        <img src={galleryItems[galleryIndex].imageUrl} alt="Avaria" className="max-h-full max-w-full object-contain" />
                       ) : (
                         <div className="text-gray-500">Carregando imagem...</div>
                       )}
 
                       {/* seta direita */}
-                      <button
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100"
-                        onClick={nextImage}
-                        title="Próxima"
-                      >
+                      <button className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100" onClick={nextImage} title="Próxima">
                         <FaChevronRight />
                       </button>
                     </div>
@@ -821,10 +851,9 @@ export default function ChecklistsList() {
                         {galleryItems.map((_, i) => (
                           <button
                             key={i}
-                            className={`h-2.5 rounded-full transition-all ${
-                              i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"
-                            }`}
-                            onClick={() => setGalleryIndex(i)}
+                            className={`h-2.5 rounded-full transition-all ${i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"}`}
+                            onClick={() => setGalleryIndex(i)
+                            }
                             aria-label={`Ir para imagem ${i + 1}`}
                           />
                         ))}
@@ -844,19 +873,12 @@ export default function ChecklistsList() {
                         <dd className="mb-2">{galleryItems[galleryIndex]?.peca ?? "—"}</dd>
 
                         <dt className="font-semibold">Observações</dt>
-                        <dd className="mb-2 whitespace-pre-wrap break-words">
-                          {galleryItems[galleryIndex]?.observacoes ?? "—"}
-                        </dd>
+                        <dd className="mb-2 whitespace-pre-wrap break-words">{galleryItems[galleryIndex]?.observacoes ?? "—"}</dd>
                       </dl>
                     </div>
 
                     <div className="mt-3">
-                      <button
-                        className={BTN + " w-full"}
-                        onClick={downloadCurrentImage}
-                        title="Baixar esta imagem"
-                        disabled={!galleryItems[galleryIndex]?.imageUrl}
-                      >
+                      <button className={BTN + " w-full"} onClick={downloadCurrentImage} title="Baixar esta imagem" disabled={!galleryItems[galleryIndex]?.imageUrl}>
                         <FaDownload />
                         Baixar imagem
                       </button>
@@ -868,17 +890,237 @@ export default function ChecklistsList() {
 
             {/* footer opcional */}
             <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
-              <button
-                className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300"
-                onClick={closeGallery}
-              >
+              <button className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeGallery}>
                 Fechar
               </button>
             </div>
           </div>
         </div>
       )}
-      {/* ====== /MODAL GALERIA ====== */}
+
+      {/* ====== MODAL DE EDIÇÃO CHECKLIST ====== */}
+      {editModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
+          <div className="absolute inset-0 bg-black/60" onClick={closeEditModal} />
+          <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div className="font-semibold">Checklist - Editar</div>
+              <button className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100" onClick={closeEditModal} title="Fechar">
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-4 max-h-[70vh] overflow-y-auto">
+              {editLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
+              {editError && <div className="py-16 text-center text-red-600">{editError}</div>}
+              {editData && (
+                <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveEditData(); }}>
+                  {/* Campos principais */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold">OS Interna</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.osInterna ?? ""} onChange={(e) => handleEditChange("osInterna", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Data/Hora Entrada</label>
+                      <input type="datetime-local" className="w-full border rounded px-2 py-1" value={editData.dataHoraEntrada ? String(editData.dataHoraEntrada).slice(0, 16) : ""} onChange={(e) => handleEditChange("dataHoraEntrada", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Observações</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.observacoes ?? ""} onChange={(e) => handleEditChange("observacoes", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Combustível (%)</label>
+                      <input type="number" className="w-full border rounded px-2 py-1" value={editData.combustivelPercentual ?? ""} onChange={(e) => handleEditChange("combustivelPercentual", Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Nome</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteNome ?? ""} onChange={(e) => handleEditChange("clienteNome", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Doc</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteDoc ?? ""} onChange={(e) => handleEditChange("clienteDoc", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Tel</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteTel ?? ""} onChange={(e) => handleEditChange("clienteTel", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Endereço</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteEnd ?? ""} onChange={(e) => handleEditChange("clienteEnd", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo Nome</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoNome ?? ""} onChange={(e) => handleEditChange("veiculoNome", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo Placa</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoPlaca ?? ""} onChange={(e) => handleEditChange("veiculoPlaca", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo Cor</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoCor ?? ""} onChange={(e) => handleEditChange("veiculoCor", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo KM</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoKm ?? ""} onChange={(e) => handleEditChange("veiculoKm", e.target.value)} />
+                    </div>
+                  </div>
+                  {/* Itens do checklist */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Itens do Checklist</label>
+                    <div className="space-y-2">
+                      {editData.ofi_checklists_items?.map((item: any, idx: number) => (
+                        <div key={item.id ?? idx} className="grid grid-cols-3 gap-2">
+                          <input type="text" className="border rounded px-2 py-1" value={item.item ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "item", e.target.value)} />
+                          <input type="text" className="border rounded px-2 py-1" value={item.status ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "status", e.target.value)} />
+                          <span className="text-xs text-gray-400">ID: {item.id}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Avarias */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Avarias</label>
+                    <div className="space-y-2">
+                      {editData.ofi_checklists_avarias?.map((av: any, idx: number) => (
+                        <div key={av.id ?? idx} className="grid grid-cols-4 gap-2">
+                          <input type="text" className="border rounded px-2 py-1" value={av.tipo ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "tipo", e.target.value)} placeholder="Tipo" />
+                          <input type="text" className="border rounded px-2 py-1" value={av.peca ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "peca", e.target.value)} placeholder="Peça" />
+                          <input type="text" className="border rounded px-2 py-1" value={av.observacoes ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "observacoes", e.target.value)} placeholder="Observações" />
+                          <span className="text-xs text-gray-400">ID: {av.id}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button type="button" className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeEditModal}>
+                      Fechar
+                    </button>
+                    <button
+                      type="submit"
+                      className={`h-10 px-4 rounded text-white font-semibold ${editLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
+                      disabled={editLoading}
+                    >
+                      {editLoading ? "Salvando..." : "Salvar"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ====== /MODAL DE EDIÇÃO CHECKLIST ====== */}
+            {/* ====== MODAL DE EDIÇÃO CHECKLIST ====== */}
+      {editModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
+          <div className="absolute inset-0 bg-black/60" onClick={closeEditModal} />
+          <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div className="font-semibold">Checklist - Editar</div>
+              <button className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100" onClick={closeEditModal} title="Fechar"><FaTimes /></button>
+            </div>
+            <div className="p-4 max-h-[70vh] overflow-y-auto">
+              {editLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
+              {editError && <div className="py-16 text-center text-red-600">{editError}</div>}
+              {editData && (
+                <form className="space-y-4">
+                  {/* Campos principais */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold">OS Interna</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.osInterna ?? ""} onChange={e => handleEditChange("osInterna", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Data/Hora Entrada</label>
+                      <input type="datetime-local" className="w-full border rounded px-2 py-1" value={editData.dataHoraEntrada ? editData.dataHoraEntrada.slice(0,16) : ""} onChange={e => handleEditChange("dataHoraEntrada", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Observações</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.observacoes ?? ""} onChange={e => handleEditChange("observacoes", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Combustível (%)</label>
+                      <input type="number" className="w-full border rounded px-2 py-1" value={editData.combustivelPercentual ?? ""} onChange={e => handleEditChange("combustivelPercentual", Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Nome</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteNome ?? ""} onChange={e => handleEditChange("clienteNome", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Doc</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteDoc ?? ""} onChange={e => handleEditChange("clienteDoc", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Tel</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteTel ?? ""} onChange={e => handleEditChange("clienteTel", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Cliente Endereço</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteEnd ?? ""} onChange={e => handleEditChange("clienteEnd", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo Nome</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoNome ?? ""} onChange={e => handleEditChange("veiculoNome", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo Placa</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoPlaca ?? ""} onChange={e => handleEditChange("veiculoPlaca", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo Cor</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoCor ?? ""} onChange={e => handleEditChange("veiculoCor", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold">Veículo KM</label>
+                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoKm ?? ""} onChange={e => handleEditChange("veiculoKm", e.target.value)} />
+                    </div>
+                  </div>
+                  {/* Itens do checklist */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Itens do Checklist</label>
+                    <div className="space-y-2">
+                      {editData.ofi_checklists_items?.map((item: any, idx: number) => (
+                        <div key={item.id} className="grid grid-cols-3 gap-2">
+                          <input type="text" className="border rounded px-2 py-1" value={item.item ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_items", idx, "item", e.target.value)} />
+                          <input type="text" className="border rounded px-2 py-1" value={item.status ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_items", idx, "status", e.target.value)} />
+                          <span className="text-xs text-gray-400">ID: {item.id}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Avarias */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Avarias</label>
+                    <div className="space-y-2">
+                      {editData.ofi_checklists_avarias?.map((av: any, idx: number) => (
+                        <div key={av.id} className="grid grid-cols-4 gap-2">
+                          <input type="text" className="border rounded px-2 py-1" value={av.tipo ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_avarias", idx, "tipo", e.target.value)} placeholder="Tipo" />
+                          <input type="text" className="border rounded px-2 py-1" value={av.peca ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_avarias", idx, "peca", e.target.value)} placeholder="Peça" />
+                          <input type="text" className="border rounded px-2 py-1" value={av.observacoes ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_avarias", idx, "observacoes", e.target.value)} placeholder="Observações" />
+                          <span className="text-xs text-gray-400">ID: {av.id}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </form>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+              <button className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeEditModal}>Fechar</button>
+              <button
+                className={`h-10 px-4 rounded text-white font-semibold ${editLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
+                onClick={saveEditData}
+                disabled={editLoading}
+              >
+                {editLoading ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+

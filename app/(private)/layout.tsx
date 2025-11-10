@@ -398,8 +398,13 @@ export default function RootLayout({
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
                           <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/expedicao/entregas" onClick={(e) => handleNavigation('/expedicao/entregas', e)} className={linkClasses('/expedicao/entregas')}>
-                              Entregas
+                            <Link href="/expedicao/dashboard" onClick={(e) => handleNavigation('/expedicao/dashboard', e)} className={linkClasses('/expedicao/dashboard')}>
+                              Dashboard
+                            </Link>
+                          </li>
+                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                            <Link href="/expedicao/aplicativo" onClick={(e) => handleNavigation('/expedicao/aplicativo', e)} className={linkClasses('/expedicao/aplicativo')}>
+                              Aplicativo
                             </Link>
                           </li>
                         </ul>
