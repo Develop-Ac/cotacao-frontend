@@ -20,6 +20,20 @@ type PedidoResumo = {
     total_itens: number;
 };
 
+type ContagemListaItem = {
+    id: string;
+    colaborador: string;
+    contagem: number;
+    contagem_cuid: string;
+    liberado_contagem: boolean;
+    created_at: string;
+    usuario: {
+        id: string;
+        nome: string;
+        codigo: string;
+    };
+};
+
 type FornecedorResp = {
     FOR_CODIGO: number;
     FOR_NOME: string;
@@ -334,7 +348,7 @@ export default function Tela() {
             setMsgCot(`Cotação criada com sucesso. Total de itens: ${out?.total_itens ?? itensCotacao.length}.`);
             setItensCotacao([]);
             setPedido("");
-            await carregarPedidos();
+            await carregarContagensLista();
         } catch (e: any) {
             setMsgCot(`Erro ao criar cotação: ${e?.message || "desconhecido"}`);
         } finally {
@@ -343,144 +357,39 @@ export default function Tela() {
     };
 
     // ===== Tabela inferior (GET all) =====
-    const [pedidos, setPedidos] = useState<PedidoResumo[]>([]);
-    const [loadingPedidos, setLoadingPedidos] = useState(false);
-    const [msgPedidos, setMsgPedidos] = useState<string | null>(null);
+    const [contagensLista, setContagensLista] = useState<ContagemListaItem[]>([]);
+    const [loadingContagensLista, setLoadingContagensLista] = useState(false);
+    const [msgContagensLista, setMsgContagensLista] = useState<string | null>(null);
     const [pageSize, setPageSize] = useState<number>(10);
     const page = 1;
 
-    const carregarPedidos = async () => {
-        setMsgPedidos(null);
-        setLoadingPedidos(true);
+    const carregarContagensLista = async () => {
+        setMsgContagensLista(null);
+        setLoadingContagensLista(true);
         try {
             const res = await fetch(
-                `https://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`,
+                `https://intranetbackend.acacessorios.local/estoque/contagem/lista?page=${page}&pageSize=${pageSize}`,
                 { headers: { Accept: "application/json" } }
             );
 
-            console.log(`https://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`)
-
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            const arr: PedidoResumo[] = Array.isArray(data?.data) ? data.data : [];
-            setPedidos(arr);
-            if (!arr.length) setMsgPedidos("Nenhum pedido encontrado.");
+            const arr: ContagemListaItem[] = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            setContagensLista(arr);
+            if (!arr.length) setMsgContagensLista("Nenhuma contagem encontrada.");
         } catch (e: any) {
-            setMsgPedidos(`Erro ao carregar: ${e?.message || "desconhecido"}`);
-            setPedidos([]);
+            setMsgContagensLista(`Erro ao carregar: ${e?.message || "desconhecido"}`);
+            setContagensLista([]);
         } finally {
-            setLoadingPedidos(false);
+            setLoadingContagensLista(false);
         }
     };
 
     useEffect(() => {
-        carregarPedidos();
+        carregarContagensLista();
     }, [pageSize]);
 
-    // ===== Modal fornecedor =====
-    const [modalOpen, setModalOpen] = useState(false);
-    const [forCodigoInput, setForCodigoInput] = useState("");
-    const [loadingForn, setLoadingForn] = useState(false);
-    const [fornMsg, setFornMsg] = useState<string | null>(null);
-    const [pedidoSelecionado, setPedidoSelecionado] = useState<number | null>(null);
-    const [fornecedoresSalvos, setFornecedoresSalvos] = useState<FornecedorSalvo[]>([]);
-
-    const carregarFornecedoresSalvos = async (pedido_cotacao: number) => {
-        try {
-            const res = await fetch(
-                `https://intranetbackend.acacessorios.local/compras/fornecedor?pedido_cotacao=${encodeURIComponent(String(pedido_cotacao))}`,
-                { headers: { Accept: "application/json" } }
-            );
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            const list: FornecedorSalvo[] = Array.isArray(data?.data) ? data.data : [];
-            setFornecedoresSalvos(list);
-        } catch (e: any) {
-            setFornecedoresSalvos([]);
-            setFornMsg(`Falha ao carregar fornecedores: ${e?.message || "desconhecido"}`);
-            setTimeout(() => setFornMsg(null), 2500);
-        }
-    };
-
-    const abrirModalFornecedor = async (pedidoDaLinha: number) => {
-        setPedidoSelecionado(pedidoDaLinha);
-        setModalOpen(true);
-        setFornMsg(null);
-        setForCodigoInput("");
-        await carregarFornecedoresSalvos(pedidoDaLinha);
-    };
-
-    const buscarFornecedor = async () => {
-        setFornMsg(null);
-        const raw = forCodigoInput.trim();
-        if (!raw) return setFornMsg("Informe o código do fornecedor.");
-        if (!pedidoSelecionado) return setFornMsg("Pedido não selecionado.");
-        const code = Number(raw);
-        if (!Number.isFinite(code)) return setFornMsg("Código inválido.");
-        setLoadingForn(true);
-        try {
-            // 1) Consulta fornecedor na OPENQUERY
-            const res = await fetch(`https://intranetbackend.acacessorios.local/compras/openquery/fornecedor/${code}`, {
-                headers: { Accept: "application/json" },
-            });
-            if (res.status === 404) {
-                setFornMsg("Fornecedor não encontrado.");
-                return;
-            }
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const novo: FornecedorResp = await res.json();
-
-            // 2) POST para persistir no pedido
-            const postBody = {
-                pedido_cotacao: pedidoSelecionado,
-                for_codigo: novo.FOR_CODIGO,
-                for_nome: novo.FOR_NOME,
-                cpf_cnpj: novo.CPF_CNPJ ?? null,
-                itens: [], // se quiser salvar itens também, envie aqui
-            };
-            const post = await fetch(`https://intranetbackend.acacessorios.local/compras/fornecedor`, {
-                method: "POST",
-                headers: { Accept: "application/json", "Content-Type": "application/json" },
-                body: JSON.stringify(postBody),
-            });
-
-            console.log("POST fornecedor response:", postBody);
-            if (!post.ok) {
-                let msg = `HTTP ${post.status}`;
-                try {
-                    const err = await post.json();
-                    if (err?.message) msg = err.message;
-                } catch {}
-                throw new Error(msg);
-            }
-
-            // 3) Recarrega a lista persistida do pedido
-            await carregarFornecedoresSalvos(pedidoSelecionado);
-            setFornMsg("Fornecedor adicionado.");
-            setTimeout(() => setFornMsg(null), 1500);
-            setForCodigoInput("");
-        } catch (e: any) {
-            setFornMsg(`Erro ao adicionar fornecedor: ${e?.message || "desconhecido"}`);
-            setTimeout(() => setFornMsg(null), 2500);
-        } finally {
-            setLoadingForn(false);
-        }
-    };
-
-    const copiarLinkFornecedor = async (f: FornecedorSalvo) => {
-        if (!f?.for_codigo || !pedidoSelecionado) return;
-        const url = `https://intranet-cotacao-fornecedor.naayqg.easypanel.host/cotacao?for_codigo=${encodeURIComponent(
-            String(f.for_codigo)
-        )}&pedido_cotacao=${encodeURIComponent(String(pedidoSelecionado))}`;
-        try {
-            await navigator.clipboard.writeText(url);
-            setFornMsg("Link copiado!");
-            setTimeout(() => setFornMsg(null), 2000);
-        } catch {
-            setFornMsg("Falha ao copiar.");
-            setTimeout(() => setFornMsg(null), 2000);
-        }
-    };
+    // ===== Modal fornecedor - Removido pois não é necessário para contagem de estoque =====
 
     const formatarData = (dataISO: string) => {
         return new Date(dataISO).toLocaleDateString('pt-BR');
@@ -511,8 +420,8 @@ export default function Tela() {
                                 id="refresh_pedidos_header"
                                 className={BTN_SQUARE}
                                 title="Atualizar lista"
-                                onClick={carregarPedidos}
-                                disabled={loadingPedidos}
+                                onClick={carregarContagensLista}
+                                disabled={loadingContagensLista}
                             >
                                 <FaSync className="text-white text-xl" />
                             </button>
@@ -758,134 +667,42 @@ export default function Tela() {
                                 </select>
                             </div>
 
-                            {msgPedidos && <p className="text-sm text-gray-600 mb-2">{msgPedidos}</p>}
+                            {msgContagensLista && <p className="text-sm text-gray-600 mb-2">{msgContagensLista}</p>}
 
                             <div className="overflow-x-auto">
                                 <table className="min-w-full">
                                     <thead className="bg-gray-50 border-b">
                                         <tr>
-                                            <th className="p-2 text-start">Empresa</th>
-                                            <th className="p-2 text-start">Pedido de Cotação</th>
-                                            <th className="p-2 text-end" style={{ width: "140px" }}>Total de Itens</th>
-                                            <th className="p-2 text-end" style={{ width: "180px" }}>Fornecedor</th>
+                                            <th className="p-2 text-start">Contagem</th>
+                                            <th className="p-2 text-start">Usuário</th>
+                                            <th className="p-2 text-start">Liberado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {pedidos.length === 0 && (
+                                        {contagensLista.length === 0 && (
                                             <tr>
-                                                <td colSpan={4} className="p-4 text-gray-500 text-center">Nenhum pedido encontrado</td>
-                                            </tr>
-                                        )}
-                                        {pedidos.map((p, idx) => (
-                                            <tr key={idx} className="border-t hover:bg-gray-50">
-                                                <td className="p-3">{p.empresa}</td>
-                                                <td className="p-3">{p.pedido_cotacao}</td>
-                                                <td className="p-3 text-end">{p.total_itens}</td>
-                                                <td className="p-3 text-end">
-                                                    <button
-                                                        className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-                                                        onClick={() => abrirModalFornecedor(p.pedido_cotacao)}
-                                                        title="Selecionar fornecedor e gerar link"
-                                                    >
-                                                        Fornecedor
-                                                    </button>
+                                                <td colSpan={3} className="p-4 text-gray-500 text-center">
+                                                    {loadingContagensLista ? "Carregando..." : "Nenhuma contagem encontrada"}
                                                 </td>
                                             </tr>
-                                        ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        {/* fim tabela pedidos */}
-                    </div>
-                </div>
-            </div>
-
-            {/* MODAL Fornecedor */}
-            {modalOpen && (
-                <div className="fixed inset-0 z-50">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setModalOpen(false)} />
-                    <div className="absolute inset-0 flex items-center justify-center p-4">
-                        <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-xl font-semibold">
-                                    Fornecedores do pedido {pedidoSelecionado ?? "-"}
-                                </h4>
-                                <button
-                                    className="text-gray-600 hover:text-gray-800"
-                                    onClick={() => setModalOpen(false)}
-                                    aria-label="Fechar"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-
-                            {/* Buscar + adicionar (POST automático) */}
-                            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="Código do fornecedor (for_codigo)"
-                                    value={forCodigoInput}
-                                    onChange={(e) => setForCodigoInput(e.target.value.replace(/[^\d]/g, ""))}
-                                    className="h-11 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <button className={BTN} onClick={buscarFornecedor} disabled={loadingForn}>
-                                    {loadingForn ? "Buscando..." : "Adicionar"}
-                                </button>
-                            </div>
-
-                            {fornMsg && <p className="text-sm text-gray-600">{fornMsg}</p>}
-
-                            {/* Lista persistida do pedido */}
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full">
-                                    <thead className="bg-gray-50 border-b">
-                                        <tr>
-                                            <th className="p-2 text-start">Código</th>
-                                            <th className="p-2 text-start">Nome</th>
-                                            <th className="p-2 text-start">CPF/CNPJ</th>
-                                            <th className="p-2 text-end" style={{ width: 180 }}>Ação</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {fornecedoresSalvos.length === 0 && (
-                                            <tr>
-                                                <td colSpan={4} className="p-4 text-gray-500 text-center">Sem fornecedores salvos</td>
-                                            </tr>
                                         )}
-                                            {fornecedoresSalvos.map((f) => (
-                                                <tr key={f.for_codigo} className="border-t hover:bg-gray-50">
-                                                    <td className="p-3">{f.for_codigo}</td>
-                                                    <td className="p-3">{f.for_nome}</td>
-                                                    <td className="p-3">{f.cpf_cnpj}</td>
-                                                    <td className="p-3 text-end">
-                                                        <button
-                                                            className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-                                                            onClick={() => copiarLinkFornecedor(f)}
-                                                        >
-                                                            Copiar link
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                            </div>
-
-                            <div className="flex justify-end">
-                                <button
-                                    className="h-10 px-4 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                                    onClick={() => setModalOpen(false)}
-                                >
-                                    Fechar
-                                </button>
+                                        {contagensLista.map((item, idx) => (
+                                            <tr key={idx} className="border-t hover:bg-gray-50">
+                                                <td className="p-3">{item.contagem}</td>
+                                                <td className="p-3">{item.usuario.nome}</td>
+                                                <td className="p-3">{item.liberado_contagem ? "Sim" : "Não"}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
+                        {/* fim tabela contagens */}
                     </div>
                 </div>
-            )}
-            {/* fim MODAL */}
             </div>
+
+            {/* MODAL Fornecedor - Removido pois não é necessário para contagem de estoque */}
         </div>
     );
 }
