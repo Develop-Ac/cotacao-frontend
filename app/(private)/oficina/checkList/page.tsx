@@ -104,6 +104,24 @@ export default function ChecklistsList() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editData, setEditData] = useState<any | null>(null);
 
+  // ====== MODAL DE VISUALIZAÇÃO (somente leitura) ======
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [viewData, setViewData] = useState<any | null>(null);
+
+  // ====== ADMIN? (lê localStorage uma vez) ======
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    // roda no cliente
+    try {
+      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+      setIsAdmin(userData?.setor === "Admin");
+    } catch {
+      setIsAdmin(false);
+    }
+  }, []);
+
   // Fecha o dropdown ao clicar fora / Esc
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -117,6 +135,7 @@ export default function ChecklistsList() {
         setPageSizeOpen(false);
         if (galleryOpen) closeGallery();
         if (editModalOpen) closeEditModal();
+        if (viewModalOpen) closeViewModal();
       }
       if (!galleryOpen) return;
       if (e.key === "ArrowLeft") prevImage();
@@ -128,7 +147,7 @@ export default function ChecklistsList() {
       document.removeEventListener("mousedown", onDocClick);
       document.removeEventListener("keydown", onKey);
     };
-  }, [galleryOpen, galleryIndex, galleryItems.length, editModalOpen]);
+  }, [galleryOpen, galleryIndex, galleryItems.length, editModalOpen, viewModalOpen]);
 
   // Helpers
   const fmtDateTime = (iso?: string | null) => {
@@ -152,9 +171,7 @@ export default function ChecklistsList() {
   // 👉 helper: converte "YYYY-MM-DDTHH:mm" para ISO, se necessário
   function toIsoIfLocal(dt?: string | null) {
     if (!dt) return dt;
-    // já parece ISO com timezone?
     if (/Z$|[+-]\d{2}:\d{2}$/.test(dt)) return dt;
-    // datetime-local (sem timezone)
     const d = new Date(dt);
     return isNaN(d.getTime()) ? dt : d.toISOString();
   }
@@ -344,7 +361,7 @@ export default function ChecklistsList() {
     URL.revokeObjectURL(url);
   };
 
-  // Função para abrir modal e buscar dados
+  // ====== EDITAR: abrir/fechar/bind ======
   async function openEditModal(osInterna: string) {
     setEditModalOpen(true);
     setEditLoading(true);
@@ -371,12 +388,39 @@ export default function ChecklistsList() {
     setEditError(null);
   }
 
-  // Função para atualizar campo do checklist
+  // ====== VISUALIZAR: abrir/fechar ======
+  async function openViewModal(osInterna: string) {
+    setViewModalOpen(true);
+    setViewLoading(true);
+    setViewError(null);
+    setViewData(null);
+    try {
+      const res = await fetch(`${API_BASE}/${encodeURIComponent(osInterna)}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
+      const data = await res.json();
+      setViewData(data);
+    } catch (e: any) {
+      setViewError(e?.message || "Falha ao buscar dados");
+    } finally {
+      setViewLoading(false);
+    }
+  }
+
+  function closeViewModal() {
+    setViewModalOpen(false);
+    setViewData(null);
+    setViewError(null);
+  }
+
+  // Função para atualizar campo do checklist (editar)
   function handleEditChange(field: string, value: any) {
     setEditData((prev: any) => ({ ...prev, [field]: value }));
   }
 
-  // Função para atualizar item do array
+  // Função para atualizar item do array (editar)
   function handleEditArrayChange(
     arrayName: string,
     idx: number,
@@ -576,7 +620,10 @@ export default function ChecklistsList() {
       setEditLoading(true);
       setEditError(null);
 
-      console.log("Payload enviado no PUT:", editData);
+      // normaliza datetime-local -> ISO
+      if (editData.dataHoraEntrada) {
+        editData.dataHoraEntrada = toIsoIfLocal(editData.dataHoraEntrada);
+      }
 
       const res = await fetch(`${API_BASE}/${encodeURIComponent(editData.id)}`, {
         method: "PUT",
@@ -588,7 +635,13 @@ export default function ChecklistsList() {
       });
 
       if (!res.ok) {
-        throw new Error(`Erro HTTP: ${res.status}`);
+        let msg = `Erro HTTP: ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
+          if (j?.error) msg = j.error;
+        } catch {}
+        throw new Error(msg);
       }
 
       alert("Checklist atualizado com sucesso!");
@@ -671,7 +724,7 @@ export default function ChecklistsList() {
                     </button>
                     {pageSizeOpen && (
                       <div className="absolute right-0 mt-2 w-28 bg-white border rounded shadow z-10" role="listbox" tabIndex={-1}>
-                        {[10, 20, 50].map((n) => (
+                        {pageSizes.map((n) => (
                           <button
                             key={n}
                             role="option"
@@ -714,7 +767,7 @@ export default function ChecklistsList() {
                       <th className="p-2 text-start">Placa</th>
                       <th className="p-2 text-start">Combustível (%)</th>
                       <th className="p-2 text-start">Criado em</th>
-                      <th className="p-2 text-center" style={{ width: "160px" }}>
+                      <th className="p-2 text-center" style={{ width: "200px" }}>
                         Ações
                       </th>
                     </tr>
@@ -733,14 +786,25 @@ export default function ChecklistsList() {
                         <td className="p-4">{fmtDateTime(row.createdAt)}</td>
                         <td className="p-4">
                           <div className="flex items-center justify-center gap-2">
-                            {/* VER (modal de edição) */}
-                            <button
-                              className={BTN_SQUARE}
-                              title="Ver/Editar"
-                              onClick={() => openEditModal(String(row.osInterna))}
-                            >
-                              Ver
-                            </button>
+                            {/* Condicional: Admin = Editar; Não-admin = Visualizar */}
+                            {isAdmin ? (
+                              <button
+                                className={BTN_SQUARE}
+                                title="Ver/Editar"
+                                onClick={() => openEditModal(String(row.osInterna))}
+                              >
+                                Editar
+                              </button>
+                            ) : (
+                              <button
+                                className={BTN_SQUARE}
+                                title="Visualizar"
+                                onClick={() => openViewModal(String(row.osInterna))}
+                              >
+                                Ver
+                              </button>
+                            )}
+
                             {/* PDF */}
                             <button
                               className={BTN_SQUARE}
@@ -748,10 +812,17 @@ export default function ChecklistsList() {
                               onClick={() => downloadChecklistPdf(String(row.id))}
                               disabled={downloadingId === String(row.id ?? "")}
                             >
-                              <FaFilePdf className={downloadingId === String(row.id ?? "") ? "opacity-60" : ""} style={{ minHeight: "24px", minWidth: "24px" }} />
+                              <FaFilePdf
+                                className={downloadingId === String(row.id ?? "") ? "opacity-60" : ""}
+                                style={{ minHeight: "24px", minWidth: "24px" }}
+                              />
                             </button>
                             {/* FOTOS (Galeria) */}
-                            <button className={BTN_SQUARE} title="Fotos (avarias)" onClick={() => openGallery(String(row.id))}>
+                            <button
+                              className={BTN_SQUARE}
+                              title="Fotos (avarias)"
+                              onClick={() => openGallery(String(row.id))}
+                            >
                               <FaImages style={{ minHeight: "24px", minWidth: "24px" }} />
                             </button>
                           </div>
@@ -783,10 +854,18 @@ export default function ChecklistsList() {
                   Total filtrado: <b>{filtered.length}</b> · Página <b>{page}</b> de <b>{totalPages}</b>
                 </div>
                 <div className="flex gap-2">
-                  <button className={BTN} onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading}>
+                  <button
+                    className={BTN}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1 || loading}
+                  >
                     Anterior
                   </button>
-                  <button className={BTN} onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))} disabled={page >= totalPages || loading}>
+                  <button
+                    className={BTN}
+                    onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))}
+                    disabled={page >= totalPages || loading}
+                  >
                     Próxima
                   </button>
                 </div>
@@ -807,8 +886,14 @@ export default function ChecklistsList() {
           <div className="relative z-10 w-full max-w-5xl mx-4 rounded-xl bg-white shadow-2xl">
             {/* header */}
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <div className="font-semibold">Galeria de fotos {galleryItems.length ? `(${galleryIndex + 1}/${galleryItems.length})` : ""}</div>
-              <button className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100" onClick={closeGallery} title="Fechar">
+              <div className="font-semibold">
+                Galeria de fotos {galleryItems.length ? `(${galleryIndex + 1}/${galleryItems.length})` : ""}
+              </div>
+              <button
+                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100"
+                onClick={closeGallery}
+                title="Fechar"
+              >
                 <FaTimes />
               </button>
             </div>
@@ -828,19 +913,31 @@ export default function ChecklistsList() {
                   <div className="lg:col-span-8">
                     <div className="relative w-full aspect-[4/3] bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center">
                       {/* seta esquerda */}
-                      <button className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100" onClick={prevImage} title="Anterior">
+                      <button
+                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100"
+                        onClick={prevImage}
+                        title="Anterior"
+                      >
                         <FaChevronLeft />
                       </button>
 
                       {/* imagem */}
                       {galleryItems[galleryIndex]?.imageUrl ? (
-                        <img src={galleryItems[galleryIndex].imageUrl} alt="Avaria" className="max-h-full max-w-full object-contain" />
+                        <img
+                          src={galleryItems[galleryIndex].imageUrl}
+                          alt="Avaria"
+                          className="max-h-full max-w-full object-contain"
+                        />
                       ) : (
                         <div className="text-gray-500">Carregando imagem...</div>
                       )}
 
                       {/* seta direita */}
-                      <button className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100" onClick={nextImage} title="Próxima">
+                      <button
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100"
+                        onClick={nextImage}
+                        title="Próxima"
+                      >
                         <FaChevronRight />
                       </button>
                     </div>
@@ -851,9 +948,10 @@ export default function ChecklistsList() {
                         {galleryItems.map((_, i) => (
                           <button
                             key={i}
-                            className={`h-2.5 rounded-full transition-all ${i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"}`}
-                            onClick={() => setGalleryIndex(i)
-                            }
+                            className={`h-2.5 rounded-full transition-all ${
+                              i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"
+                            }`}
+                            onClick={() => setGalleryIndex(i)}
                             aria-label={`Ir para imagem ${i + 1}`}
                           />
                         ))}
@@ -861,7 +959,7 @@ export default function ChecklistsList() {
                     )}
                   </div>
 
-                  {/* metadados + ações */}
+                    {/* metadados + ações */}
                   <div className="lg:col-span-4">
                     <div className="rounded-lg border p-3 bg-gray-50">
                       <div className="text-sm text-gray-600 mb-2">Informações da avaria</div>
@@ -873,12 +971,19 @@ export default function ChecklistsList() {
                         <dd className="mb-2">{galleryItems[galleryIndex]?.peca ?? "—"}</dd>
 
                         <dt className="font-semibold">Observações</dt>
-                        <dd className="mb-2 whitespace-pre-wrap break-words">{galleryItems[galleryIndex]?.observacoes ?? "—"}</dd>
+                        <dd className="mb-2 whitespace-pre-wrap break-words">
+                          {galleryItems[galleryIndex]?.observacoes ?? "—"}
+                        </dd>
                       </dl>
                     </div>
 
                     <div className="mt-3">
-                      <button className={BTN + " w-full"} onClick={downloadCurrentImage} title="Baixar esta imagem" disabled={!galleryItems[galleryIndex]?.imageUrl}>
+                      <button
+                        className={BTN + " w-full"}
+                        onClick={downloadCurrentImage}
+                        title="Baixar esta imagem"
+                        disabled={!galleryItems[galleryIndex]?.imageUrl}
+                      >
                         <FaDownload />
                         Baixar imagem
                       </button>
@@ -888,7 +993,7 @@ export default function ChecklistsList() {
               )}
             </div>
 
-            {/* footer opcional */}
+            {/* footer */}
             <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
               <button className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeGallery}>
                 Fechar
@@ -905,7 +1010,11 @@ export default function ChecklistsList() {
           <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="font-semibold">Checklist - Editar</div>
-              <button className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100" onClick={closeEditModal} title="Fechar">
+              <button
+                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100"
+                onClick={closeEditModal}
+                title="Fechar"
+              >
                 <FaTimes />
               </button>
             </div>
@@ -913,56 +1022,122 @@ export default function ChecklistsList() {
               {editLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
               {editError && <div className="py-16 text-center text-red-600">{editError}</div>}
               {editData && (
-                <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveEditData(); }}>
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    saveEditData();
+                  }}
+                >
                   {/* Campos principais */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold">OS Interna</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.osInterna ?? ""} onChange={(e) => handleEditChange("osInterna", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.osInterna ?? ""}
+                        onChange={(e) => handleEditChange("osInterna", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Data/Hora Entrada</label>
-                      <input type="datetime-local" className="w-full border rounded px-2 py-1" value={editData.dataHoraEntrada ? String(editData.dataHoraEntrada).slice(0, 16) : ""} onChange={(e) => handleEditChange("dataHoraEntrada", e.target.value)} />
+                      <input
+                        type="datetime-local"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.dataHoraEntrada ? String(editData.dataHoraEntrada).slice(0, 16) : ""}
+                        onChange={(e) => handleEditChange("dataHoraEntrada", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Observações</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.observacoes ?? ""} onChange={(e) => handleEditChange("observacoes", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.observacoes ?? ""}
+                        onChange={(e) => handleEditChange("observacoes", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Combustível (%)</label>
-                      <input type="number" className="w-full border rounded px-2 py-1" value={editData.combustivelPercentual ?? ""} onChange={(e) => handleEditChange("combustivelPercentual", Number(e.target.value))} />
+                      <input
+                        type="number"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.combustivelPercentual ?? ""}
+                        onChange={(e) => handleEditChange("combustivelPercentual", Number(e.target.value))}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Cliente Nome</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteNome ?? ""} onChange={(e) => handleEditChange("clienteNome", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.clienteNome ?? ""}
+                        onChange={(e) => handleEditChange("clienteNome", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Cliente Doc</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteDoc ?? ""} onChange={(e) => handleEditChange("clienteDoc", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.clienteDoc ?? ""}
+                        onChange={(e) => handleEditChange("clienteDoc", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Cliente Tel</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteTel ?? ""} onChange={(e) => handleEditChange("clienteTel", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.clienteTel ?? ""}
+                        onChange={(e) => handleEditChange("clienteTel", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Cliente Endereço</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteEnd ?? ""} onChange={(e) => handleEditChange("clienteEnd", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.clienteEnd ?? ""}
+                        onChange={(e) => handleEditChange("clienteEnd", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Veículo Nome</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoNome ?? ""} onChange={(e) => handleEditChange("veiculoNome", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.veiculoNome ?? ""}
+                        onChange={(e) => handleEditChange("veiculoNome", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Veículo Placa</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoPlaca ?? ""} onChange={(e) => handleEditChange("veiculoPlaca", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.veiculoPlaca ?? ""}
+                        onChange={(e) => handleEditChange("veiculoPlaca", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Veículo Cor</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoCor ?? ""} onChange={(e) => handleEditChange("veiculoCor", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.veiculoCor ?? ""}
+                        onChange={(e) => handleEditChange("veiculoCor", e.target.value)}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold">Veículo KM</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoKm ?? ""} onChange={(e) => handleEditChange("veiculoKm", e.target.value)} />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1"
+                        value={editData.veiculoKm ?? ""}
+                        onChange={(e) => handleEditChange("veiculoKm", e.target.value)}
+                      />
                     </div>
                   </div>
                   {/* Itens do checklist */}
@@ -971,8 +1146,18 @@ export default function ChecklistsList() {
                     <div className="space-y-2">
                       {editData.ofi_checklists_items?.map((item: any, idx: number) => (
                         <div key={item.id ?? idx} className="grid grid-cols-3 gap-2">
-                          <input type="text" className="border rounded px-2 py-1" value={item.item ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "item", e.target.value)} />
-                          <input type="text" className="border rounded px-2 py-1" value={item.status ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "status", e.target.value)} />
+                          <input
+                            type="text"
+                            className="border rounded px-2 py-1"
+                            value={item.item ?? ""}
+                            onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "item", e.target.value)}
+                          />
+                          <input
+                            type="text"
+                            className="border rounded px-2 py-1"
+                            value={item.status ?? ""}
+                            onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "status", e.target.value)}
+                          />
                           <span className="text-xs text-gray-400">ID: {item.id}</span>
                         </div>
                       ))}
@@ -984,21 +1169,47 @@ export default function ChecklistsList() {
                     <div className="space-y-2">
                       {editData.ofi_checklists_avarias?.map((av: any, idx: number) => (
                         <div key={av.id ?? idx} className="grid grid-cols-4 gap-2">
-                          <input type="text" className="border rounded px-2 py-1" value={av.tipo ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "tipo", e.target.value)} placeholder="Tipo" />
-                          <input type="text" className="border rounded px-2 py-1" value={av.peca ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "peca", e.target.value)} placeholder="Peça" />
-                          <input type="text" className="border rounded px-2 py-1" value={av.observacoes ?? ""} onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "observacoes", e.target.value)} placeholder="Observações" />
+                          <input
+                            type="text"
+                            className="border rounded px-2 py-1"
+                            value={av.tipo ?? ""}
+                            onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "tipo", e.target.value)}
+                            placeholder="Tipo"
+                          />
+                          <input
+                            type="text"
+                            className="border rounded px-2 py-1"
+                            value={av.peca ?? ""}
+                            onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "peca", e.target.value)}
+                            placeholder="Peça"
+                          />
+                          <input
+                            type="text"
+                            className="border rounded px-2 py-1"
+                            value={av.observacoes ?? ""}
+                            onChange={(e) =>
+                              handleEditArrayChange("ofi_checklists_avarias", idx, "observacoes", e.target.value)
+                            }
+                            placeholder="Observações"
+                          />
                           <span className="text-xs text-gray-400">ID: {av.id}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2 pt-2">
-                    <button type="button" className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeEditModal}>
+                    <button
+                      type="button"
+                      className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300"
+                      onClick={closeEditModal}
+                    >
                       Fechar
                     </button>
                     <button
                       type="submit"
-                      className={`h-10 px-4 rounded text-white font-semibold ${editLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
+                      className={`h-10 px-4 rounded text-white font-semibold ${
+                        editLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+                      }`}
                       disabled={editLoading}
                     >
                       {editLoading ? "Salvando..." : "Salvar"}
@@ -1010,110 +1221,88 @@ export default function ChecklistsList() {
           </div>
         </div>
       )}
-      {/* ====== /MODAL DE EDIÇÃO CHECKLIST ====== */}
-            {/* ====== MODAL DE EDIÇÃO CHECKLIST ====== */}
-      {editModalOpen && (
+
+      {/* ====== MODAL DE VISUALIZAÇÃO (somente leitura) ====== */}
+      {viewModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
-          <div className="absolute inset-0 bg-black/60" onClick={closeEditModal} />
+          <div className="absolute inset-0 bg-black/60" onClick={closeViewModal} />
           <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <div className="font-semibold">Checklist - Editar</div>
-              <button className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100" onClick={closeEditModal} title="Fechar"><FaTimes /></button>
+              <div className="font-semibold">Checklist - Visualização</div>
+              <button
+                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100"
+                onClick={closeViewModal}
+                title="Fechar"
+              >
+                <FaTimes />
+              </button>
             </div>
+
             <div className="p-4 max-h-[70vh] overflow-y-auto">
-              {editLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
-              {editError && <div className="py-16 text-center text-red-600">{editError}</div>}
-              {editData && (
-                <form className="space-y-4">
-                  {/* Campos principais */}
+              {viewLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
+              {viewError && <div className="py-16 text-center text-red-600">{viewError}</div>}
+
+              {viewData && (
+                <div className="space-y-6">
+                  {/* Campos principais (read-only) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold">OS Interna</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.osInterna ?? ""} onChange={e => handleEditChange("osInterna", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Data/Hora Entrada</label>
-                      <input type="datetime-local" className="w-full border rounded px-2 py-1" value={editData.dataHoraEntrada ? editData.dataHoraEntrada.slice(0,16) : ""} onChange={e => handleEditChange("dataHoraEntrada", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Observações</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.observacoes ?? ""} onChange={e => handleEditChange("observacoes", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Combustível (%)</label>
-                      <input type="number" className="w-full border rounded px-2 py-1" value={editData.combustivelPercentual ?? ""} onChange={e => handleEditChange("combustivelPercentual", Number(e.target.value))} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Nome</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteNome ?? ""} onChange={e => handleEditChange("clienteNome", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Doc</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteDoc ?? ""} onChange={e => handleEditChange("clienteDoc", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Tel</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteTel ?? ""} onChange={e => handleEditChange("clienteTel", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Endereço</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.clienteEnd ?? ""} onChange={e => handleEditChange("clienteEnd", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo Nome</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoNome ?? ""} onChange={e => handleEditChange("veiculoNome", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo Placa</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoPlaca ?? ""} onChange={e => handleEditChange("veiculoPlaca", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo Cor</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoCor ?? ""} onChange={e => handleEditChange("veiculoCor", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo KM</label>
-                      <input type="text" className="w-full border rounded px-2 py-1" value={editData.veiculoKm ?? ""} onChange={e => handleEditChange("veiculoKm", e.target.value)} />
-                    </div>
+                    <Field label="OS Interna" value={viewData.osInterna} />
+                    <Field label="Data/Hora Entrada" value={fmtDateTime(viewData.dataHoraEntrada)} />
+                    <Field label="Observações" value={viewData.observacoes} />
+                    <Field label="Combustível (%)" value={viewData.combustivelPercentual} />
+                    <Field label="Cliente Nome" value={viewData.clienteNome} />
+                    <Field label="Cliente Doc" value={viewData.clienteDoc} />
+                    <Field label="Cliente Tel" value={viewData.clienteTel} />
+                    <Field label="Cliente Endereço" value={viewData.clienteEnd} />
+                    <Field label="Veículo Nome" value={viewData.veiculoNome} />
+                    <Field label="Veículo Placa" value={viewData.veiculoPlaca} />
+                    <Field label="Veículo Cor" value={viewData.veiculoCor} />
+                    <Field label="Veículo KM" value={viewData.veiculoKm} />
                   </div>
+
                   {/* Itens do checklist */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2">Itens do Checklist</label>
-                    <div className="space-y-2">
-                      {editData.ofi_checklists_items?.map((item: any, idx: number) => (
-                        <div key={item.id} className="grid grid-cols-3 gap-2">
-                          <input type="text" className="border rounded px-2 py-1" value={item.item ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_items", idx, "item", e.target.value)} />
-                          <input type="text" className="border rounded px-2 py-1" value={item.status ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_items", idx, "status", e.target.value)} />
-                          <span className="text-xs text-gray-400">ID: {item.id}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <div className="block text-sm font-semibold mb-2">Itens do Checklist</div>
+                    {Array.isArray(viewData.ofi_checklists_items) && viewData.ofi_checklists_items.length > 0 ? (
+                      <div className="space-y-2">
+                        {viewData.ofi_checklists_items.map((item: any) => (
+                          <div key={item.id} className="grid grid-cols-3 gap-2 text-sm">
+                            <Field label="Item" value={item.item} compact />
+                            <Field label="Status" value={item.status} compact />
+                            <div className="text-xs text-gray-400 self-center">ID: {item.id}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500">Sem itens.</div>
+                    )}
                   </div>
+
                   {/* Avarias */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2">Avarias</label>
-                    <div className="space-y-2">
-                      {editData.ofi_checklists_avarias?.map((av: any, idx: number) => (
-                        <div key={av.id} className="grid grid-cols-4 gap-2">
-                          <input type="text" className="border rounded px-2 py-1" value={av.tipo ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_avarias", idx, "tipo", e.target.value)} placeholder="Tipo" />
-                          <input type="text" className="border rounded px-2 py-1" value={av.peca ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_avarias", idx, "peca", e.target.value)} placeholder="Peça" />
-                          <input type="text" className="border rounded px-2 py-1" value={av.observacoes ?? ""} onChange={e => handleEditArrayChange("ofi_checklists_avarias", idx, "observacoes", e.target.value)} placeholder="Observações" />
-                          <span className="text-xs text-gray-400">ID: {av.id}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <div className="block text-sm font-semibold mb-2">Avarias</div>
+                    {Array.isArray(viewData.ofi_checklists_avarias) && viewData.ofi_checklists_avarias.length > 0 ? (
+                      <div className="space-y-2">
+                        {viewData.ofi_checklists_avarias.map((av: any) => (
+                          <div key={av.id} className="grid grid-cols-4 gap-2 text-sm">
+                            <Field label="Tipo" value={av.tipo} compact />
+                            <Field label="Peça" value={av.peca} compact />
+                            <Field label="Observações" value={av.observacoes} compact />
+                            <div className="text-xs text-gray-400 self-center">ID: {av.id}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500">Sem avarias.</div>
+                    )}
                   </div>
-                </form>
+                </div>
               )}
             </div>
+
             <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
-              <button className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeEditModal}>Fechar</button>
-              <button
-                className={`h-10 px-4 rounded text-white font-semibold ${editLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
-                onClick={saveEditData}
-                disabled={editLoading}
-              >
-                {editLoading ? "Salvando..." : "Salvar"}
+              <button className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeViewModal}>
+                Fechar
               </button>
             </div>
           </div>
@@ -1123,4 +1312,24 @@ export default function ChecklistsList() {
   );
 }
 
-
+/**
+ * Componente auxiliar para exibir um campo de leitura (label + valor)
+ */
+function Field({
+  label,
+  value,
+  compact = false,
+}: {
+  label: string;
+  value?: any;
+  compact?: boolean;
+}) {
+  const display =
+    value === null || value === undefined || value === "" ? "—" : String(value);
+  return (
+    <div className={compact ? "" : "border rounded px-3 py-2 bg-gray-50"}>
+      <div className={`text-xs ${compact ? "text-gray-500" : "text-gray-600"} mb-1`}>{label}</div>
+      <div className="text-sm">{display}</div>
+    </div>
+  );
+}
