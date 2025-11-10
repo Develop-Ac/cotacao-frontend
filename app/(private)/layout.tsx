@@ -475,12 +475,18 @@ export default function RootLayout({
                     const itemsToRender = popover.section === 'Compras' ? comprasSubmenu : mainItems.map(item => ({ label: item.label, href: item.href }));
 
                     return itemsToRender.map(item => (
-                      item.items ? (
+                      ('items' in item && item.items) ? (
                         <li key={item.label}>
                           <button
                             className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition ${buttonMotionClasses}`}
-                            onMouseEnter={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items }); }}
-                            onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items }); }}
+                            onMouseEnter={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
+                            }}
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
+                            }}
                           >
                             <span>{item.label}</span>
                             <MdChevronRight className="ml-auto text-gray-400" />
