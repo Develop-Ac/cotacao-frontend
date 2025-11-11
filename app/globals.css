@@ -106,9 +106,9 @@ a.button:not(.keep-color),
 a[aria-disabled][role="button"]:not(.keep-color),
 a[class*="btn"]:not(.keep-color),
 a[class*="button"]:not(.keep-color) {
-  background-color: var(--primary-600) !important; /* #3067C5 */
+  /* background-color: var(--primary-600) !important; #3067C5 */
   background-image: none !important; /* override tailwind gradients */
-  color: #ffffff !important;
+  /* color: #ffffff !important; */
   font-weight: 700 !important;
   border-color: var(--primary-600) !important;
 }
