@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useRef } from "react";
+import "./comparativo.override.css"; // Sobrescreve os estilos globais
 
 type ApiItem = {
   id: string | number;
