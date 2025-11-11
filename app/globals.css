@@ -113,15 +113,15 @@ a[class*="button"]:not(.keep-color):not(.comparativo) {
   border-color: var(--primary-600) !important;
 }
 
-button:hover:not(:disabled):not(.keep-color),
-.btn:hover:not(.keep-color),
-input[type="submit"]:hover:not(.keep-color),
-a.btn:hover:not(.keep-color),
-[role="button"]:hover:not(.keep-color),
-a.button:hover:not(.keep-color),
-.button:hover:not(.keep-color),
-a[class*="btn"]:hover:not(.keep-color),
-a[class*="button"]:hover:not(.keep-color) {
+button:hover:not(:disabled):not(.keep-color):not(.comparativo),
+.btn:hover:not(.keep-color):not(.comparativo),
+input[type="submit"]:hover:not(.keep-color):not(.comparativo),
+a.btn:hover:not(.keep-color):not(.comparativo),
+[role="button"]:hover:not(.keep-color):not(.comparativo),
+a.button:hover:not(.keep-color):not(.comparativo),
+.button:hover:not(.keep-color):not(.comparativo),
+a[class*="btn"]:hover:not(.keep-color):not(.comparativo),
+a[class*="button"]:hover:not(.keep-color):not(.comparativo) {
   background-color: var(--primary-800) !important; /* deeper blue */
 }
 
