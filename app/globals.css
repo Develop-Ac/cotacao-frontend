@@ -92,23 +92,23 @@ aside.collapsed details > ul { display: none; }
 
 /* Global button styling override: blue background, white bold text/icons */
 /* Opt-out by adding .keep-color on the element */
-button:not(.keep-color),
-.btn:not(.keep-color),
-.btn-primary:not(.keep-color),
-.btn-success:not(.keep-color),
-.btn-warning:not(.keep-color),
-input[type="submit"]:not(.keep-color),
-a.btn:not(.keep-color),
-[role="button"]:not(.keep-color),
+button:not(.keep-color):not(.comparativo),
+.btn:not(.keep-color):not(.comparativo),
+.btn-primary:not(.keep-color):not(.comparativo),
+.btn-success:not(.keep-color):not(.comparativo),
+.btn-warning:not(.keep-color):not(.comparativo),
+input[type="submit"]:not(.keep-color):not(.comparativo),
+a.btn:not(.keep-color):not(.comparativo),
+[role="button"]:not(.keep-color):not(.comparativo),
 /* Common anchor-as-button patterns */
-a.button:not(.keep-color),
-.button:not(.keep-color),
-a[aria-disabled][role="button"]:not(.keep-color),
-a[class*="btn"]:not(.keep-color),
-a[class*="button"]:not(.keep-color) {
-  /* background-color: var(--primary-600) !important; #3067C5 */
+a.button:not(.keep-color):not(.comparativo),
+.button:not(.keep-color):not(.comparativo),
+a[aria-disabled][role="button"]:not(.keep-color):not(.comparativo),
+a[class*="btn"]:not(.keep-color):not(.comparativo),
+a[class*="button"]:not(.keep-color):not(.comparativo) {
+  background-color: var(--primary-600) !important; /* #3067C5 */
   background-image: none !important; /* override tailwind gradients */
-  /* color: #ffffff !important; */
+  color: #ffffff !important;
   font-weight: 700 !important;
   border-color: var(--primary-600) !important;
 }

@@ -2,7 +2,6 @@
 "use client";
 
 import { useMemo, useState, useCallback, useRef } from "react";
-import "./comparativo.override.css"; // Sobrescreve os estilos globais
 
 type ApiItem = {
   id: string | number;
@@ -682,7 +681,7 @@ export default function ComparativoPage() {
                         <button
                           type="button"
                           onClick={() => openObservacao(f)}
-                          className="group flex w-full flex-col items-end text-right"
+                          className="group flex w-full flex-col items-end text-right comparativo"
                           title="Clique para ver observações do fornecedor"
                         >
                           <span className="truncate max-w-[240px] underline decoration-dotted underline-offset-2 group-hover:underline" title={f.for_nome}>
@@ -734,7 +733,7 @@ export default function ComparativoPage() {
                               <button
                                 type="button"
                                 onClick={() => openEditPrice(row, f)}
-                                className="group inline-flex items-center justify-end gap-2 w-full"
+                                className="group inline-flex items-center justify-end gap-2 w-full comparativo"
                                 title="Clique para editar o valor"
                               >
                                 <span className={`inline-block h-2.5 w-2.5 rounded-full ${dot}`} />
