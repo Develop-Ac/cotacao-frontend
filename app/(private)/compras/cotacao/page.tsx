@@ -249,19 +249,12 @@ export default function Tela() {
     }
   };
 
-  const copiarLinkFornecedor = async (f: FornecedorSalvo) => {
-    if (!f?.for_codigo || !pedidoSelecionado) return;
-    const url = `https://fornecedor.acacessorios.com.br/cotacao?for_codigo=${encodeURIComponent(
+  // Função para gerar o link do fornecedor
+  const gerarLinkFornecedor = (f: FornecedorSalvo) => {
+    if (!f?.for_codigo || !pedidoSelecionado) return "";
+    return `https://fornecedor.acacessorios.com.br/cotacao?for_codigo=${encodeURIComponent(
       String(f.for_codigo)
     )}&pedido_cotacao=${encodeURIComponent(String(pedidoSelecionado))}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setFornMsg("Link copiado!");
-      setTimeout(() => setFornMsg(null), 2000);
-    } catch {
-      setFornMsg("Falha ao copiar.");
-      setTimeout(() => setFornMsg(null), 2000);
-    }
   };
 
   return (
@@ -471,7 +464,7 @@ export default function Tela() {
                       <th className="p-2 text-start">Código</th>
                       <th className="p-2 text-start">Nome</th>
                       <th className="p-2 text-start">CPF/CNPJ</th>
-                      <th className="p-2 text-end" style={{ width: 180 }}>Ação</th>
+                      <th className="p-2 text-end" style={{ width: 180 }}>Link</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -486,12 +479,14 @@ export default function Tela() {
                         <td className="p-3">{f.for_nome}</td>
                         <td className="p-3">{f.cpf_cnpj}</td>
                         <td className="p-3 text-end">
-                          <button
-                            className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-                            onClick={() => copiarLinkFornecedor(f)}
-                          >
-                            Copiar link
-                          </button>
+                          <input
+                            type="text"
+                            readOnly
+                            value={gerarLinkFornecedor(f)}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50 cursor-pointer"
+                            onFocus={(e) => e.target.select()}
+                            title="Selecione e copie o link"
+                          />
                         </td>
                       </tr>
                     ))}
