@@ -142,8 +142,6 @@ export default function Tela() {
         { headers: { Accept: "application/json" } }
       );
 
-      console.log(`http://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`)
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const arr: PedidoResumo[] = Array.isArray(data?.data) ? data.data : [];
@@ -253,7 +251,7 @@ export default function Tela() {
 
   const copiarLinkFornecedor = async (f: FornecedorSalvo) => {
     if (!f?.for_codigo || !pedidoSelecionado) return;
-    const url = `http://intranet-cotacao-fornecedor.naayqg.easypanel.host/cotacao?for_codigo=${encodeURIComponent(
+    const url = `https://fornecedor.acacessorios.com.br/cotacao?for_codigo=${encodeURIComponent(
       String(f.for_codigo)
     )}&pedido_cotacao=${encodeURIComponent(String(pedidoSelecionado))}`;
     try {
