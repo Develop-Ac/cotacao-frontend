@@ -44,7 +44,7 @@ describe('Usuários Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'https://intranetbackend.acacessorios.local/usuarios',
+          'http://intranetbackend.acacessorios.local/usuarios',
           expect.objectContaining({
             method: 'GET',
             headers: { Accept: 'application/json' }
@@ -170,7 +170,7 @@ describe('Usuários Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'https://intranetbackend.acacessorios.local/usuarios',
+          'http://intranetbackend.acacessorios.local/usuarios',
           expect.objectContaining({
             method: 'POST',
             headers: {
@@ -252,7 +252,7 @@ describe('Usuários Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'https://intranetbackend.acacessorios.local/usuarios/1',
+          'http://intranetbackend.acacessorios.local/usuarios/1',
           expect.objectContaining({
             method: 'DELETE',
             headers: {

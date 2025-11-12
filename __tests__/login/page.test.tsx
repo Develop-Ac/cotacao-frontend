@@ -93,7 +93,7 @@ describe('Login Page', () => {
       await user.click(screen.getByRole('button', { name: 'Entrar' }))
       
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://intranetbackend.acacessorios.local/login',
+        'http://intranetbackend.acacessorios.local/login',
         {
           method: 'POST',
           headers: {
@@ -170,7 +170,7 @@ describe('Login Page', () => {
       await user.click(screen.getByRole('button', { name: 'Entrar' }))
       
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://intranetbackend.acacessorios.local/login',
+        'http://intranetbackend.acacessorios.local/login',
         expect.objectContaining({
           body: JSON.stringify({ codigo: '', senha: '' }),
         })

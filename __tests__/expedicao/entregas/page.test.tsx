@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import EntregasPage from '@/app/(private)/expedicao/entregas/page'
+import EntregasPage from '@/app/(private)/expedicao/dashboard/page'
 import { mockFetchResponse, mockFetchError, setupAuthenticatedUser } from '../../utils/test-utils'
 
 interface Entrega {
@@ -71,7 +71,7 @@ describe('Entregas Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'https://intranetbackend.acacessorios.local/expedicao/entregas'
+          'http://intranetbackend.acacessorios.local/expedicao/entregas'
         )
       })
     })

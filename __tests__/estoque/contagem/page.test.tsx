@@ -128,7 +128,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'https://intranetbackend.acacessorios.local/compras/cotacao/123'
+          'http://intranetbackend.acacessorios.local/compras/cotacao/123'
         )
       })
     })
@@ -236,7 +236,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('https://intranetbackend.acacessorios.local/estoque/contagem')
+          expect.stringContaining('http://intranetbackend.acacessorios.local/estoque/contagem')
         )
       })
     })
@@ -484,7 +484,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'https://intranetbackend.acacessorios.local/usuarios'
+          'http://intranetbackend.acacessorios.local/usuarios'
         )
       })
     })
@@ -576,7 +576,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'https://intranetbackend.acacessorios.local/estoque/contagem',
+          'http://intranetbackend.acacessorios.local/estoque/contagem',
           expect.objectContaining({
             method: 'POST',
             headers: {

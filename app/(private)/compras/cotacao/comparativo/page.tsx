@@ -31,7 +31,7 @@ type ApiResponseTodos = {
 };
 
 // ====== CONFIG do endpoint de salvamento ======
-const SAVE_URL = `https://intranetbackend.acacessorios.local/compras/pedido`;
+const SAVE_URL = `http://intranetbackend.acacessorios.local/compras/pedido`;
 
 // --- utils ---
 const parseMoney = (v: string | number | null | undefined): number | null => {
@@ -128,7 +128,7 @@ export default function ComparativoPage() {
     setObsData(null);
     setObsTarget({ for_codigo: f.for_codigo, for_nome: f.for_nome });
     try {
-      const url = `https://intranet-cotacao-fornecedor.naayqg.easypanel.host/api/cotacao/observacao?pedido_cotacao=${encodeURIComponent(
+      const url = `http://intranet-cotacao-fornecedor.naayqg.easypanel.host/api/cotacao/observacao?pedido_cotacao=${encodeURIComponent(
         pedidoCarregado
       )}&for_codigo=${encodeURIComponent(f.for_codigo)}`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
@@ -276,7 +276,7 @@ export default function ComparativoPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`https://intranetbackend.acacessorios.local/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
+      const res = await fetch(`http://intranetbackend.acacessorios.local/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
       if (!res.ok) {
         let emsg = `HTTP ${res.status}`;
         try {

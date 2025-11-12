@@ -36,7 +36,7 @@ export default function Login() {
   // Função para carregar usuários
   const carregarUsuarios = async () => {
     try {
-      const response = await fetch("https://intranetbackend.acacessorios.local/usuarios", {
+      const response = await fetch("http://intranetbackend.acacessorios.local/usuarios", {
         method: "GET",
         headers: { "Accept": "application/json" },
       });
@@ -63,7 +63,7 @@ export default function Login() {
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch("https://intranetbackend.acacessorios.local/usuarios", {
+      const response = await fetch("http://intranetbackend.acacessorios.local/usuarios", {
         method: "POST",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ nome, codigo, setor, senha }),
@@ -96,7 +96,7 @@ export default function Login() {
 
   const deletarUsuario = async (id: string) => {
     try {
-      const response = await fetch(`https://intranetbackend.acacessorios.local/usuarios/${id}`, {
+      const response = await fetch(`http://intranetbackend.acacessorios.local/usuarios/${id}`, {
         method: "DELETE",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
       });

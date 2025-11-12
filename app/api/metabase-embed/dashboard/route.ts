@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
-const METABASE_SITE_URL = "https://bi.acacessorios.local"; // igual ao MB_SITE_URL do Metabase
+const METABASE_SITE_URL = "http://bi.acacessorios.local"; // igual ao MB_SITE_URL do Metabase
 const METABASE_SECRET_KEY = "cmhp8xpyq0000356orleqfl9x"; // defina no .env do servidor
 
 export async function GET(req: NextRequest) {

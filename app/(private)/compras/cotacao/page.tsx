@@ -63,7 +63,7 @@ export default function Tela() {
     if (!p) return setMsgCot("Informe o pedido de cotação.");
     setLoadingCot(true);
     try {
-      const url = `https://intranetbackend.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
+      const url = `http://intranetbackend.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -100,7 +100,7 @@ export default function Tela() {
         })),
       };
 
-      const res = await fetch(`https://intranetbackend.acacessorios.local/compras/pedidos-cotacao`, {
+      const res = await fetch(`http://intranetbackend.acacessorios.local/compras/pedidos-cotacao`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -138,11 +138,11 @@ export default function Tela() {
     setLoadingPedidos(true);
     try {
       const res = await fetch(
-        `https://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`,
+        `http://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`,
         { headers: { Accept: "application/json" } }
       );
 
-      console.log(`https://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`)
+      console.log(`http://intranetbackend.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`)
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -172,7 +172,7 @@ export default function Tela() {
   const carregarFornecedoresSalvos = async (pedido_cotacao: number) => {
     try {
       const res = await fetch(
-        `https://intranetbackend.acacessorios.local/compras/fornecedor?pedido_cotacao=${encodeURIComponent(String(pedido_cotacao))}`,
+        `http://intranetbackend.acacessorios.local/compras/fornecedor?pedido_cotacao=${encodeURIComponent(String(pedido_cotacao))}`,
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -204,7 +204,7 @@ export default function Tela() {
     setLoadingForn(true);
     try {
       // 1) Consulta fornecedor na OPENQUERY
-      const res = await fetch(`https://intranetbackend.acacessorios.local/compras/openquery/fornecedor/${code}`, {
+      const res = await fetch(`http://intranetbackend.acacessorios.local/compras/openquery/fornecedor/${code}`, {
         headers: { Accept: "application/json" },
       });
       if (res.status === 404) {
@@ -222,7 +222,7 @@ export default function Tela() {
         cpf_cnpj: novo.CPF_CNPJ ?? null,
         itens: [], // se quiser salvar itens também, envie aqui
       };
-      const post = await fetch(`https://intranetbackend.acacessorios.local/compras/fornecedor`, {
+      const post = await fetch(`http://intranetbackend.acacessorios.local/compras/fornecedor`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(postBody),
@@ -253,7 +253,7 @@ export default function Tela() {
 
   const copiarLinkFornecedor = async (f: FornecedorSalvo) => {
     if (!f?.for_codigo || !pedidoSelecionado) return;
-    const url = `https://intranet-cotacao-fornecedor.naayqg.easypanel.host/cotacao?for_codigo=${encodeURIComponent(
+    const url = `http://intranet-cotacao-fornecedor.naayqg.easypanel.host/cotacao?for_codigo=${encodeURIComponent(
       String(f.for_codigo)
     )}&pedido_cotacao=${encodeURIComponent(String(pedidoSelecionado))}`;
     try {

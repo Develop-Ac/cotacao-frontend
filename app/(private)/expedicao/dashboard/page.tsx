@@ -107,7 +107,7 @@ export default function EntregasPage() {
     useEffect(() => {
         const fetchEntregas = async () => {
             try {
-                const response = await fetch('https://intranetbackend.acacessorios.local/expedicao/entregas');
+                const response = await fetch('http://intranetbackend.acacessorios.local/expedicao/entregas');
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados');
                 }
