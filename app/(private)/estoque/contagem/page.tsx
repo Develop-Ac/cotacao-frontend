@@ -2,6 +2,7 @@
 
 import { FaPlusSquare, FaSync } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { randomUUID } from 'crypto';
 
 type CotacaoItem = {
     PEDIDO_COTACAO: number;
@@ -207,7 +208,7 @@ export default function Tela() {
     const salvarContagem = async () => {
         const produtosSelecionados = Array.from(itensSelecionados).map(index => itensFiltrados[index]);
 
-        const contagem_cuid = crypto.randomUUID();
+        const contagem_cuid = randomUUID();
         
         try {
             if (contagem1) {
