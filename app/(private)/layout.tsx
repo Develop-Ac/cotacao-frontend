@@ -284,6 +284,23 @@ export default function RootLayout({
                             </details>
                           </li>
                           <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                            <details className="group">
+                              <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/cotacao') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
+                                <span className="font-medium">Nota Fiscal</span>
+                                <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
+                              </summary>
+                              <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                                <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
+                                  <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                                    <Link href="/compras/notaFiscal/notaFiscal" onClick={(e) => handleNavigation('/compras/notaFiscal/notaFiscal', e)} className={linkClasses('/compras/notaFiscal/notaFiscal', true)}>
+                                      Lista
+                                    </Link>
+                                  </li>
+                                </ul>
+                              </div>
+                            </details>
+                          </li>
+                          <li className={cascadeItemClass()} style={cascadeStyle(2)}>
                             <Link href="/compras/kanban" onClick={(e) => handleNavigation('/compras/kanban', e)} className={`${linkClasses('/compras/kanban')} px-4 block`}>
                               Kanban
                             </Link>
