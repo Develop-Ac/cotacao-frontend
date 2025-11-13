@@ -31,7 +31,7 @@ type ApiResponseTodos = {
 };
 
 // ====== CONFIG do endpoint de salvamento ======
-const SAVE_URL = `http://intranetbackend.acacessorios.local/compras/pedido`;
+const SAVE_URL = `http://compras-service.acacessorios.local/compras/pedido`;
 
 // --- utils ---
 const parseMoney = (v: string | number | null | undefined): number | null => {
@@ -276,7 +276,7 @@ export default function ComparativoPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`http://intranetbackend.acacessorios.local/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
+      const res = await fetch(`http://compras-service.acacessorios.local/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
       if (!res.ok) {
         let emsg = `HTTP ${res.status}`;
         try {

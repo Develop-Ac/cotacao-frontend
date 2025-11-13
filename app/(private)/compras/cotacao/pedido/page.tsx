@@ -17,7 +17,7 @@ type CotacaoItem = {
 // Novo tipo para a listagem vinda de GET /compras/pedido
 type PedidoListItem = {
   id: string;              // UUID do pedido
-  for_codigo: string;      // veio como string aqui (ok)
+  for_nome: string;      // veio como string aqui (ok)
   pedido_cotacao: number;
   created_at: string;      // ISO
   itens_count: number;
@@ -47,7 +47,7 @@ export default function Tela() {
     if (!p) return setMsgCot("Informe o pedido de cotação.");
     setLoadingCot(true);
     try {
-      const url = `http://intranetbackend.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
+      const url = `http://compras-service.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -83,7 +83,7 @@ export default function Tela() {
         })),
       };
 
-      const res = await fetch("http://intranetbackend.acacessorios.local/compras/pedidos-cotacao", {
+      const res = await fetch("http://compras-service.acacessorios.local/compras/pedidos-cotacao", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -119,7 +119,7 @@ export default function Tela() {
     setMsgPedidos(null);
     setLoadingPedidos(true);
     try {
-      const res = await fetch(`http://intranetbackend.acacessorios.local/compras/pedido`, {
+      const res = await fetch(`http://compras-service.acacessorios.local/compras/pedido`, {
         headers: { Accept: "application/json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -165,7 +165,7 @@ export default function Tela() {
 
     return pedidos.filter((p) => {
       // Fornecedor
-      if (fFor && !String(p.for_codigo ?? "").includes(fFor.trim())) return false;
+      if (fFor && !String(p.for_nome ?? "").includes(fFor.trim())) return false;
 
       // Pedido de Cotação (exato se numérico)
       if (pedNum != null && !Number.isNaN(pedNum) && p.pedido_cotacao !== pedNum) return false;
@@ -401,7 +401,7 @@ export default function Tela() {
                     )}
                     {pagina.map((p) => (
                       <tr key={p.id} className="border-t hover:bg-gray-50">
-                        <td className="p-3">{p.for_codigo}</td>
+                        <td className="p-3">{p.for_nome}</td>
                         <td className="p-3">{p.pedido_cotacao}</td>
                         <td className="p-3">{fmtDateTime(p.created_at)}</td>
                         <td className="p-3 text-end">{p.itens_count}</td>
@@ -414,7 +414,7 @@ export default function Tela() {
                             {/* PDF com MARCA */}
                             <a
                               className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-                              href={`http://intranetbackend.acacessorios.local/compras/pedido/${encodeURIComponent(p.id)}?marca=true`}
+                              href={`http://compras-service.acacessorios.local/compras/pedido/${encodeURIComponent(p.id)}?marca=true`}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Abrir PDF (com marca)"
@@ -425,7 +425,7 @@ export default function Tela() {
                             {/* PDF sem MARCA */}
                             <a
                               className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-                              href={`http://intranetbackend.acacessorios.local/compras/pedido/${encodeURIComponent(p.id)}?marca=false`}
+                              href={`http://compras-service.acacessorios.local/compras/pedido/${encodeURIComponent(p.id)}?marca=false`}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Abrir PDF (sem marca)"

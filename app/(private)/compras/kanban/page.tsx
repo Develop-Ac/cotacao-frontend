@@ -1,5 +1,6 @@
+
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 
 // --- Types ---
 type ColumnKey =
@@ -417,9 +418,43 @@ export default function Page() {
     return out;
   }, [board, filterResp]);
 
+  // --- Scroll horizontal por arraste ---
+  const boardRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const scrollStartX = useRef(0);
+
+  // handlers para mouse/touch
+  function handleBoardMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    scrollStartX.current = boardRef.current?.scrollLeft || 0;
+    document.body.style.cursor = "grabbing";
+  }
+  function handleBoardMouseMove(e: MouseEvent) {
+    if (!isDragging.current) return;
+    if (!boardRef.current) return;
+    const dx = e.clientX - dragStartX.current;
+    boardRef.current.scrollLeft = scrollStartX.current - dx;
+  }
+  function handleBoardMouseUp() {
+    isDragging.current = false;
+    document.body.style.cursor = "";
+  }
+  useEffect(() => {
+    const move = (e: MouseEvent) => handleBoardMouseMove(e);
+    const up = () => handleBoardMouseUp();
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-neutral-950 dark:to-neutral-900 text-gray-900 dark:text-gray-100">
-      <div className="mx-auto max-w-[1400px] px-6 py-8">
+      <div className="max-w-[1400px] px-6 py-8">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">Kanban – Fluxo Operacional</h1>
@@ -461,7 +496,11 @@ export default function Page() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div
+          className="overflow-x-auto cursor-grab"
+          ref={boardRef}
+          onMouseDown={handleBoardMouseDown}
+        >
           <div className="flex gap-4 min-w-max pb-2">
             {COLS.map((c) => (
               <Column

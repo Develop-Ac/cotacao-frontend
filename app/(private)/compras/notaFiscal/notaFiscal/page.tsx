@@ -21,7 +21,7 @@ type NotaFiscalRow = {
   TIPO_OPERACAO_DESC: string;
 };
 
-const API_BASE = "http://intranetbackend.acacessorios.local/compras/nota-fiscal/nfe-distribuicao";
+const API_BASE = "http://compras-service.acacessorios.local/compras/nota-fiscal/nfe-distribuicao";
 
 export default function NotaFiscalList() {
   const BTN =
@@ -211,13 +211,13 @@ export default function NotaFiscalList() {
                 <table className="min-w-full">
                   <thead>
                     <tr>
-                      <th className="p-2 text-start">Empresa</th>
+                      {/* <th className="p-2 text-start">Empresa</th> */}
                       <th className="p-2 text-start">Chave NFe</th>
                       <th className="p-2 text-start">CPF/CNPJ Emitente</th>
                       <th className="p-2 text-start">Nome Emitente</th>
                       <th className="p-2 text-start">RG/IE Emitente</th>
                       <th className="p-2 text-start">Data Emissão</th>
-                      <th className="p-2 text-start">Tipo Operação</th>
+                      {/* <th className="p-2 text-start">Tipo Operação</th> */}
                       <th className="p-2 text-start">Tipo Operação Desc</th>
                       <th className="p-2 text-center">PDF</th>
                     </tr>
@@ -225,13 +225,13 @@ export default function NotaFiscalList() {
                   <tbody>
                     {paged.map((row, idx) => (
                       <tr key={row.CHAVE_NFE ?? idx} className="border-t">
-                        <td className="p-4">{row.EMPRESA}</td>
+                        {/* <td className="p-4">{row.EMPRESA}</td> */}
                         <td className="p-4">{row.CHAVE_NFE}</td>
                         <td className="p-4">{row.CPF_CNPJ_EMITENTE}</td>
                         <td className="p-4">{row.NOME_EMITENTE}</td>
                         <td className="p-4">{row.RG_IE_EMITENTE}</td>
                         <td className="p-4">{fmtDate(row.DATA_EMISSAO)}</td>
-                        <td className="p-4">{row.TIPO_OPERACAO}</td>
+                        {/* <td className="p-4">{row.TIPO_OPERACAO}</td> */}
                         <td className="p-4">{row.TIPO_OPERACAO_DESC}</td>
                         <td className="p-4 text-center">
                           <button
@@ -239,7 +239,7 @@ export default function NotaFiscalList() {
                             title="Baixar PDF DANFE"
                             onClick={async () => {
                               try {
-                                const res = await fetch(`http://intranetbackend.acacessorios.local/compras/nota-fiscal/danfe?chaveNfe=${row.CHAVE_NFE}`, {
+                                const res = await fetch(`http://compras-service.acacessorios.local/compras/nota-fiscal/danfe?chaveNfe=${row.CHAVE_NFE}`, {
                                   method: "GET",
                                   headers: { Accept: "application/pdf" },
                                 });

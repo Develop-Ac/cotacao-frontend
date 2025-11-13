@@ -1,6 +1,7 @@
 "use client"
 
 import { FaPlusSquare, FaSync } from "react-icons/fa";
+import * as XLSX from "xlsx";
 import { useEffect, useState } from "react";
 import { genId } from "../../../utils/genId";
 
@@ -439,7 +440,21 @@ export default function Tela() {
         setLogsDetalhes([]);
     };
 
-    // ===== Modal fornecedor - Removido pois não é necessário para contagem de estoque =====
+
+    // Função para gerar Excel dos logs
+    const gerarExcelLogs = () => {
+        if (!logsDetalhes.length) return;
+        const data = logsDetalhes.map(log => ({
+            "Código": log.item?.cod_produto ?? "-",
+            "Descrição": log.item?.desc_produto ?? "-",
+            "Estoque": log.estoque ?? "-",
+            "Contado": log.contado ?? "-"
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Logs");
+        XLSX.writeFile(wb, `logs-contagem-${contagemSelecionada?.contagem}.xlsx`);
+    };
 
     const formatarData = (dataISO: string) => {
         return new Date(dataISO).toLocaleDateString('pt-BR');
@@ -765,6 +780,17 @@ export default function Tela() {
                                 className="text-gray-500 hover:text-gray-700 text-2xl"
                             >
                                 ×
+                            </button>
+                        </div>
+
+                        {/* Botão para gerar Excel dos logs */}
+                        <div className="flex justify-end mb-4">
+                            <button
+                                onClick={gerarExcelLogs}
+                                className={`${BTN} mr-2`}
+                                disabled={logsDetalhes.length === 0}
+                            >
+                                Gerar Excel
                             </button>
                         </div>
 
