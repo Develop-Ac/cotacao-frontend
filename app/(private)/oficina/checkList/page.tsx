@@ -46,11 +46,11 @@ type ImageUrlResponse = {
   url: string;
 };
 
-const API_BASE = "http://intranetbackend.acacessorios.local/oficina/checklists";
+const API_BASE = "http://oficina-service.acacessorios.local/oficina/checklists";
 // endpoint das imagens (controller /img/:id)
-const IMG_API_BASE = "http://intranetbackend.acacessorios.local/oficina/img";
+const IMG_API_BASE = "http://oficina-service.acacessorios.local/oficina/img";
 // nova URL para buscar URLs das imagens
-const UPLOADS_API_BASE = "http://intranetbackend.acacessorios.local/oficina/uploads/avarias/url";
+const UPLOADS_API_BASE = "http://oficina-service.acacessorios.local/oficina/uploads/avarias/url";
 
 export default function ChecklistsList() {
   // ====== PADRÕES DE BOTÃO ======

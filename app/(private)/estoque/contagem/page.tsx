@@ -124,7 +124,7 @@ export default function Tela() {
         if (!p) return setMsgCot("Informe o pedido de cotação.");
         setLoadingCot(true);
         try {
-            const url = `http://intranetbackend.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
+            const url = `http://estoque-service.acacessorios.local//compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
             const res = await fetch(url, { headers: { Accept: "application/json" } });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -149,7 +149,7 @@ export default function Tela() {
         
         setLoadingContagem(true);
         try {
-            const url = `http://intranetbackend.acacessorios.local/estoque/contagem?data_inicial=${encodeURIComponent(dataInicial)}&data_final=${encodeURIComponent(dataFinal)}&empresa=3`;
+            const url = `http://estoque-service.acacessorios.local//estoque/contagem?data_inicial=${encodeURIComponent(dataInicial)}&data_final=${encodeURIComponent(dataFinal)}&empresa=3`;
             
             const res = await fetch(url, { headers: { Accept: "application/json" } });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -167,7 +167,7 @@ export default function Tela() {
     const carregarUsuarios = async () => {
         setLoadingUsuarios(true);
         try {
-            const res = await fetch('http://intranetbackend.acacessorios.local/usuarios', {
+            const res = await fetch('http://estoque-service.acacessorios.local//usuarios', {
                 headers: { Accept: "application/json" }
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -221,7 +221,7 @@ export default function Tela() {
                     produtos: produtosSelecionados
                 };
                 
-                await fetch('http://intranetbackend.acacessorios.local/estoque/contagem', {
+                await fetch('http://estoque-service.acacessorios.local//estoque/contagem', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -240,7 +240,7 @@ export default function Tela() {
                     produtos: produtosSelecionados
                 };
                 
-                await fetch('http://intranetbackend.acacessorios.local/estoque/contagem', {
+                await fetch('http://estoque-service.acacessorios.local//estoque/contagem', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -259,7 +259,7 @@ export default function Tela() {
                     produtos: produtosSelecionados
                 };
                 
-                await fetch('http://intranetbackend.acacessorios.local/estoque/contagem', {
+                await fetch('http://estoque-service.acacessorios.local//estoque/contagem', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -341,7 +341,7 @@ export default function Tela() {
                 })),
             };
 
-            const res = await fetch(`http://intranetbackend.acacessorios.local/compras/pedidos-cotacao`, {
+            const res = await fetch(`http://estoque-service.acacessorios.local//compras/pedidos-cotacao`, {
                 method: "POST",
                 headers: { Accept: "application/json", "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -385,7 +385,7 @@ export default function Tela() {
         setLoadingContagensLista(true);
         try {
             const res = await fetch(
-                `http://intranetbackend.acacessorios.local/estoque/contagem/lista?page=${page}&pageSize=${pageSize}`,
+                `http://estoque-service.acacessorios.local//estoque/contagem/lista?page=${page}&pageSize=${pageSize}`,
                 { headers: { Accept: "application/json" } }
             );
 
@@ -419,7 +419,7 @@ export default function Tela() {
             } else {
                 // Caso precise fazer uma requisição separada para buscar os logs
                 const res = await fetch(
-                    `http://intranetbackend.acacessorios.local/estoque/contagem/logs/${contagem.id}`,
+                    `http://estoque-service.acacessorios.local//estoque/contagem/logs/${contagem.id}`,
                     { headers: { Accept: "application/json" } }
                 );
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
