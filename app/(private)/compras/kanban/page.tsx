@@ -205,15 +205,28 @@ function Column({
 }
 
 export default function Page() {
-  const [board, setBoard] = useState<BoardState>(() => {
-    if (typeof window === "undefined")
-      return COLS.reduce((a, c) => ({ ...a, [c.key]: [] }), {} as BoardState);
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return COLS.reduce((a, c) => ({ ...a, [c.key]: [] }), {} as BoardState);
-  });
+  const [board, setBoard] = useState<BoardState>(COLS.reduce((a, c) => ({ ...a, [c.key]: [] }), {} as BoardState));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+
+  // Carrega o board via GET ao montar
+  useEffect(() => {
+    async function fetchBoard() {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch("http://compras-service.acacessorios.local/compras/kanban");
+        if (!res.ok) throw new Error("Erro ao buscar kanban");
+        const data = await res.json();
+        setBoard(data);
+      } catch (err: any) {
+        setError(err.message || "Erro desconhecido");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchBoard();
+  }, []);
 
   // --- Filtro por Responsável ---
   const [filterResp, setFilterResp] = useState<string>("");
@@ -252,9 +265,19 @@ export default function Page() {
     prioridade: "baixa" | "media" | "alta";
   }>({ title: "", desc: "", responsavel: "", due: "", prioridade: "media" });
 
-  // Persistência do board
+  // Persistência do board via PUT
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    if (loading) return; // não envia enquanto carrega
+    async function putBoard() {
+      try {
+        await fetch("http://compras-service.acacessorios.local/compras/kanban", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(board),
+        });
+      } catch {}
+    }
+    putBoard();
   }, [board]);
 
   function addTask(col: ColumnKey, title: string) {
@@ -514,61 +537,6 @@ export default function Page() {
                 onOpenTask={openTaskModal}
               />
             ))}
-          </div>
-        </div>
-
-        {/* Modal: Nova Automação */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[400px] shadow-lg">
-              <h2 className="text-lg font-semibold mb-4">Nova Automação</h2>
-              <label className="block text-sm mb-1">Título</label>
-              <input
-                value={automation.title}
-                onChange={(e) => setAutomation({ ...automation, title: e.target.value })}
-                className="w-full mb-3 rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
-              />
-
-              <label className="block text-sm mb-1">Horário (HH:MM)</label>
-              <input
-                type="time"
-                value={automation.time}
-                onChange={(e) => setAutomation({ ...automation, time: e.target.value })}
-                className="w-full mb-3 rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
-              />
-
-              <label className="block text-sm mb-1">Coluna destino</label>
-              <select
-                value={automation.col}
-                onChange={(e) =>
-                  setAutomation({ ...automation, col: e.target.value as ColumnKey })
-                }
-                className="w-full mb-4 rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
-              >
-                {COLS.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-neutral-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={saveAutomation}
-                  className="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Salvar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Modal: Detalhes/Edição do Card */}
         {showTaskModal && selected && (
@@ -660,6 +628,8 @@ export default function Page() {
           </div>
         )}
       </div>
+    </div>
+    </div>
     </div>
   );
 }
