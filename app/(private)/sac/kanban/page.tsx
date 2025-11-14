@@ -213,7 +213,7 @@ export default function Page() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch("http://sac-service.acacessorios.local/compras/kanban");
+        const res = await fetch("http://sac-service.acacessorios.local/kanban");
         if (!res.ok) throw new Error("Erro ao buscar kanban");
         const data = await res.json();
         setBoard(data);
@@ -286,7 +286,7 @@ export default function Page() {
     if (loading) return; // não envia enquanto carrega
     async function putBoard() {
       try {
-        await fetch("http://sac-service.acacessorios.local/sac/kanban", {
+        await fetch("http://sac-service.acacessorios.local/kanban", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(board),

@@ -19,6 +19,9 @@ export default function Login() {
       });
 
       const data = await response.json();
+
+      console.log('Resposta do login:', data);
+
       if (data.success) {
         localStorage.setItem('auth', 'true');
         localStorage.setItem('userData', JSON.stringify(data));
