@@ -10,6 +10,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Image from 'next/image';
 import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight } from "react-icons/md";
 import { FaShoppingCart, FaWrench, FaBox, FaTruck, FaCog, FaChevronRight } from 'react-icons/fa';
+import { IoPersonSharp } from "react-icons/io5";
 import Link from "next/link";
 import { useState, useEffect, MouseEvent } from "react";
 
@@ -115,6 +116,7 @@ export default function RootLayout({
       'Estoque': ['Estoque'],
       'Expedição': ['Expedição'],
       'Expedicao': ['Expedição'],
+      'Sac': ['Sac'],
     };
 
     const userModules = moduleAccess[userData.setor] || [];
@@ -422,6 +424,44 @@ export default function RootLayout({
                           <li className={cascadeItemClass()} style={cascadeStyle(0)}>
                             <Link href="/expedicao/aplicativo" onClick={(e) => handleNavigation('/expedicao/aplicativo', e)} className={linkClasses('/expedicao/aplicativo')}>
                               Aplicativo
+                            </Link>
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+                  </details>
+                </li>
+              )}
+              {hasAccessToModule('Sac') && (
+                <li>
+                  <details className="group">
+                    <summary
+                      onClick={(e) => {
+                        if (sidebarCollapsed) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Expedicao' });
+                        }
+                      }}
+                      className={summaryClasses(sectionActive.expedicao)}
+                    >
+                      <IoPersonSharp  title="Sac" className={`${iconSpacingClass} ${iconClasses(sectionActive.expedicao)}`} />
+                      <span
+                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
+                        style={labelStyle(4)}
+                        aria-hidden={sidebarCollapsed ? true : undefined}
+                      >
+                        Sac
+                      </span>
+                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
+                    </summary>
+                    {!sidebarCollapsed && (
+                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
+                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                            <Link href="/sac/kanban" onClick={(e) => handleNavigation('/sac/kanban', e)} className={linkClasses('/sac/kanban')}>
+                              Kanban
                             </Link>
                           </li>
                         </ul>
