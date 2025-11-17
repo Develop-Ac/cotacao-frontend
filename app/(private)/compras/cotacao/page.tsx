@@ -252,7 +252,7 @@ export default function Tela() {
   // Função para gerar o link do fornecedor
   const gerarLinkFornecedor = (f: FornecedorSalvo) => {
     if (!f?.for_codigo || !pedidoSelecionado) return "";
-    return `http://compras-service.acacessorios.local/cotacao?for_codigo=${encodeURIComponent(
+    return `https://fornecedor.acacessorios.com.br/cotacao?for_codigo=${encodeURIComponent(
       String(f.for_codigo)
     )}&pedido_cotacao=${encodeURIComponent(String(pedidoSelecionado))}`;
   };
