@@ -1,6 +1,7 @@
 
 "use client";
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { serviceUrl } from "@/lib/services";
 
 // --- Types ---
 // ...existing code...
@@ -199,6 +200,7 @@ function Column({
 }
 
 export default function Page() {
+  const KANBAN_URL = `${serviceUrl("sac")}/kanban`;
   const [board, setBoard] = useState<BoardState>({
     aguardando_atendimento: [],
     em_analise: [],
@@ -213,7 +215,7 @@ export default function Page() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch("http://sac-service.acacessorios.local/kanban");
+        const res = await fetch(KANBAN_URL);
         if (!res.ok) throw new Error("Erro ao buscar kanban");
         const data = await res.json();
         setBoard(data);
@@ -286,7 +288,7 @@ export default function Page() {
     if (loading) return; // não envia enquanto carrega
     async function putBoard() {
       try {
-        await fetch("http://sac-service.acacessorios.local/kanban", {
+        await fetch(KANBAN_URL, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(board),

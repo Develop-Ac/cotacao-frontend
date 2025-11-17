@@ -82,7 +82,7 @@ describe('Pedido Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/compras/pedidos-cotacao'
+          comprasPath('/pedidos-cotacao')
         )
       })
     })
@@ -156,7 +156,7 @@ describe('Pedido Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/compras/openquery/pedido/123?empresa=3',
+          ${comprasPath('/openquery/pedido/123')}?empresa=3,
           expect.objectContaining({
             headers: { Accept: 'application/json' }
           })
@@ -294,7 +294,7 @@ describe('Pedido Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/compras/pedidos-cotacao',
+          comprasPath('/pedidos-cotacao'),
           expect.objectContaining({
             method: 'POST',
             headers: {

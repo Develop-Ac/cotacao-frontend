@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ContagemPage from '@/app/(private)/estoque/contagem/page'
 import { mockFetchResponse, mockFetchError, setupAuthenticatedUser } from '../../utils/test-utils'
+import { serviceUrl } from '@/lib/services'
 
 interface ContagemItem {
   DATA: string;
@@ -36,6 +37,8 @@ interface Usuario {
 
 describe('Contagem Page', () => {
   let fetchMock: jest.Mock
+  const ESTOQUE_BASE = serviceUrl('estoque')
+  const estoquePath = (path = '') => `${ESTOQUE_BASE}${path}`
 
   beforeEach(() => {
     setupAuthenticatedUser()
@@ -128,7 +131,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/compras/cotacao/123'
+          estoquePath('/compras/cotacao/123')
         )
       })
     })
@@ -236,7 +239,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('http://intranetbackend.acacessorios.local/estoque/contagem')
+          expect.stringContaining(estoquePath('/estoque/contagem'))
         )
       })
     })
@@ -484,7 +487,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/usuarios'
+          estoquePath('/usuarios')
         )
       })
     })
@@ -576,7 +579,7 @@ describe('Contagem Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/estoque/contagem',
+          estoquePath('/estoque/contagem'),
           expect.objectContaining({
             method: 'POST',
             headers: {

@@ -11,6 +11,7 @@ import {
   FaDownload,
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { serviceUrl } from "@/lib/services";
 
 // ===============================
 // Tipos esperados da API
@@ -46,11 +47,10 @@ type ImageUrlResponse = {
   url: string;
 };
 
-const API_BASE = "http://oficina-service.acacessorios.local/oficina/checklists";
-// endpoint das imagens (controller /img/:id)
-const IMG_API_BASE = "http://oficina-service.acacessorios.local/oficina/img";
-// nova URL para buscar URLs das imagens
-const UPLOADS_API_BASE = "http://oficina-service.acacessorios.local/oficina/uploads/avarias/url";
+const OFICINA_BASE = serviceUrl("oficina");
+const API_BASE = `${OFICINA_BASE}/oficina/checklists`;
+const IMG_API_BASE = `${OFICINA_BASE}/oficina/img`;
+const UPLOADS_API_BASE = `${OFICINA_BASE}/oficina/uploads/avarias/url`;
 
 export default function ChecklistsList() {
   // ====== PADRÕES DE BOTÃO ======

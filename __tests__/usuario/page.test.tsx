@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import UsuariosPage from '@/app/(private)/usuario/page'
 import { mockFetchResponse, mockFetchError, setupAuthenticatedUser } from '../utils/test-utils'
+import { serviceUrl } from '@/lib/services'
 
 type Usuario = {
   id: string;
@@ -44,7 +45,7 @@ describe('Usuários Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/usuarios',
+          usuariosUrl(),
           expect.objectContaining({
             method: 'GET',
             headers: { Accept: 'application/json' }
@@ -170,7 +171,7 @@ describe('Usuários Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/usuarios',
+          usuariosUrl(),
           expect.objectContaining({
             method: 'POST',
             headers: {
@@ -252,7 +253,7 @@ describe('Usuários Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/usuarios/1',
+          usuariosUrl('/1'),
           expect.objectContaining({
             method: 'DELETE',
             headers: {

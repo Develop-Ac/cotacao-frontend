@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { serviceUrl } from '@/lib/services';
 
 interface Entrega {
     id: number;
@@ -104,10 +105,12 @@ export default function EntregasPage() {
         });
     };
 
+    const EXPEDICAO_API = serviceUrl("expedicao");
+
     useEffect(() => {
         const fetchEntregas = async () => {
             try {
-                const response = await fetch('http://expedicao-service.acacessorios.local/expedicao/entregas');
+                const response = await fetch(`${EXPEDICAO_API}/expedicao/entregas`);
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados');
                 }

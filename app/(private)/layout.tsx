@@ -9,7 +9,7 @@ import PrivateRoute from "@/components/PrivateRoute";
 import { useRouter, usePathname } from "next/navigation";
 import Image from 'next/image';
 import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight } from "react-icons/md";
-import { FaShoppingCart, FaWrench, FaBox, FaTruck, FaCog, FaChevronRight } from 'react-icons/fa';
+import { FaShoppingCart, FaWrench, FaBox, FaTruck, FaCog, FaChevronRight, FaClipboardCheck } from 'react-icons/fa';
 import { IoPersonSharp } from "react-icons/io5";
 import Link from "next/link";
 import { useState, useEffect, MouseEvent } from "react";
@@ -36,13 +36,14 @@ export default function RootLayout({
       ? pathname === '/'
       : pathname === target || pathname.startsWith(`${target}/`);
 
-  const sectionActive = {
-    compras: isPathActive('/compras'),
-    oficina: isPathActive('/oficina'),
-    estoque: isPathActive('/estoque'),
-    expedicao: isPathActive('/expedicao'),
-    sistema: isPathActive('/usuario'),
-  };
+  const sectionActive = {
+    compras: isPathActive('/compras'),
+    oficina: isPathActive('/oficina'),
+    estoque: isPathActive('/estoque'),
+    expedicao: isPathActive('/expedicao'),
+    qualidade: isPathActive('/qualidade'),
+    sistema: isPathActive('/usuario'),
+  };
   const buttonMotionClasses = "transition-transform duration-200 ease-out hover:scale-105 active:scale-95";
 
   const summaryClasses = (active: boolean) =>
@@ -116,6 +117,8 @@ export default function RootLayout({
       'Estoque': ['Estoque'],
       'Expedição': ['Expedição'],
       'Expedicao': ['Expedição'],
+      'Qualidade': ['Qualidade'],
+
       'Sac': ['Sac'],
     };
 
@@ -127,7 +130,7 @@ export default function RootLayout({
     switch (section) {
       case 'Compras':
         return [
-          { label: 'Criar Cotação', href: '/compras/cotacao' },
+          { label: 'Criar Cota��o', href: '/compras/cotacao' },
           { label: 'Comparativo', href: '/compras/cotacao/comparativo' },
           { label: 'Pedido', href: '/compras/cotacao/pedido' },
           { label: 'Kanban', href: '/compras/kanban' },
@@ -138,8 +141,14 @@ export default function RootLayout({
         return [{ label: 'Contagem', href: '/estoque/contagem' }];
       case 'Expedicao':
         return [{ label: 'Entregas', href: '/expedicao/entregas' }];
+      case 'Qualidade':
+        return [
+          { label: 'Central', href: '/qualidade' },
+          { label: 'Nova Garantia', href: '/qualidade/nova' },
+          { label: 'Inbox', href: '/qualidade/caixa' },
+        ];
       case 'Sistema':
-        return [{ label: 'Usuários', href: '/usuario' }];
+        return [{ label: 'Usu�rios', href: '/usuario' }];
       default:
         return [];
     }
@@ -428,11 +437,59 @@ export default function RootLayout({
                           </li>
                         </ul>
                       </div>
-                    )}
-                  </details>
-                </li>
               )}
-              {hasAccessToModule('Sac') && (
+            </details>
+          </li>
+        )}
+        {hasAccessToModule('Qualidade') && (
+          <li>
+            <details className="group">
+              <summary
+                onClick={(e) => {
+                  if (sidebarCollapsed) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Qualidade' });
+                  }
+                }}
+                className={summaryClasses(sectionActive.qualidade)}
+              >
+                <FaClipboardCheck title="Qualidade" className={`${iconSpacingClass} ${iconClasses(sectionActive.qualidade)}`} />
+                <span
+                  className={`font-medium whitespace-nowrap ${textTransitionClass}`}
+                  style={labelStyle(5)}
+                  aria-hidden={sidebarCollapsed ? true : undefined}
+                >
+                  Qualidade
+                </span>
+                {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
+              </summary>
+              {!sidebarCollapsed && (
+                <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                  <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
+                    <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                      <Link href="/qualidade" onClick={(e) => handleNavigation('/qualidade', e)} className={linkClasses('/qualidade', true)}>
+                        Central
+                      </Link>
+                    </li>
+                    <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                      <Link href="/qualidade/nova" onClick={(e) => handleNavigation('/qualidade/nova', e)} className={linkClasses('/qualidade/nova')}>
+                        Nova Garantia
+                      </Link>
+                    </li>
+                    <li className={cascadeItemClass()} style={cascadeStyle(2)}>
+                      <Link href="/qualidade/caixa" onClick={(e) => handleNavigation('/qualidade/caixa', e)} className={linkClasses('/qualidade/caixa')}>
+                        Inbox
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </details>
+          </li>
+        )}
+        {hasAccessToModule('Sac') && (
                 <li>
                   <details className="group">
                     <summary
@@ -616,3 +673,7 @@ export default function RootLayout({
     </PrivateRoute>
   );
 }
+
+
+
+
