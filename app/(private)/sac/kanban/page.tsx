@@ -359,6 +359,9 @@ export default function Page() {
       ...prev,
       [col]: prev[col].filter((t) => t.id !== id),
     }));
+    fetch(`${KANBAN_URL}/kanban/${id}`, {
+      method: "DELETE"
+    });
   }
   async function moveTask(data: DragData, to: ColumnKey) {
     setBoard((prev) => {
