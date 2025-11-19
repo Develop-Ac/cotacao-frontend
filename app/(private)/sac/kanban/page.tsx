@@ -1,15 +1,24 @@
-
 "use client";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { serviceUrl } from "@/lib/services";
 
+const KANBAN_URL = serviceUrl("sac");
+// const KANBAN_URL = "http://localhost:8000";
+
 // --- Types ---
+type ColumnKey = "aguardando_atendimento" | "em_analise" | "finalizado";
+const COLS: { key: ColumnKey; label: string }[] = [
+  { key: "aguardando_atendimento", label: "Aguardando atendimento" },
+  { key: "em_analise", label: "Em análise" },
+  { key: "finalizado", label: "Finalizado" },
+];
 // ...existing code...
 
 type Task = {
   id: string;
   title: string;
   createdAt: number;
+  etapa: ColumnKey;
   // campos extras (editáveis no modal do card)
   desc?: string;
   responsavel?: string;
@@ -29,15 +38,14 @@ type Task = {
 };
 
 type DragData = { taskId: string; from: ColumnKey };
-type BoardState = Record<ColumnKey, Task[]>;
+  type BoardState = Record<string, Task[]>;
 
-type ColumnKey = "aguardando_atendimento" | "em_analise" | "finalizado";
-
-const COLS: { key: ColumnKey; label: string }[] = [
-  { key: "aguardando_atendimento", label: "Aguardando atendimento" },
-  { key: "em_analise", label: "Em análise" },
-  { key: "finalizado", label: "Finalizado" },
-];
+// COLS será gerado dinamicamente após o fetch
+const COL_LABELS: Record<string, string> = {
+  aguardando_atendimento: "Aguardando atendimento",
+  em_analise: "Em análise",
+  finalizado: "Finalizado",
+};
 
 const STORAGE_KEY = "kanban_ac_board_v1";
 const AUTOS_KEY = "kanban_automations";
@@ -156,7 +164,7 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
     } catch {}
     const canMove = (userSetor === "Atacado" || userSetor === "Varejo") ? colKey === "aguardando_atendimento" : true;
     if (!payload || !canMove) return;
-    onDropTask(payload, colKey);
+    onDropTask(payload, colKey as ColumnKey);
   }
 
   return (
@@ -164,67 +172,58 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
       data-col={colKey}
       onDragOver={(e: React.DragEvent<HTMLDivElement>) => e.preventDefault()}
       onDrop={handleDrop}
-      className="flex flex-col gap-3 w-[320px] md:w-[360px] dark:bg-neutral-950 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm p-3 min-h-[280px]"
+      className="min-w-[320px] w-[320px] bg-white dark:bg-neutral-950 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-neutral-800 flex flex-col"
     >
-      <div className="sticky top-0 dark:bg-neutral-950/80 backdrop-blur rounded-xl px-2 py-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{label}</h3>
-        <span className="text-xs text-gray-400">{tasks.length}</span>
-      </div>
-      <div className="flex flex-col gap-2 mt-1 max-h-[70vh] overflow-y-auto pr-1">
+      <h2 className="text-lg font-semibold mb-3">{label}</h2>
+      <div className="flex flex-col gap-2">
         {tasks.map((t) => (
           <Card
             key={t.id}
             task={t}
             onDelete={() => onDeleteTask(colKey, t.id)}
             onOpen={() => onOpenTask(colKey, t.id)}
-            colKey={colKey}
+            colKey={colKey as ColumnKey}
             userSetor={userSetor}
           />
         ))}
       </div>
-      {/* Define canCreate for this scope */}
-      {(() => {
-        const canCreate = true; // or set your logic here
-        return (
-          <div className="flex mt-2 gap-1">
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Novo card..."
-              className="w-full text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1"
-              disabled={!canCreate}
-            />
-            <button
-              onClick={() => {
-                let title = value.trim();
-                if (!title) {
-                  // Busca o maior número global entre todas as colunas
-                  const prefix = "garantia #";
-                  const allTasks = Object.values(board).flat() as Task[];
-                  const nums = allTasks
-                    .map((t: Task) => t.title)
-                    .filter(t => t.startsWith(prefix))
-                    .map(t => {
-                      const m = t.match(/garantia #(\d{3})/);
-                      return m ? parseInt(m[1], 10) : null;
-                    })
-                    .filter(n => n !== null);
-                  const nextNum = nums.length ? Math.max(...nums as number[]) + 1 : 0;
-                  title = `${prefix}${nextNum.toString().padStart(3, "0")}`;
-                }
-                if (canCreate) {
-                  onAddTask(colKey, title);
-                  setValue("");
-                }
-              }}
-              className="text-sm px-3 py-1 rounded-xl border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
-              disabled={!canCreate}
-            >
-              +
-            </button>
-          </div>
-        );
-      })()}
+      <div className="flex mt-2 gap-1">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Novo card..."
+          className="w-full text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1"
+          disabled={!canCreate}
+        />
+        <button
+          onClick={() => {
+            let title = value.trim();
+            if (!title) {
+              // Busca o maior número global entre todas as colunas
+              const prefix = "garantia #";
+              const allTasks = Object.values(board).flat() as Task[];
+              const nums = allTasks
+                .map((t: Task) => t.title)
+                .filter(t => t.startsWith(prefix))
+                .map(t => {
+                  const m = t.match(/garantia #(\d{3})/);
+                  return m ? parseInt(m[1], 10) : null;
+                })
+                .filter(n => n !== null);
+              const nextNum = nums.length ? Math.max(...nums as number[]) + 1 : 0;
+              title = `${prefix}${nextNum.toString().padStart(3, "0")}`;
+            }
+            if (canCreate) {
+              onAddTask(colKey as ColumnKey, title);
+              setValue("");
+            }
+          }}
+          className="text-sm px-3 py-1 rounded-xl border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
+          disabled={!canCreate}
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }
@@ -237,19 +236,25 @@ export default function Page() {
     em_analise: [],
     finalizado: []
   });
+  const [cols, setCols] = useState<{ key: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
-  // Carrega o board via GET ao montar
+  // Carrega o board e as colunas via GET ao montar
   useEffect(() => {
     async function fetchBoard() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(KANBAN_URL);
+        const res = await fetch(KANBAN_URL + "/kanban");
         if (!res.ok) throw new Error("Erro ao buscar kanban");
         const data = await res.json();
-        setBoard(data);
+        console.log("KANBAN GET:", data);
+        setBoard({
+          aguardando_atendimento: data.aguardando_atendimento || [],
+          em_analise: data.em_analise || [],
+          finalizado: data.finalizado || []
+        });
       } catch (err: any) {
         setError(err.message || "Erro desconhecido");
       } finally {
@@ -265,8 +270,8 @@ export default function Page() {
   // Lista única de responsáveis existentes no board (para o select)
   const responsaveis = useMemo(() => {
     const set = new Set<string>();
-    Object.values(board).forEach((list) =>
-      list.forEach((t) => {
+    Object.values(board).forEach((list: any) =>
+      (list ?? []).forEach((t: any) => {
         if (t.responsavel && t.responsavel.trim()) set.add(t.responsavel.trim());
       })
     );
@@ -278,7 +283,7 @@ export default function Page() {
   // Modal de automação
   const [showModal, setShowModal] = useState(false);
   const [automation, setAutomation] = useState({
-    col: COLS[0].key,
+    col: "aguardando_atendimento",
     title: "",
     time: "",
   });
@@ -329,11 +334,25 @@ export default function Page() {
     putBoard();
   }, [board]);
 
-  function addTask(col: ColumnKey, title: string) {
+  async function addTask(col: ColumnKey, title: string) {
+    const newTask: Task = {
+      id: uid(),
+      title,
+      createdAt: Date.now(),
+      etapa: col,
+      data: String(new Date().getTime())  
+    };
     setBoard((prev) => ({
       ...prev,
-      [col]: [{ id: uid(), title, createdAt: Date.now() }, ...(prev[col] ?? [])],
+      [col]: [newTask, ...(prev[col] ?? [])],
     }));
+    try {
+      await fetch(`${KANBAN_URL}/kanban`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTask)
+      });
+    } catch {}
   }
   function deleteTask(col: ColumnKey, id: string) {
     setBoard((prev) => ({
@@ -341,16 +360,23 @@ export default function Page() {
       [col]: prev[col].filter((t) => t.id !== id),
     }));
   }
-  function moveTask(data: DragData, to: ColumnKey) {
+  async function moveTask(data: DragData, to: ColumnKey) {
     setBoard((prev) => {
       const src = [...(prev[data.from] ?? [])];
       const idx = src.findIndex((t) => t.id === data.taskId);
       if (idx === -1) return prev;
       const [task] = src.splice(idx, 1);
       const dest = [...(prev[to] ?? [])];
-      dest.unshift(task);
+      dest.unshift({ ...task, etapa: to });
       return { ...prev, [data.from]: src, [to]: dest };
     });
+    try {
+      await fetch(`${KANBAN_URL}/kanban/etapa/${data.taskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ etapa: to })
+      });
+    } catch {}
   }
 
   // --- Automação robusta: dispara no minuto exato e evita repetição por dia ---
@@ -397,6 +423,7 @@ export default function Page() {
                 id: uid(),
                 title: a.title + " (auto)",
                 createdAt: Date.now(),
+                etapa: a.col,
               },
               ...prev[a.col],
             ],
@@ -445,7 +472,7 @@ export default function Page() {
     };
     const saved = localStorage.getItem(AUTOS_KEY);
     const autos: Automation[] = saved ? JSON.parse(saved) : [];
-    autos.push({ id: uid(), title, time: t, col: automation.col });
+    autos.push({ id: uid(), title, time: t, col: automation.col as ColumnKey });
     localStorage.setItem(AUTOS_KEY, JSON.stringify(autos));
     setShowModal(false);
   }
@@ -473,12 +500,21 @@ export default function Page() {
     });
     setShowTaskModal(true);
   }
-  function saveTaskModal() {
+  async function saveTaskModal() {
     if (!selected) return;
     setBoard((prev) => {
       const list = prev[selected.col].map((t) =>
         t.id === selected.id ? { ...t, ...taskForm } : t
       );
+      // PUT com o card atualizado
+      const updated = list.find((t) => t.id === selected.id);
+      if (updated) {
+        fetch(`${KANBAN_URL}/kanban`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updated)
+        });
+      }
       return { ...prev, [selected.col]: list };
     });
     setShowTaskModal(false);
@@ -487,10 +523,14 @@ export default function Page() {
   // Board filtrado por responsável (aplicado na renderização)
   const filteredBoard: BoardState = useMemo(() => {
     if (!filterResp) return board;
-    const out = {} as BoardState;
+    const out: BoardState = {
+      aguardando_atendimento: [],
+      em_analise: [],
+      finalizado: []
+    };
     for (const col of COLS) {
-      out[col.key] = board[col.key].filter(
-        (t) => (t.responsavel || "").toLowerCase() === filterResp.toLowerCase()
+      out[col.key] = (board[col.key] ?? []).filter(
+        (t: any) => (t.responsavel || "").toLowerCase() === filterResp.toLowerCase()
       );
     }
     return out;
@@ -529,6 +569,21 @@ export default function Page() {
       window.removeEventListener("mouseup", up);
     };
   }, []);
+
+  // Defina o setor do usuário aqui (exemplo: "Atacado", "Varejo", ou outro valor)
+  const userSetor =
+    typeof window !== "undefined"
+      ? (() => {
+          try {
+            const raw = localStorage.getItem("userData");
+            if (!raw) return "";
+            const data = JSON.parse(raw);
+            return data.setor || "";
+          } catch {
+            return "";
+          }
+        })()
+      : "";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-neutral-950 dark:to-neutral-900 text-gray-900 dark:text-gray-100">
@@ -584,8 +639,8 @@ export default function Page() {
               <Column
                 key={c.key}
                 label={c.label}
-                colKey={c.key}
-                tasks={filteredBoard[c.key]}
+                colKey={c.key as ColumnKey}
+                tasks={filteredBoard[c.key] ?? []}
                 board={board}
                 onDropTask={moveTask}
                 onAddTask={addTask}
@@ -604,7 +659,12 @@ export default function Page() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm mb-1">DATA</label>
-                  <input type="date" value={taskForm.data} onChange={e => setTaskForm({ ...taskForm, data: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                  <input
+                    type="date"
+                    value={taskForm.data ? new Date(taskForm.data).toISOString().slice(0, 10) : ""}
+                    onChange={e => setTaskForm({ ...taskForm, data: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm mb-1">VENDA</label>
@@ -665,9 +725,9 @@ export default function Page() {
             </div>
           </div>
         )}
+          </div>
+        </div>
       </div>
-    </div>
-    </div>
     </div>
   );
 }
