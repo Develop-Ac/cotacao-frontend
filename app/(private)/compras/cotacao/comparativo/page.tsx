@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useRef } from "react";
+import { serviceUrl } from "@/lib/services";
 
 type ApiItem = {
   id: string | number;
@@ -31,7 +32,8 @@ type ApiResponseTodos = {
 };
 
 // ====== CONFIG do endpoint de salvamento ======
-const SAVE_URL = `http://compras-service.acacessorios.local/compras/pedido`;
+const COMPRAS_BASE = serviceUrl("compras");
+const SAVE_URL = `${COMPRAS_BASE}/compras/pedido`;
 
 // --- utils ---
 const parseMoney = (v: string | number | null | undefined): number | null => {
@@ -276,7 +278,7 @@ export default function ComparativoPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`http://compras-service.acacessorios.local/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
+      const res = await fetch(`${COMPRAS_BASE}/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
       if (!res.ok) {
         let emsg = `HTTP ${res.status}`;
         try {

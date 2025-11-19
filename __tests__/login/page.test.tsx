@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useRouter } from 'next/navigation'
 import Login from '@/app/login/page'
 import { mockFetchResponse, mockFetchError, setupAuthenticatedUser } from '../utils/test-utils'
+import { serviceUrl } from '@/lib/services'
 
 // Mock the router
 const mockPush = jest.fn()
@@ -20,6 +21,7 @@ jest.mock('@/app/logo.svg', () => ({
 
 describe('Login Page', () => {
   let fetchMock: jest.Mock
+  const LOGIN_URL = serviceUrl("sistema", "/login")
 
   beforeEach(() => {
     setupAuthenticatedUser()
@@ -93,7 +95,7 @@ describe('Login Page', () => {
       await user.click(screen.getByRole('button', { name: 'Entrar' }))
       
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://intranetbackend.acacessorios.local/login',
+        LOGIN_URL,
         {
           method: 'POST',
           headers: {
@@ -170,7 +172,7 @@ describe('Login Page', () => {
       await user.click(screen.getByRole('button', { name: 'Entrar' }))
       
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://intranetbackend.acacessorios.local/login',
+        LOGIN_URL,
         expect.objectContaining({
           body: JSON.stringify({ codigo: '', senha: '' }),
         })

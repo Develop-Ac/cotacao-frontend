@@ -2,6 +2,7 @@
 
 import { FaPlusSquare, FaSync } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { serviceUrl } from "@/lib/services";
 
 type CotacaoItem = {
   PEDIDO_COTACAO: number;
@@ -42,6 +43,9 @@ type FornecedorSalvo = {
   cpf_cnpj: string | null;
 };
 
+const COMPRAS_API = serviceUrl("compras");
+const comprasPath = (path: string) => `${COMPRAS_API}/compras${path}`;
+
 export default function Tela() {
   const BTN =
     "h-10 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400";
@@ -63,7 +67,7 @@ export default function Tela() {
     if (!p) return setMsgCot("Informe o pedido de cotação.");
     setLoadingCot(true);
     try {
-      const url = `http://compras-service.acacessorios.local/compras/openquery/pedido/${encodeURIComponent(p)}?empresa=3`;
+      const url = `${comprasPath(`/openquery/pedido/${encodeURIComponent(p)}`)}?empresa=3`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -100,7 +104,7 @@ export default function Tela() {
         })),
       };
 
-      const res = await fetch(`http://compras-service.acacessorios.local/compras/pedidos-cotacao`, {
+      const res = await fetch(comprasPath("/pedidos-cotacao"), {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -138,7 +142,7 @@ export default function Tela() {
     setLoadingPedidos(true);
     try {
       const res = await fetch(
-        `http://compras-service.acacessorios.local/compras/pedidos-cotacao?page=${page}&pageSize=${pageSize}`,
+        `${comprasPath("/pedidos-cotacao")}?page=${page}&pageSize=${pageSize}`,
         { headers: { Accept: "application/json" } }
       );
 
@@ -170,7 +174,7 @@ export default function Tela() {
   const carregarFornecedoresSalvos = async (pedido_cotacao: number) => {
     try {
       const res = await fetch(
-        `http://compras-service.acacessorios.local/compras/fornecedor?pedido_cotacao=${encodeURIComponent(String(pedido_cotacao))}`,
+        `${comprasPath("/fornecedor")}?pedido_cotacao=${encodeURIComponent(String(pedido_cotacao))}`,
         { headers: { Accept: "application/json" } }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -202,7 +206,7 @@ export default function Tela() {
     setLoadingForn(true);
     try {
       // 1) Consulta fornecedor na OPENQUERY
-      const res = await fetch(`http://compras-service.acacessorios.local/compras/openquery/fornecedor/${code}`, {
+      const res = await fetch(comprasPath(`/openquery/fornecedor/${code}`), {
         headers: { Accept: "application/json" },
       });
       if (res.status === 404) {
@@ -220,7 +224,7 @@ export default function Tela() {
         cpf_cnpj: novo.CPF_CNPJ ?? null,
         itens: [], // se quiser salvar itens também, envie aqui
       };
-      const post = await fetch(`http://compras-service.acacessorios.local/compras/fornecedor`, {
+      const post = await fetch(comprasPath("/fornecedor"), {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(postBody),

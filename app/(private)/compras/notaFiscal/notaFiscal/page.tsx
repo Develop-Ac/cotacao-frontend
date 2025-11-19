@@ -6,6 +6,7 @@ import {
 } from "react-icons/fa";
 import { FaFilePdf } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { serviceUrl } from "@/lib/services";
 
 // ===============================
 // Tipos esperados da API
@@ -21,7 +22,9 @@ type NotaFiscalRow = {
   TIPO_OPERACAO_DESC: string;
 };
 
-const API_BASE = "http://compras-service.acacessorios.local/compras/nota-fiscal/nfe-distribuicao";
+const COMPRAS_BASE = serviceUrl("compras");
+const API_BASE = `${COMPRAS_BASE}/compras/nota-fiscal/nfe-distribuicao`;
+const DANFE_ENDPOINT = `${COMPRAS_BASE}/compras/nota-fiscal/danfe`;
 
 export default function NotaFiscalList() {
   const BTN =
@@ -239,7 +242,7 @@ export default function NotaFiscalList() {
                             title="Baixar PDF DANFE"
                             onClick={async () => {
                               try {
-                                const res = await fetch(`http://compras-service.acacessorios.local/compras/nota-fiscal/danfe?chaveNfe=${row.CHAVE_NFE}`, {
+                                const res = await fetch(`${DANFE_ENDPOINT}?chaveNfe=${row.CHAVE_NFE}`, {
                                   method: "GET",
                                   headers: { Accept: "application/pdf" },
                                 });

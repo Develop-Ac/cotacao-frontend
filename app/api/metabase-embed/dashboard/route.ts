@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import { getServiceBase } from "@/lib/services";
 
-const METABASE_SITE_URL = "http://bi.acacessorios.local"; // igual ao MB_SITE_URL do Metabase
-const METABASE_SECRET_KEY = "cmhp8xpyq0000356orleqfl9x"; // defina no .env do servidor
+const METABASE_SITE_URL = process.env.METABASE_SITE_URL?.trim() || getServiceBase("metabase");
+const METABASE_SECRET_KEY = process.env.METABASE_SECRET_KEY || "";
 
 export async function GET(req: NextRequest) {
+  if (!METABASE_SECRET_KEY) {
+    return NextResponse.json({ error: "METABASE_SECRET_KEY not configured" }, { status: 500 });
+  }
   // Filtros (adicione conforme seus filtros do dashboard)
   const params = {
     data: ["2025-09-26", "2025-10-07"],  // intervalo de datas em ISO (YYYY-MM-DD)

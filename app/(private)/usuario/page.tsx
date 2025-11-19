@@ -2,6 +2,7 @@
 
 import { FaPlusSquare, FaTrash, FaEdit, FaFilePdf, FaSync , FaListUl, FaCaretDown, FaFilter } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { serviceUrl } from "@/lib/services";
 
 export default function Login() {
   const [formularioAberto, setFormularioAberto] = useState(false);
@@ -34,9 +35,11 @@ export default function Login() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
 
   // Função para carregar usuários
+  const SISTEMA_API = serviceUrl("sistema");
+
   const carregarUsuarios = async () => {
     try {
-      const response = await fetch("http://sistema-service.acacessorios.local/usuarios", {
+      const response = await fetch(`${SISTEMA_API}/usuarios`, {
         method: "GET",
         headers: { "Accept": "application/json" },
       });
@@ -63,7 +66,7 @@ export default function Login() {
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch("http://sistema-service.acacessorios.local/usuarios", {
+      const response = await fetch(`${SISTEMA_API}/usuarios`, {
         method: "POST",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ nome, codigo, setor, senha }),
@@ -96,7 +99,7 @@ export default function Login() {
 
   const deletarUsuario = async (id: string) => {
     try {
-      const response = await fetch(`http://sistema-service.acacessorios.local/usuarios/${id}`, {
+      const response = await fetch(`${SISTEMA_API}/usuarios/${id}`, {
         method: "DELETE",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
       });

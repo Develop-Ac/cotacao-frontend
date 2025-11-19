@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import logo from '../logo.svg';
 import Image from 'next/image';
+import { serviceUrl } from '@/lib/services';
 
 export default function Login() {
   const [codigo, setCodigo] = useState('');
@@ -11,7 +12,8 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('http://sistema-service.acacessorios.local/login', {
+      const SISTEMA_API = serviceUrl("sistema", "/login");
+      const response = await fetch(SISTEMA_API, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         credentials: 'include',

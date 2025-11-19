@@ -1,6 +1,7 @@
 
 "use client";
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { serviceUrl } from "@/lib/services";
 
 // --- Types ---
 type ColumnKey =
@@ -205,6 +206,7 @@ function Column({
 }
 
 export default function Page() {
+  const KANBAN_URL = `${serviceUrl("compras")}/compras/kanban`;
   const [board, setBoard] = useState<BoardState>(COLS.reduce((a, c) => ({ ...a, [c.key]: [] }), {} as BoardState));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -215,7 +217,7 @@ export default function Page() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch("http://compras-service.acacessorios.local/compras/kanban");
+        const res = await fetch(KANBAN_URL);
         if (!res.ok) throw new Error("Erro ao buscar kanban");
         const data = await res.json();
         setBoard(data);
@@ -270,7 +272,7 @@ export default function Page() {
     if (loading) return; // não envia enquanto carrega
     async function putBoard() {
       try {
-        await fetch("http://compras-service.acacessorios.local/compras/kanban", {
+        await fetch(KANBAN_URL, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(board),

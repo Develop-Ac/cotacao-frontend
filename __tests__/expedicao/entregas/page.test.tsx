@@ -71,7 +71,7 @@ describe('Entregas Page', () => {
       
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith(
-          'http://intranetbackend.acacessorios.local/expedicao/entregas'
+          entregasUrl()
         )
       })
     })
