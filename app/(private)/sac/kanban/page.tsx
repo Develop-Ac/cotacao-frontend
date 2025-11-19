@@ -653,7 +653,7 @@ export default function Page() {
         {/* Modal: Detalhes/Edição do Card */}
         {showTaskModal && selected && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[520px] shadow-lg">
+              <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[520px] shadow-lg max-h-[80vh] overflow-y-auto">
               <h2 className="text-lg font-semibold mb-4">Detalhes do Card</h2>
 
               <div className="grid grid-cols-2 gap-3">
