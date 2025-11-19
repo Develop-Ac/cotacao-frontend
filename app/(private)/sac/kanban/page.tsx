@@ -44,21 +44,29 @@ const uid = () =>
   Math.random().toString(36).slice(2, 7) + "-" + Date.now().toString(36);
 
 // --- Componentes ---
-function Card({
-  task,
-  onDelete,
-  onOpen,
-}: {
+interface CardProps {
   task: Task;
   onDelete?: () => void;
   onOpen?: () => void;
-}) {
+  colKey: ColumnKey;
+  userSetor: string;
+}
+function Card({ task, onDelete, onOpen, colKey, userSetor }: CardProps) {
+  // Permissão de edição
+  const canEdit =
+    (userSetor === "Atacado" || userSetor === "Varejo")
+      ? colKey === "aguardando_atendimento"
+      : true;
   return (
     <div
-      onClick={() => onOpen && onOpen()}
-      className="rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 cursor-pointer"
-      draggable
+      onClick={() => canEdit && onOpen && onOpen()}
+      className={`rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 ${canEdit ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+      draggable={canEdit}
       onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
+        if (!canEdit) {
+          e.preventDefault();
+          return;
+        }
         const container = e.currentTarget.closest<HTMLElement>("[data-col]");
         const from = (container?.dataset.col || "") as ColumnKey;
         const payload = { taskId: task.id, from };
@@ -67,7 +75,7 @@ function Card({
     >
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-sm font-medium leading-5">{task.title}</h4>
-        {onDelete && (
+        {onDelete && canEdit && (
           <button
             onClick={(ev: React.MouseEvent<HTMLButtonElement>) => {
               ev.stopPropagation();
@@ -113,24 +121,20 @@ function Card({
   );
 }
 
-function Column({
-  label,
-  colKey,
-  tasks = [],
-  onDropTask,
-  onAddTask,
-  onDeleteTask,
-  onOpenTask,
-}: {
+interface ColumnProps {
   label: string;
   colKey: ColumnKey;
   tasks: Task[];
+  board: BoardState;
   onDropTask: (data: DragData, to: ColumnKey) => void;
   onAddTask: (col: ColumnKey, title: string) => void;
   onDeleteTask: (col: ColumnKey, id: string) => void;
   onOpenTask: (col: ColumnKey, id: string) => void;
-}) {
+  userSetor: string;
+}
+function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask, onOpenTask, board, userSetor }: ColumnProps) {
   const [value, setValue] = useState("");
+  const canCreate = (userSetor === "Atacado" || userSetor === "Varejo") ? colKey === "aguardando_atendimento" : true;
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -149,7 +153,8 @@ function Column({
         payload = { taskId: String(p.taskId), from: p.from as ColumnKey };
       }
     } catch {}
-    if (!payload) return;
+    const canMove = (userSetor === "Atacado" || userSetor === "Varejo") ? colKey === "aguardando_atendimento" : true;
+    if (!payload || !canMove) return;
     onDropTask(payload, colKey);
   }
 
@@ -158,13 +163,12 @@ function Column({
       data-col={colKey}
       onDragOver={(e: React.DragEvent<HTMLDivElement>) => e.preventDefault()}
       onDrop={handleDrop}
-      className="flex flex-col gap-3 w-[320px] md:w-[360px dark:bg-neutral-950 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm p-3 min-h-[280px]"
+      className="flex flex-col gap-3 w-[320px] md:w-[360px] dark:bg-neutral-950 rounded-2xl border border-gray-100 dark:border-neutral-800 shadow-sm p-3 min-h-[280px]"
     >
-      <div className="sticky top-0  dark:bg-neutral-950/80 backdrop-blur rounded-xl px-2 py-2 flex items-center justify-between">
+      <div className="sticky top-0 dark:bg-neutral-950/80 backdrop-blur rounded-xl px-2 py-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold">{label}</h3>
         <span className="text-xs text-gray-400">{tasks.length}</span>
       </div>
-
       <div className="flex flex-col gap-2 mt-1 max-h-[70vh] overflow-y-auto pr-1">
         {tasks.map((t) => (
           <Card
@@ -172,33 +176,69 @@ function Column({
             task={t}
             onDelete={() => onDeleteTask(colKey, t.id)}
             onOpen={() => onOpenTask(colKey, t.id)}
+            colKey={colKey}
+            userSetor={userSetor}
           />
         ))}
       </div>
-
-      <div className="flex mt-2 gap-1">
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Novo card..."
-          className="w-full text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1"
-        />
-        <button
-          onClick={() => {
-            if (!value.trim()) return;
-            onAddTask(colKey, value);
-            setValue("");
-          }}
-          className="text-sm px-3 py-1 rounded-xl border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
-        >
-          +
-        </button>
-      </div>
+      {/* Define canCreate for this scope */}
+      {(() => {
+        const canCreate = true; // or set your logic here
+        return (
+          <div className="flex mt-2 gap-1">
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Novo card..."
+              className="w-full text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1"
+              disabled={!canCreate}
+            />
+            <button
+              onClick={() => {
+                let title = value.trim();
+                if (!title) {
+                  // Busca o maior número global entre todas as colunas
+                  const prefix = "garantia #";
+                  const allTasks = Object.values(board).flat() as Task[];
+                  const nums = allTasks
+                    .map((t: Task) => t.title)
+                    .filter(t => t.startsWith(prefix))
+                    .map(t => {
+                      const m = t.match(/garantia #(\d{3})/);
+                      return m ? parseInt(m[1], 10) : null;
+                    })
+                    .filter(n => n !== null);
+                  const nextNum = nums.length ? Math.max(...nums as number[]) + 1 : 0;
+                  title = `${prefix}${nextNum.toString().padStart(3, "0")}`;
+                }
+                if (canCreate) {
+                  onAddTask(colKey, title);
+                  setValue("");
+                }
+              }}
+              className="text-sm px-3 py-1 rounded-xl border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
+              disabled={!canCreate}
+            >
+              +
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
+// ...existing code...
+        // (Remove this duplicated block entirely, as the input and button logic already exists inside the Column component)
 
 export default function Page() {
+  // Pega setor do usuário do localStorage
+  let userSetor = "";
+  if (typeof window !== "undefined") {
+    try {
+      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+      userSetor = userData.setor || "";
+    } catch {}
+  }
   const [board, setBoard] = useState<BoardState>({
     aguardando_atendimento: [],
     em_analise: [],
@@ -553,10 +593,12 @@ export default function Page() {
                 label={c.label}
                 colKey={c.key}
                 tasks={filteredBoard[c.key]}
+                board={board}
                 onDropTask={moveTask}
                 onAddTask={addTask}
                 onDeleteTask={deleteTask}
                 onOpenTask={openTaskModal}
+                userSetor={userSetor}
               />
             ))}
 

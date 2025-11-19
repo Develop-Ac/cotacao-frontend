@@ -110,6 +110,7 @@ export default function RootLayout({
 
     if (userData.setor === 'Admin') return true;
 
+    // Permissões de acesso por setor
     const moduleAccess: { [key: string]: string[] } = {
       'Compras': ['Compras'],
       'Oficina': ['Oficina'],
@@ -117,6 +118,8 @@ export default function RootLayout({
       'Expedição': ['Expedição'],
       'Expedicao': ['Expedição'],
       'Sac': ['Sac'],
+      'Atacado': ['Sac'],
+      'Varejo': ['Sac'],
     };
 
     const userModules = moduleAccess[userData.setor] || [];
