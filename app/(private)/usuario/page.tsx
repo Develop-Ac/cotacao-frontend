@@ -199,6 +199,7 @@ export default function Login() {
                       <option value="Administrativo">Administrativo</option>
                       <option value="Admin">Admin</option>
                       <option value="Sac">Sac</option>
+                      <option value="Qualidade">Qualidade</option>
                       <option value="Atacado">Atacado</option>
                       <option value="Varejo">Varejo</option>
                       <option value="TI">TI</option>

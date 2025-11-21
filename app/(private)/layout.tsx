@@ -126,9 +126,9 @@ export default function RootLayout({
       'Estoque': ['Estoque'],
       'Expedição': ['Expedição'],
       'Expedicao': ['Expedição'],
-      'Qualidade': ['Qualidade'],
+      'Qualidade': ['Qualidade', 'Sac'],
 
-      'Sac': ['Sac'],
+      'Sac': ['Sac', 'Qualidade'],
       'Atacado': ['Sac'],
       'Varejo': ['Sac'],
     };
