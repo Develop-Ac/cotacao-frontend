@@ -2,8 +2,8 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { serviceUrl } from "@/lib/services";
 
-// const KANBAN_URL = serviceUrl("sac");
-const KANBAN_URL = "http://localhost:8000";
+const KANBAN_URL = serviceUrl("sac");
+// const KANBAN_URL = "http://localhost:8000";
 
 // --- Types ---
 type ColumnKey = "aguardando_atendimento" | "em_analise" | "finalizado";
