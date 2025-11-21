@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import "../globals.css";
 import logo from './assets/images/logo.svg';
@@ -44,14 +44,22 @@ export default function RootLayout({
       ? pathname === '/'
       : pathname === target || pathname.startsWith(`${target}/`);
 
-  const sectionActive = {
-    compras: isPathActive('/compras'),
-    oficina: isPathActive('/oficina'),
-    estoque: isPathActive('/estoque'),
-    expedicao: isPathActive('/expedicao'),
-    qualidade: isPathActive('/qualidade'),
-    sistema: isPathActive('/usuario'),
-  };
+  const sectionActive = {
+
+    compras: isPathActive('/compras'),
+
+    oficina: isPathActive('/oficina'),
+
+    estoque: isPathActive('/estoque'),
+
+    expedicao: isPathActive('/expedicao'),
+
+    qualidade: isPathActive('/qualidade'),
+
+    sistema: isPathActive('/usuario'),
+
+  };
+
   const buttonMotionClasses = "transition-transform duration-200 ease-out hover:scale-105 active:scale-95";
 
   const summaryClasses = (active: boolean) =>
@@ -112,15 +120,18 @@ export default function RootLayout({
 
     if (userData.setor === 'Admin') return true;
 
+    // Permissões de acesso por setor
     const moduleAccess: { [key: string]: string[] } = {
       'Compras': ['Compras'],
       'Oficina': ['Oficina'],
       'Estoque': ['Estoque'],
       'Expedição': ['Expedição'],
       'Expedicao': ['Expedição'],
-      'Qualidade': ['Qualidade'],
+      'Qualidade': ['Qualidade', 'Sac'],
 
-      'Sac': ['Sac'],
+      'Sac': ['Sac', 'Qualidade'],
+      'Atacado': ['Sac'],
+      'Varejo': ['Sac'],
     };
 
     const userModules = moduleAccess[userData.setor] || [];
@@ -515,7 +526,7 @@ export default function RootLayout({
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
                           <li className={cascadeItemClass()} style={cascadeStyle(0)}>
                             <Link href="/sac/kanban" onClick={(e) => handleNavigation('/sac/kanban', e)} className={linkClasses('/sac/kanban')}>
-                              Kanban
+                              Nova Solicitação
                             </Link>
                           </li>
                         </ul>
