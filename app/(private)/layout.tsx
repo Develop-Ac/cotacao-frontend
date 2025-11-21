@@ -529,7 +529,7 @@ export default function RootLayout({
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
                           <li className={cascadeItemClass()} style={cascadeStyle(0)}>
                             <Link href="/sac/kanban" onClick={(e) => handleNavigation('/sac/kanban', e)} className={linkClasses('/sac/kanban')}>
-                              Kanban
+                              Nova Solicitação
                             </Link>
                           </li>
                         </ul>

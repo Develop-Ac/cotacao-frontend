@@ -2,15 +2,15 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { serviceUrl } from "@/lib/services";
 
-const KANBAN_URL = serviceUrl("sac");
-// const KANBAN_URL = "http://localhost:8000";
+// const KANBAN_URL = serviceUrl("sac");
+const KANBAN_URL = "http://localhost:8000";
 
 // --- Types ---
 type ColumnKey = "aguardando_atendimento" | "em_analise" | "finalizado";
 const COLS: { key: ColumnKey; label: string }[] = [
-  { key: "aguardando_atendimento", label: "Aguardando atendimento" },
-  { key: "em_analise", label: "Em análise" },
-  { key: "finalizado", label: "Finalizado" },
+  { key: "aguardando_atendimento", label: "Solicitado" },
+  { key: "em_analise", label: "Em Andamento" },
+  { key: "finalizado", label: "Concluído" },
 ];
 // ...existing code...
 
@@ -35,6 +35,7 @@ type Task = {
   dptoResponsavel?: string;
   tipo?: string;
   vendedor?: string;
+  imagem?: any; // Pode ser File, string (base64), ou null
 };
 
 type DragData = { taskId: string; from: ColumnKey };
@@ -69,7 +70,7 @@ function Card({ task, onDelete, onOpen, colKey, userSetor }: CardProps) {
   return (
     <div
       onClick={() => canEdit && onOpen && onOpen()}
-      className={`rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 ${canEdit ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+      className={`rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 ${canEdit ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
       draggable={canEdit}
       onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
         if (!canEdit) {
@@ -82,45 +83,33 @@ function Card({ task, onDelete, onOpen, colKey, userSetor }: CardProps) {
         e.dataTransfer.setData("application/json", JSON.stringify(payload));
       }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-medium leading-5">{task.title}</h4>
-        {onDelete && canEdit && (
-          <button
-            onClick={(ev: React.MouseEvent<HTMLButtonElement>) => {
-              ev.stopPropagation();
-              onDelete();
-            }}
-            className="text-xs text-red-500 hover:text-red-700"
-            aria-label="Excluir"
-            title="Excluir"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
-      <div className="mt-1 text-[11px] text-gray-400">
-        {new Date(task.createdAt).toLocaleString("pt-BR")}
+      <div className="flex flex-col items-start justify-between gap-2">
+        <h4 className="text-base font-bold leading-5 text-blue-900 dark:text-blue-200 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-1"></span>
+          {task.title}
+        </h4>
+        <p className="text-xs text-blue-700 dark:text-blue-200">Vendedor: <span className="font-semibold">{task.vendedor}</span></p>
+        <p className="text-xs text-blue-700 dark:text-blue-200">Venda: <span className="font-semibold">{task.venda}</span></p>
       </div>
 
       {task.responsavel && (
-        <div className="mt-2 text-[11px] text-gray-700 dark:text-gray-200 flex items-center gap-1">
-          <span>👤</span>
-          <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-neutral-700">
+        <div className="mt-2 text-xs text-blue-700 dark:text-blue-200 flex items-center gap-2">
+          <span className="inline-block w-4 h-4">👤</span>
+          <span className="px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900 font-semibold text-blue-900 dark:text-blue-100">
             {task.responsavel}
           </span>
         </div>
       )}
 
       {(task.prioridade || task.due) && (
-        <div className="mt-2 flex items-center gap-2 text-[11px]">
+        <div className="mt-2 flex items-center gap-2 text-xs">
           {task.prioridade && (
-            <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-neutral-700">
+            <span className={`px-2 py-0.5 rounded-full border font-bold ${task.prioridade === "alta" ? "bg-red-100 border-red-300 text-red-700" : task.prioridade === "media" ? "bg-yellow-100 border-yellow-300 text-yellow-700" : "bg-green-100 border-green-300 text-green-700"}`}>
               {task.prioridade}
             </span>
           )}
           {task.due && (
-            <span className="text-gray-500">
+            <span className="text-blue-700 dark:text-blue-200">
               vence {new Date(task.due).toLocaleDateString("pt-BR")}
             </span>
           )}
@@ -187,12 +176,12 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
           />
         ))}
       </div>
-      <div className="flex mt-2 gap-1">
+      <div className="flex mt-4 gap-2">
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Novo card..."
-          className="w-full text-sm rounded-xl border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1"
+          className="w-full text-base rounded-2xl border border-blue-200 dark:border-blue-700 bg-white dark:bg-neutral-900 px-3 py-2 shadow focus:ring-2 focus:ring-blue-300"
           disabled={!canCreate}
         />
         <button
@@ -218,7 +207,7 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
               setValue("");
             }
           }}
-          className="text-sm px-3 py-1 rounded-xl border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
+          className="text-base px-4 py-2 rounded-2xl border border-blue-200 dark:border-blue-700 bg-blue-500 hover:bg-blue-600 text-white shadow font-bold transition-all duration-150"
           disabled={!canCreate}
         >
           +
@@ -305,6 +294,8 @@ export default function Page() {
     dptoResponsavel: string;
     tipo: string;
     vendedor: string;
+    imagem: File | null;
+    imagemPreview?: string;
   }>({
     data: "",
     venda: "",
@@ -316,7 +307,9 @@ export default function Page() {
     custo: "",
     dptoResponsavel: "",
     tipo: "",
-    vendedor: ""
+    vendedor: "",
+    imagem: null,
+    imagemPreview: ""
   });
 
   // Persistência do board via PUT
@@ -497,7 +490,9 @@ export default function Page() {
         custo: t?.custo || "",
         dptoResponsavel: t?.dptoResponsavel || "",
         tipo: t?.tipo || "",
-        vendedor: t?.vendedor || ""
+        vendedor: t?.vendedor || "",
+        imagem: t?.imagem || null,
+        imagemPreview: ""
       });
       return prev; // não altera o estado aqui
     });
@@ -505,6 +500,28 @@ export default function Page() {
   }
   async function saveTaskModal() {
     if (!selected) return;
+    // Se houver imagem, converte para base64 antes de enviar
+    const sendUpdate = async (updated: any) => {
+      if (taskForm.imagem) {
+        const toBase64 = (file: File) => {
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        };
+        try {
+          const base64 = await toBase64(taskForm.imagem);
+          updated.imagem = base64;
+        } catch {}
+      }
+      fetch(`${KANBAN_URL}/kanban`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      });
+    };
     setBoard((prev) => {
       const list = prev[selected.col].map((t) =>
         t.id === selected.id ? { ...t, ...taskForm } : t
@@ -512,11 +529,7 @@ export default function Page() {
       // PUT com o card atualizado
       const updated = list.find((t) => t.id === selected.id);
       if (updated) {
-        fetch(`${KANBAN_URL}/kanban`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updated)
-        });
+        sendUpdate(updated);
       }
       return { ...prev, [selected.col]: list };
     });
@@ -589,46 +602,12 @@ export default function Page() {
       : "";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-neutral-950 dark:to-neutral-900 text-gray-900 dark:text-gray-100">
-      <div className="max-w-[1400px] px-6 py-8">
+    <div className="min-h-screen bg-white dark:bg-neutral-950 text-gray-900 dark:text-gray-100">
+      <div className="max-w-[1400px] px-6 py-8 mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">Kanban – Fluxo Operacional</h1>
             <p className="text-sm text-gray-500">Automatize e gerencie seu fluxo.</p>
-          </div>
-
-          {/* Filtro por Responsável */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600 dark:text-gray-300">Responsável</label>
-            <select
-              value={filterResp}
-              onChange={(e) => setFilterResp(e.target.value)}
-              className="text-sm rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2"
-              title="Filtrar por responsável"
-            >
-              <option value="">Todos</option>
-              {responsaveis.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-            {filterResp && (
-              <button
-                onClick={() => setFilterResp("")}
-                className="text-sm px-3 py-2 rounded-lg border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800"
-                title="Limpar filtro"
-              >
-                Limpar
-              </button>
-            )}
-
-            <button
-              onClick={() => setShowModal(true)}
-              className="ml-3 px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-            >
-              + Criar Automação
-            </button>
           </div>
         </div>
 
@@ -681,9 +660,41 @@ export default function Page() {
                   <label className="block text-sm mb-1">ITEM RECLAMADO</label>
                   <input value={taskForm.itemReclamado} onChange={e => setTaskForm({ ...taskForm, itemReclamado: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
+                <div>
+                  <label className="block text-sm mb-1">DPTO RESPONSAVEL</label>
+                  <input value={taskForm.dptoResponsavel} onChange={e => setTaskForm({ ...taskForm, dptoResponsavel: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">VENDEDOR</label>
+                  <input value={taskForm.vendedor} onChange={e => setTaskForm({ ...taskForm, vendedor: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                </div>
                 <div className="col-span-2">
                   <label className="block text-sm mb-1">RECLAMAÇÃO</label>
                   <textarea value={taskForm.reclamacao} onChange={e => setTaskForm({ ...taskForm, reclamacao: e.target.value })} rows={2} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm mb-1">Imagem</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      setTaskForm(prev => ({
+                        ...prev,
+                        imagem: file,
+                        imagemPreview: file ? URL.createObjectURL(file) : ""
+                      }));
+                    }}
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                  />
+                  {taskForm.imagemPreview && (
+                    <img src={taskForm.imagemPreview} alt="Preview" className="mt-2 max-h-40 rounded-lg border" />
+                  )}
+                  {
+                    taskForm.imagem && !taskForm.imagemPreview && (
+                      <img src={taskForm.imagem} alt="Preview" className="mt-2 max-h-40 rounded-lg border" />
+                    )
+                  }
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm mb-1">SOLUÇÃO</label>
@@ -698,16 +709,8 @@ export default function Page() {
                   <input value={taskForm.custo} onChange={e => setTaskForm({ ...taskForm, custo: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
                 <div>
-                  <label className="block text-sm mb-1">DPTO RESPONSAVEL</label>
-                  <input value={taskForm.dptoResponsavel} onChange={e => setTaskForm({ ...taskForm, dptoResponsavel: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
                   <label className="block text-sm mb-1">TIPO</label>
                   <input value={taskForm.tipo} onChange={e => setTaskForm({ ...taskForm, tipo: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">VENDEDOR</label>
-                  <input value={taskForm.vendedor} onChange={e => setTaskForm({ ...taskForm, vendedor: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
               </div>
 
