@@ -1,5 +1,6 @@
 import { QUALIDADE_API_BASE, QUALIDADE_EMAIL_SYNC_URL } from "./config";
 import {
+  Anexo,
   AtualizacaoPayload,
   FornecedorConfig,
   Garantia,
@@ -70,7 +71,7 @@ const toIsoString = (value: unknown): string | null => {
   return date.toISOString();
 };
 
-const parseAnexos = (payload: unknown) =>
+const parseAnexos = (payload: unknown): Anexo[] =>
   Array.isArray(payload)
     ? payload
         .map((item) => {
@@ -84,7 +85,7 @@ const parseAnexos = (payload: unknown) =>
           }
           return null;
         })
-        .filter(Boolean)
+        .filter((item): item is Anexo => Boolean(item))
     : [];
 
 const ensureDate = (value: unknown): Date => {

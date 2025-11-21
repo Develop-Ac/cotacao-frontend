@@ -5,6 +5,8 @@ import logo from './assets/images/logo.svg';
 import logo_mini from './assets/images/logo-mini.svg';
 import logoSidebarFull from './assets/images/logo_completa.png';
 import logoSidebarIcon from './assets/images/logo_icon.png';
+import acLogoMin from './assets/images/AC_logo_min.png';
+import Head from "next/head";
 import PrivateRoute from "@/components/PrivateRoute";
 import { useRouter, usePathname } from "next/navigation";
 import Image from 'next/image';
@@ -174,6 +176,9 @@ export default function RootLayout({
 
   return (
     <PrivateRoute>
+      <Head>
+        <link rel="icon" href={acLogoMin.src} />
+      </Head>
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
         <nav
           role="navigation"
@@ -681,7 +686,5 @@ export default function RootLayout({
     </PrivateRoute>
   );
 }
-
-
 
 
