@@ -132,6 +132,10 @@ interface ColumnProps {
 }
 function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask, onOpenTask, board, userSetor }: ColumnProps) {
   const [value, setValue] = useState("");
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [pendingTitle, setPendingTitle] = useState("");
+  const [pendingCol, setPendingCol] = useState<ColumnKey | null>(null);
+  const [typeChoice, setTypeChoice] = useState<"garantia" | "devolucao" | null>(null);
   const canCreate = (userSetor === "Atacado" || userSetor === "Varejo") ? colKey === "aguardando_atendimento" : true;
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -157,63 +161,107 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
   }
 
   return (
-    <div
-      data-col={colKey}
-      onDragOver={(e: React.DragEvent<HTMLDivElement>) => e.preventDefault()}
-      onDrop={handleDrop}
-      className="min-w-[320px] w-[320px] bg-white dark:bg-neutral-950 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-neutral-800 flex flex-col"
-    >
-      <h2 className="text-lg font-semibold mb-3">{label}</h2>
-      <div className="flex flex-col gap-2">
-        {tasks.map((t) => (
-          <Card
-            key={t.id}
-            task={t}
-            onDelete={() => onDeleteTask(colKey, t.id)}
-            onOpen={() => onOpenTask(colKey, t.id)}
-            colKey={colKey as ColumnKey}
-            userSetor={userSetor}
+    <>
+      <div
+        data-col={colKey}
+        onDragOver={(e: React.DragEvent<HTMLDivElement>) => e.preventDefault()}
+        onDrop={handleDrop}
+        className="min-w-[320px] w-[320px] bg-white dark:bg-neutral-950 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-neutral-800 flex flex-col"
+      >
+        <h2 className="text-lg font-semibold mb-3">{label}</h2>
+        <div className="flex flex-col gap-2">
+          {tasks.map((t) => (
+            <Card
+              key={t.id}
+              task={t}
+              onDelete={() => onDeleteTask(colKey, t.id)}
+              onOpen={() => onOpenTask(colKey, t.id)}
+              colKey={colKey as ColumnKey}
+              userSetor={userSetor}
+            />
+          ))}
+        </div>
+        <div className="flex mt-4 gap-2">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Novo card..."
+            className="w-full text-base rounded-2xl border border-blue-200 dark:border-blue-700 bg-white dark:bg-neutral-900 px-3 py-2 shadow focus:ring-2 focus:ring-blue-300"
+            disabled={!canCreate}
           />
-        ))}
+          <button
+            onClick={() => {
+              // Ao clicar, abre modal de escolha
+              setPendingTitle(value.trim());
+              setPendingCol(colKey as ColumnKey);
+              setShowTypeModal(true);
+            }}
+            className="text-base px-4 py-2 rounded-2xl border border-blue-200 dark:border-blue-700 bg-blue-500 hover:bg-blue-600 text-white shadow font-bold transition-all duration-150"
+            disabled={!canCreate}
+          >
+            +
+          </button>
+        </div>
       </div>
-      <div className="flex mt-4 gap-2">
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Novo card..."
-          className="w-full text-base rounded-2xl border border-blue-200 dark:border-blue-700 bg-white dark:bg-neutral-900 px-3 py-2 shadow focus:ring-2 focus:ring-blue-300"
-          disabled={!canCreate}
-        />
-        <button
-          onClick={() => {
-            let title = value.trim();
-            if (!title) {
-              // Busca o maior número global entre todas as colunas
-              const prefix = "garantia #";
-              const allTasks = Object.values(board).flat() as Task[];
-              const nums = allTasks
-                .map((t: Task) => t.title)
-                .filter(t => t.startsWith(prefix))
-                .map(t => {
-                  const m = t.match(/garantia #(\d{3})/);
-                  return m ? parseInt(m[1], 10) : null;
-                })
-                .filter(n => n !== null);
-              const nextNum = nums.length ? Math.max(...nums as number[]) + 1 : 0;
-              title = `${prefix}${nextNum.toString().padStart(3, "0")}`;
-            }
-            if (canCreate) {
-              onAddTask(colKey as ColumnKey, title);
-              setValue("");
-            }
-          }}
-          className="text-base px-4 py-2 rounded-2xl border border-blue-200 dark:border-blue-700 bg-blue-500 hover:bg-blue-600 text-white shadow font-bold transition-all duration-150"
-          disabled={!canCreate}
-        >
-          +
-        </button>
-      </div>
-    </div>
+
+      {/* Modal de escolha Garantia/Devolução */}
+      {showTypeModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[340px] shadow-lg">
+            <h2 className="text-lg font-semibold mb-4">Tipo de Card</h2>
+            <div className="flex flex-col gap-3">
+              <button
+                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "garantia" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
+                onClick={() => setTypeChoice("garantia")}
+              >Garantia</button>
+              <button
+                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "devolucao" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
+                onClick={() => setTypeChoice("devolucao")}
+              >Devolução</button>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                className="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-neutral-700"
+                onClick={() => {
+                  setShowTypeModal(false);
+                  setTypeChoice(null);
+                }}
+              >Cancelar</button>
+              <button
+                className="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={!typeChoice}
+                onClick={() => {
+                  if (!pendingCol) return;
+                  // Busca o maior número global entre todas as colunas para o tipo
+                  const prefix = typeChoice === "garantia" ? "garantia #" : "devolucao #";
+                  const allTasks = Object.values(board).flat() as Task[];
+                  const nums = allTasks
+                    .map((t: Task) => t.title)
+                    .filter(t => t.startsWith(prefix))
+                    .map(t => {
+                      const m = t.match(/(garantia|devolucao) #(\d{3})/);
+                      return m ? parseInt(m[2], 10) : null;
+                    })
+                    .filter(n => n !== null);
+                  const nextNum = nums.length ? Math.max(...(nums as number[])) + 1 : 0;
+                  let title = pendingTitle;
+                  if (!title) {
+                    title = `${prefix}${nextNum.toString().padStart(3, "0")}`;
+                  } else {
+                    // Se o usuário digitou algo, prefixa o tipo
+                    title = `${prefix}${title}`;
+                  }
+                  onAddTask(pendingCol, title);
+                  setValue("");
+                  setShowTypeModal(false);
+                  setTypeChoice(null);
+                }}
+              >Criar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 // ...existing code...
