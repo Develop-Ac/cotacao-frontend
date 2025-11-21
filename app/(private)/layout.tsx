@@ -12,7 +12,7 @@ import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight 
 import { FaShoppingCart, FaWrench, FaBox, FaTruck, FaCog, FaChevronRight, FaClipboardCheck } from 'react-icons/fa';
 import { IoPersonSharp } from "react-icons/io5";
 import Link from "next/link";
-import { useState, useEffect, MouseEvent } from "react";
+import { useState, MouseEvent } from "react";
 
 export default function RootLayout({
   children,
@@ -21,7 +21,15 @@ export default function RootLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = window.localStorage.getItem("userData");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [popover, setPopover] = useState<{ top: number; left: number; section: string } | null>(null);
   const [subPopover, setSubPopover] = useState<{ top: number; left: number; items: { label: string; href: string }[] } | null>(null);
@@ -77,18 +85,7 @@ export default function RootLayout({
   const cascadeItemClass = () =>
     `transition-all duration-300 ease-out opacity-0 -translate-y-2 group-open:opacity-100 group-open:translate-y-0`;
 
-  useEffect(() => {
-    const userDataFromStorage = localStorage.getItem('userData');
-    if (userDataFromStorage) {
-      setUserData(JSON.parse(userDataFromStorage));
-    }
-  }, []);
-
-  useEffect(() => {
-    setIsNavigating(false);
-  }, [pathname]);
-
-  const handleNavigation = (href: string, event?: MouseEvent<HTMLElement>) => {
+  const handleNavigation = async (href: string, event?: MouseEvent<HTMLElement>) => {
     if (event) {
       if (
         event.button !== 0 ||
@@ -103,7 +100,11 @@ export default function RootLayout({
     }
     if (isNavigating || href === pathname) return;
     setIsNavigating(true);
-    router.push(href);
+    try {
+      await router.push(href);
+    } finally {
+      setIsNavigating(false);
+    }
   };
 
   const hasAccessToModule = (module: string): boolean => {
@@ -144,7 +145,6 @@ export default function RootLayout({
       case 'Qualidade':
         return [
           { label: 'Central', href: '/qualidade' },
-          { label: 'Nova Garantia', href: '/qualidade/nova' },
           { label: 'Inbox', href: '/qualidade/caixa' },
         ];
       case 'Sistema':
@@ -155,7 +155,9 @@ export default function RootLayout({
   };
 
   function deslogar() {
-    localStorage.setItem('auth', 'false');
+    window.localStorage.setItem('auth', 'false');
+    window.localStorage.removeItem('userData');
+    setUserData(null);
     handleNavigation('/login');
   }
 
@@ -474,11 +476,6 @@ export default function RootLayout({
                       </Link>
                     </li>
                     <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                      <Link href="/qualidade/nova" onClick={(e) => handleNavigation('/qualidade/nova', e)} className={linkClasses('/qualidade/nova')}>
-                        Nova Garantia
-                      </Link>
-                    </li>
-                    <li className={cascadeItemClass()} style={cascadeStyle(2)}>
                       <Link href="/qualidade/caixa" onClick={(e) => handleNavigation('/qualidade/caixa', e)} className={linkClasses('/qualidade/caixa')}>
                         Inbox
                       </Link>

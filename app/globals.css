@@ -145,3 +145,9 @@ a[class*="btn"] svg,
 a[class*="button"] svg {
   color: #ffffff !important;
 }
+
+button.keep-color svg,
+button.keep-color * svg,
+.keep-color svg {
+  color: inherit !important;
+}

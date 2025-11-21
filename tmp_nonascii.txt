@@ -1,0 +1,40 @@
+1: ﻿"use client";
+54:   razao: "RazÃ£o Social",
+55:   endereco: "EndereÃ§o",
+57:   codigo: "CÃ³digo",
+58:   obs: "ObservaÃ§Ãµes",
+64:   if (field === "obs") return "ObservaÃ§Ãµes (opcional)";
+65:   if (field === "codigo") return "CÃ³digo (opcional)";
+289:       setError(err instanceof Error ? err.message : "NÃ£o foi possÃ­vel carregar os detalhes.");
+330:       window.alert(err instanceof Error ? err.message : "Não foi possível registrar a atualização.");
+398:         window.alert(err instanceof Error ? err.message : "NÃ£o foi possivel baixar o anexo.");
+425:           setAnexoViewerError(err instanceof Error ? err.message : "NÃ£o foi possivel carregar o arquivo.");
+528:       window.alert("Informe o nÃºmero da NF.");
+603:       window.alert("Informe um valor vÃ¡lido.");
+689:       return <ActionButton label="Crédito Liberado" icon={<MdPaid size={18} />} onClick={handleLiberarCredito} />;
+711:     return <p className="text-sm text-slate-500">Nenhuma aÃ§Ã£o disponÃ­vel para este status.</p>;
+719:           subtitle="Acompanhe as interações e atualize o processo"
+757:           <SectionCard title="Valores de Crédito">
+759:               <ResumoCard label="Crédito Total" value={formatCurrency(total)} />
+767:               <p className="text-sm text-slate-500">Nenhuma interaÃ§Ã£o registrada ainda.</p>
+773:           <SectionCard title="Atualizações internas">
+777:               placeholder="Descreva a atualização e ela será registrada neste processo."
+818:               label="Registrar atualização"
+829:               <p className="text-sm text-slate-500">Nenhum anexo disponÃ­vel.</p>
+850:           <SectionCard title="Dados logí­sticos">
+855:               {garantia.numeroNfDevolucao && <InfoLine label="NF de devolução" value={garantia.numeroNfDevolucao} />}
+903:                               title="Próximo"
+918:                           <p className="text-sm text-slate-500">Gerando link para visualização...</p>
+921:                             Pré-visualização disponível apenas para imagens. Utilize o botão para baixar o arquivo.
+994:         <p className="text-sm font-semibold text-slate-600">SerÃ¡ necessÃ¡ria Nota Fiscal?</p>
+1001:             Não
+1032:         <p className="text-sm font-semibold text-slate-600">O fornecedor precisa de Nota Fiscal de devolução?</p>
+1039:             Não
+1053:         title="InformaÃ§Ãµes de Coleta/Envio"
+1094:                 cidade: "SÃƒO PAULO",
+1139:           placeholder="Número da NF *"
+1240:         title="Valor de CrÃ©dito"
+1261:         title="Liberar CrÃ©dito"
+1277:           <option value={STATUS_CODES.produtoProximaCompra}>Produto em PrÃ³xima Compra</option>
+1279:           <option value={STATUS_CODES.abatimentoProximoPedido}>Abatimento em PrÃ³ximo Pedido</option>
+1280:           <option value={STATUS_CODES.creditoEmConta}>CrÃ©dito em Conta</option>
