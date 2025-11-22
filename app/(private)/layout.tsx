@@ -6,7 +6,6 @@ import logo_mini from './assets/images/logo-mini.svg';
 import logoSidebarFull from './assets/images/logo_completa.png';
 import logoSidebarIcon from './assets/images/logo_icon.png';
 import acLogoMin from './assets/images/AC_logo_min.png';
-import Head from "next/head";
 import PrivateRoute from "@/components/PrivateRoute";
 import { useRouter, usePathname } from "next/navigation";
 import Image from 'next/image';
@@ -14,7 +13,7 @@ import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight 
 import { FaShoppingCart, FaWrench, FaBox, FaTruck, FaCog, FaChevronRight, FaClipboardCheck } from 'react-icons/fa';
 import { IoPersonSharp } from "react-icons/io5";
 import Link from "next/link";
-import { useState, MouseEvent } from "react";
+import { useState, useEffect, MouseEvent } from "react";
 
 export default function RootLayout({
   children,
@@ -23,15 +22,18 @@ export default function RootLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [userData, setUserData] = useState<any>(() => {
-    if (typeof window === "undefined") return null;
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
     try {
       const stored = window.localStorage.getItem("userData");
-      return stored ? JSON.parse(stored) : null;
+      if (stored) {
+        setUserData(JSON.parse(stored));
+      }
     } catch {
-      return null;
+      // ignore
     }
-  });
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [popover, setPopover] = useState<{ top: number; left: number; section: string } | null>(null);
   const [subPopover, setSubPopover] = useState<{ top: number; left: number; items: { label: string; href: string }[] } | null>(null);
@@ -65,20 +67,17 @@ export default function RootLayout({
   const buttonMotionClasses = "transition-transform duration-200 ease-out hover:scale-105 active:scale-95";
 
   const summaryClasses = (active: boolean) =>
-    `flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'px-4'} py-2 cursor-pointer rounded transition-all duration-300 ease-in-out ${
-      active && !sidebarCollapsed ? 'bg-blue-100 text-[var(--primary-600)] font-semibold shadow-inner' : 'text-gray-700 hover:bg-blue-50'
+    `flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'px-4'} py-2 cursor-pointer rounded transition-all duration-300 ease-in-out ${active && !sidebarCollapsed ? 'bg-blue-100 text-[var(--primary-600)] font-semibold shadow-inner' : 'text-gray-700 hover:bg-blue-50'
     } ${active && sidebarCollapsed ? 'text-[var(--primary-600)]' : ''}`;
 
   const iconClasses = (active: boolean) =>
-    `text-xl transform transition-all duration-300 ease-in-out ${
-      active ? 'text-[var(--primary-600)]' : 'text-gray-700'
+    `text-xl transform transition-all duration-300 ease-in-out ${active ? 'text-[var(--primary-600)]' : 'text-gray-700'
     } ${sidebarCollapsed ? 'scale-110 translate-x-0' : 'scale-100 translate-x-1'}`;
 
   const linkClasses = (href: string, exact = false) => {
     const active = exact ? pathname === href : isPathActive(href);
-    return `text-gray-600 py-1 px-2 rounded hover:bg-blue-100 ${
-      active ? 'bg-blue-100 text-[var(--primary-600)] font-medium' : ''
-    }`;
+    return `text-gray-600 py-1 px-2 rounded hover:bg-blue-100 ${active ? 'bg-blue-100 text-[var(--primary-600)] font-medium' : ''
+      }`;
   };
   const textTransitionClass = sidebarCollapsed
     ? 'opacity-0 -translate-x-2 pointer-events-none'
@@ -176,9 +175,6 @@ export default function RootLayout({
 
   return (
     <PrivateRoute>
-      <Head>
-        <link rel="icon" href={acLogoMin.src} />
-      </Head>
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
         <nav
           role="navigation"
@@ -214,7 +210,7 @@ export default function RootLayout({
 
         <div className="flex">
           <aside
-            className="fixed top-0 left-0 h-screen bg-white shadow-xl flex flex-col overflow-y-auto overflow-x-visible transition-all duration-300"
+            className={`fixed top-0 left-0 h-screen bg-white shadow-xl flex flex-col overflow-y-auto overflow-x-visible transition-all duration-300 ${sidebarCollapsed ? 'no-scrollbar' : ''}`}
             style={{ width: sidebarWidth }}
           >
             <div className="p-4 flex flex-col items-center gap-4 bg-white text-gray-700">
@@ -455,54 +451,54 @@ export default function RootLayout({
                           </li>
                         </ul>
                       </div>
+                    )}
+                  </details>
+                </li>
               )}
-            </details>
-          </li>
-        )}
-        {hasAccessToModule('Qualidade') && (
-          <li>
-            <details className="group">
-              <summary
-                onClick={(e) => {
-                  if (sidebarCollapsed) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Qualidade' });
-                  }
-                }}
-                className={summaryClasses(sectionActive.qualidade)}
-              >
-                <FaClipboardCheck title="Qualidade" className={`${iconSpacingClass} ${iconClasses(sectionActive.qualidade)}`} />
-                <span
-                  className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                  style={labelStyle(5)}
-                  aria-hidden={sidebarCollapsed ? true : undefined}
-                >
-                  Qualidade
-                </span>
-                {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-              </summary>
-              {!sidebarCollapsed && (
-                <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                  <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                    <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                      <Link href="/qualidade" onClick={(e) => handleNavigation('/qualidade', e)} className={linkClasses('/qualidade', true)}>
-                        Central
-                      </Link>
-                    </li>
-                    <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                      <Link href="/qualidade/caixa" onClick={(e) => handleNavigation('/qualidade/caixa', e)} className={linkClasses('/qualidade/caixa')}>
-                        Inbox
-                      </Link>
-                    </li>
-                  </ul>
-                </div>
+              {hasAccessToModule('Qualidade') && (
+                <li>
+                  <details className="group">
+                    <summary
+                      onClick={(e) => {
+                        if (sidebarCollapsed) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Qualidade' });
+                        }
+                      }}
+                      className={summaryClasses(sectionActive.qualidade)}
+                    >
+                      <FaClipboardCheck title="Qualidade" className={`${iconSpacingClass} ${iconClasses(sectionActive.qualidade)}`} />
+                      <span
+                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
+                        style={labelStyle(5)}
+                        aria-hidden={sidebarCollapsed ? true : undefined}
+                      >
+                        Qualidade
+                      </span>
+                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
+                    </summary>
+                    {!sidebarCollapsed && (
+                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
+                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                            <Link href="/qualidade" onClick={(e) => handleNavigation('/qualidade', e)} className={linkClasses('/qualidade', true)}>
+                              Central
+                            </Link>
+                          </li>
+                          <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                            <Link href="/qualidade/caixa" onClick={(e) => handleNavigation('/qualidade/caixa', e)} className={linkClasses('/qualidade/caixa')}>
+                              Inbox
+                            </Link>
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+                  </details>
+                </li>
               )}
-            </details>
-          </li>
-        )}
-        {hasAccessToModule('Sac') && (
+              {hasAccessToModule('Sac') && (
                 <li>
                   <details className="group">
                     <summary
@@ -516,7 +512,7 @@ export default function RootLayout({
                       }}
                       className={summaryClasses(sectionActive.expedicao)}
                     >
-                      <IoPersonSharp  title="Sac" className={`${iconSpacingClass} ${iconClasses(sectionActive.expedicao)}`} />
+                      <IoPersonSharp title="Sac" className={`${iconSpacingClass} ${iconClasses(sectionActive.expedicao)}`} />
                       <span
                         className={`font-medium whitespace-nowrap ${textTransitionClass}`}
                         style={labelStyle(4)}
@@ -589,89 +585,89 @@ export default function RootLayout({
               {children}
             </main>
 
-          {sidebarCollapsed && popover && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => { setSubPopover(null); setPopover(null); }} />
+            {sidebarCollapsed && popover && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => { setSubPopover(null); setPopover(null); }} />
+                <div
+                  className="fixed z-50 bg-white shadow-2xl rounded-lg overflow-hidden min-w-56"
+                  style={{ top: popover.top, left: popover.left }}
+                >
+                  <ul className="py-2">
+                    {(() => {
+                      const mainItems = getSubmenuItems(popover.section);
+                      const comprasSubmenu = popover.section === 'Compras' ? [
+                        { label: 'Cotação', items: [{ label: 'Criar Cotação', href: '/compras/cotacao' }, { label: 'Comparativo', href: '/compras/cotacao/comparativo' }, { label: 'Pedido', href: '/compras/cotacao/pedido' }] },
+                        { label: 'Kanban', href: '/compras/kanban' }
+                      ] : mainItems.map(item => ({ label: item.label, href: item.href }));
+
+                      const itemsToRender = popover.section === 'Compras' ? comprasSubmenu : mainItems.map(item => ({ label: item.label, href: item.href }));
+
+                      return itemsToRender.map(item => (
+                        ('items' in item && item.items) ? (
+                          <li key={item.label}>
+                            <button
+                              className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition ${buttonMotionClasses}`}
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
+                              }}
+                              onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
+                              }}
+                            >
+                              <span>{item.label}</span>
+                              <MdChevronRight className="ml-auto text-gray-400" />
+                            </button>
+                          </li>
+                        ) : (
+                          <li key={item.href || item.label}>
+                            <Link
+                              href={item.href!}
+                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition"
+                              onClick={(e) => {
+                                handleNavigation(item.href!, e);
+                                setSubPopover(null);
+                                setPopover(null);
+                              }}
+                            >
+                              {item.label}
+                            </Link>
+                          </li>
+                        )
+                      ));
+                    })()}
+                  </ul>
+                </div>
+              </>
+            )}
+
+            {subPopover && (
               <div
                 className="fixed z-50 bg-white shadow-2xl rounded-lg overflow-hidden min-w-56"
-                style={{ top: popover.top, left: popover.left }}
+                style={{ top: subPopover.top, left: subPopover.left }}
+                onMouseLeave={() => setSubPopover(null)}
+                onMouseEnter={() => { }}
               >
                 <ul className="py-2">
-                  {(() => {
-                    const mainItems = getSubmenuItems(popover.section);
-                    const comprasSubmenu = popover.section === 'Compras' ? [
-                      { label: 'Cotação', items: [{ label: 'Criar Cotação', href: '/compras/cotacao' }, { label: 'Comparativo', href: '/compras/cotacao/comparativo' }, { label: 'Pedido', href: '/compras/cotacao/pedido' }] },
-                      { label: 'Kanban', href: '/compras/kanban' }
-                    ] : mainItems.map(item => ({ label: item.label, href: item.href }));
-
-                    const itemsToRender = popover.section === 'Compras' ? comprasSubmenu : mainItems.map(item => ({ label: item.label, href: item.href }));
-
-                    return itemsToRender.map(item => (
-                      ('items' in item && item.items) ? (
-                        <li key={item.label}>
-                          <button
-                            className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition ${buttonMotionClasses}`}
-                            onMouseEnter={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
-                            }}
-                            onClick={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
-                            }}
-                          >
-                            <span>{item.label}</span>
-                            <MdChevronRight className="ml-auto text-gray-400" />
-                          </button>
-                        </li>
-                      ) : (
-                        <li key={item.href || item.label}>
-                          <Link
-                            href={item.href!}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition"
-                            onClick={(e) => {
-                              handleNavigation(item.href!, e);
-                              setSubPopover(null);
-                              setPopover(null);
-                            }}
-                          >
-                            {item.label}
-                          </Link>
-                        </li>
-                      )
-                    ));
-                  })()}
+                  {subPopover.items.map(item => (
+                    <li key={item.href || item.label}>
+                      <Link
+                        href={item.href}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition"
+                        onClick={(e) => {
+                          handleNavigation(item.href, e);
+                          setSubPopover(null);
+                          setPopover(null);
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </div>
-            </>
-          )}
-
-          {subPopover && (
-            <div
-              className="fixed z-50 bg-white shadow-2xl rounded-lg overflow-hidden min-w-56"
-              style={{ top: subPopover.top, left: subPopover.left }}
-              onMouseLeave={() => setSubPopover(null)}
-              onMouseEnter={() => {}}
-            >
-              <ul className="py-2">
-                {subPopover.items.map(item => (
-                  <li key={item.href || item.label}>
-                    <Link
-                      href={item.href}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition"
-                      onClick={(e) => {
-                        handleNavigation(item.href, e);
-                        setSubPopover(null);
-                        setPopover(null);
-                      }}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+            )}
           </div>
         </div>
       </div>
