@@ -192,7 +192,7 @@ export const NovaGarantiaForm = ({
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [skipEmail, setSkipEmail] = useState(false);
+  const [skipEmail, setSkipEmail] = useState(true);
   const [produtoParaAdicionar, setProdutoParaAdicionar] = useState<string>("");
 
   const normalizedInitialData = useMemo(() => {
@@ -255,7 +255,7 @@ export const NovaGarantiaForm = ({
     setLookupMessage(null);
     setProdutosForm([]);
     setVendaProdutos([]);
-    setSkipEmail(false);
+    setSkipEmail(true);
     setFormularioFile(null);
     setMediaFiles([]);
     setFornecedorConfig(null);
@@ -344,7 +344,7 @@ export const NovaGarantiaForm = ({
     setLookupError(null);
     setStep("form");
     setProdutosForm([]);
-    setSkipEmail(!(normalizedInitialData.emailFornecedor ?? "").trim());
+    setSkipEmail(true);
     setFormularioFile(null);
     setMediaFiles([]);
     setFornecedorConfig(null);
@@ -597,7 +597,7 @@ const removeMediaFile = (index: number) => {
     if (isEditMode) {
       setForm(normalizedInitialData);
       setLookupValue(normalizedInitialData.notaInterna ?? "");
-      setSkipEmail(!(normalizedInitialData.emailFornecedor ?? "").trim());
+      setSkipEmail(true);
       if (vendaProdutos.length > 0) {
         setProdutosFromVenda(vendaProdutos);
       }
@@ -866,15 +866,16 @@ const removeMediaFile = (index: number) => {
           disabled={skipEmail}
           onChange={(event) => setForm((prev) => ({ ...prev, copiasEmail: event.target.value }))}
         />
-        <label className="flex items-center gap-2 text-sm ml-[3px]">
-          <input
-            type="checkbox"
-            checked={skipEmail}
-            onChange={(event) => setSkipEmail(event.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 accent-[var(--primary-600)]"
-          />
-          <span className="text-xs font-semibold text-slate-600">Não enviar e-mails ao fornecedor</span>
-        </label>
+          <label className="flex items-center gap-2 text-sm ml-[3px] opacity-70 cursor-not-allowed">
+            <input type="hidden" name="skipEmail" value="true" />
+            <input
+              type="checkbox"
+              checked
+              readOnly
+              className="h-4 w-4 rounded border-slate-300 accent-[var(--primary-600)]"
+            />
+            <span className="text-xs font-semibold text-slate-600">Não enviar e-mails ao fornecedor</span>
+          </label>
           <>
             <Field
               label="NF Compra"
