@@ -88,10 +88,13 @@ const FINAL_STATUS_CODES = new Set<number>([
   STATUS_CODES.garantiaReprovadaAnalise,
 ]);
 
-const NF_REQUIRED_STATUS = new Set<number>([
-  STATUS_CODES.trocaProduto,
+const NF_REQUIRED_STATUS = new Set<number>([]);
+const NF_E_VALOR_REQUIRED_STATUS = new Set<number>([
   STATUS_CODES.abatimentoProximoPedido,
+  STATUS_CODES.produtoProximaCompra,
+  STATUS_CODES.trocaProduto,
 ]);
+const SALDO_TOLERANCE = 0.009;
 
 const normalizeStatusText = (value: string): string =>
   value
@@ -269,10 +272,15 @@ export default function GarantiaDetalhePage() {
   const [liberarStatus, setLiberarStatus] = useState<number>(STATUS_CODES.produtoProximaCompra);
   const [liberarValor, setLiberarValor] = useState("");
   const [liberarNf, setLiberarNf] = useState("");
-  const [liberarRows, setLiberarRows] = useState<AbatimentoRow[]>([newAbatimentoRow()]);
   const [editarDadosVisible, setEditarDadosVisible] = useState(false);
   const [concluirVisible, setConcluirVisible] = useState(false);
   const [concluirNf, setConcluirNf] = useState("");
+  const [concluirValor, setConcluirValor] = useState("");
+  const [abaterCreditoVisible, setAbaterCreditoVisible] = useState(false);
+  const [abaterNf, setAbaterNf] = useState("");
+  const [abaterValor, setAbaterValor] = useState("");
+  const [abaterSaving, setAbaterSaving] = useState(false);
+  const [abaterRows, setAbaterRows] = useState<AbatimentoRow[]>([newAbatimentoRow()]);
   const [freteCortesiaSelecionado, setFreteCortesiaSelecionado] = useState(false);
   const [envioVisible, setEnvioVisible] = useState(false);
   const [enviarMercadoria, setEnviarMercadoria] = useState(true);
@@ -535,8 +543,17 @@ export default function GarantiaDetalhePage() {
 
   const handleConcluirProcesso = useCallback(async () => {
     if (!garantia) return;
-    if (garantia.status === STATUS_CODES.produtoProximaCompra) {
+    const saldoPendente = Math.max(
+      (garantia.valorCreditoTotal ?? 0) - (garantia.valorCreditoUtilizado ?? 0),
+      0,
+    );
+    if (saldoPendente > SALDO_TOLERANCE) {
+      window.alert("O saldo de crédito precisa estar zerado para concluir o processo.");
+      return;
+    }
+    if (NF_E_VALOR_REQUIRED_STATUS.has(garantia.status)) {
       setConcluirNf("");
+      setConcluirValor("");
       setConcluirVisible(true);
       return;
     }
@@ -545,20 +562,36 @@ export default function GarantiaDetalhePage() {
 
   const submitConcluir = async () => {
     if (!garantia) return;
-    if (garantia.status === STATUS_CODES.produtoProximaCompra) {
+
+    const saldoPendente = Math.max(
+      (garantia.valorCreditoTotal ?? 0) - (garantia.valorCreditoUtilizado ?? 0),
+      0,
+    );
+    if (saldoPendente > SALDO_TOLERANCE) {
+      window.alert("O saldo de crédito precisa estar zerado para concluir o processo.");
+      return;
+    }
+
+    if (NF_E_VALOR_REQUIRED_STATUS.has(garantia.status)) {
       const nf = concluirNf.trim();
+      const valor = parseCurrencyInput(concluirValor);
       if (!nf) {
         window.alert("Informe o número da NF para concluir.");
         return;
       }
+      if (!valor || valor <= 0) {
+        window.alert("Informe o valor recebido para concluir.");
+        return;
+      }
       try {
+        const statusLabel = STATUS_FLOW.find((s) => s.code === garantia.status)?.label ?? "Processo";
         await QualidadeApi.enviarAtualizacao(garantia.id, {
-          descricao: `NF informada para conclusão (Produto em Próxima Compra): ${nf}.`,
+          descricao: `NF informada para conclusão (${statusLabel}): ${nf}. Valor: ${formatCurrency(valor)}.`,
         });
       } catch {
         // segue mesmo se falhar o registro
       }
-      await updateStatus(STATUS_CODES.concluida, { numero_nf_credito: nf });
+      await updateStatus(STATUS_CODES.concluida, { numero_nf_credito: nf, valor_credito_utilizado: valor });
       setConcluirVisible(false);
       return;
     }
@@ -608,7 +641,7 @@ export default function GarantiaDetalhePage() {
   const submitEnvio = async () => {
     if (!garantia) return;
     if (!enviarMercadoria) {
-      await updateStatus(STATUS_CODES.aguardandoCredito);
+      await updateStatus(STATUS_CODES.descarteMercadoria);
       setEnvioVisible(false);
       return;
     }
@@ -674,15 +707,13 @@ export default function GarantiaDetalhePage() {
 
   const submitDescarte = async () => {
     if (!garantia) return;
-    if (descarteAnexos.length === 0) {
-      window.alert("Selecione ao menos um comprovante.");
-      return;
+    if (descarteAnexos.length > 0) {
+      await QualidadeApi.enviarAtualizacao(garantia.id, {
+        descricao: "Comprovante de descarte anexado.",
+        anexos: descarteAnexos.map(fileToAttachment),
+        enviarEmail: false,
+      });
     }
-    await QualidadeApi.enviarAtualizacao(garantia.id, {
-      descricao: "Comprovante de descarte anexado.",
-      anexos: descarteAnexos.map(fileToAttachment),
-      enviarEmail: false,
-    });
     await updateStatus(STATUS_CODES.aguardandoCredito);
     setDescarteVisible(false);
   };
@@ -717,44 +748,132 @@ export default function GarantiaDetalhePage() {
     setValorCreditoVisible(false);
   };
 
-  const handleLiberarCredito = () => {
-    setLiberarStatus(STATUS_CODES.produtoProximaCompra);
-    setLiberarValor("");
-    setLiberarNf("");
-    setLiberarRows([newAbatimentoRow()]);
-    setLiberarVisible(true);
+  const handleAbaterCredito = () => {
+    if (!garantia) return;
+    setAbaterNf("");
+    setAbaterValor("");
+    setAbaterRows([newAbatimentoRow()]);
+    setAbaterCreditoVisible(true);
   };
 
-  const submitLiberarCredito = async () => {
+  const submitAbaterCredito = async () => {
     if (!garantia) return;
-    if (liberarStatus === STATUS_CODES.abatimentoEmBoleto) {
+    const utilizadoAtual = garantia.valorCreditoUtilizado ?? 0;
+    const totalAtual = garantia.valorCreditoTotal ?? 0;
+
+    // Abatimento em boleto: coleta linhas completas
+    if (garantia.status === STATUS_CODES.abatimentoEmBoleto) {
       const linhas: Array<{ nf: string; parcela: string; vencimento: string; valor: number }> = [];
-      for (const row of liberarRows) {
-        const valor = parseCurrencyInput(row.valor);
+      for (const row of abaterRows) {
+        const valorLinha = parseCurrencyInput(row.valor);
         const data = parseBrDate(row.vencimento);
-        if (!row.nf.trim() || !row.parcela.trim() || !valor || !data) {
-          window.alert("Preencha todas as colunas das linhas de abatimento.");
+        if (!row.nf.trim() || !row.parcela.trim() || !valorLinha || !data) {
+          window.alert("Preencha todos os campos (NF, parcela, vencimento e valor) para cada linha.");
           return;
         }
         linhas.push({
           nf: row.nf.trim(),
           parcela: row.parcela.trim(),
           vencimento: data.toISOString().split("T")[0],
-          valor,
+          valor: valorLinha,
         });
       }
-      await updateStatus(STATUS_CODES.abatimentoEmBoleto, { abatimentos: linhas });
-      setLiberarVisible(false);
+      const totalLinhas = linhas.reduce((sum, item) => sum + item.valor, 0);
+      if (totalLinhas <= 0) {
+        window.alert("Informe pelo menos um valor de abatimento.");
+        return;
+      }
+      const novoUtilizado = utilizadoAtual + totalLinhas;
+      if (novoUtilizado - totalAtual > SALDO_TOLERANCE) {
+        window.alert("O valor informado excede o credito disponivel.");
+        return;
+      }
+      setAbaterSaving(true);
+      try {
+        await QualidadeApi.enviarAtualizacao(garantia.id, {
+          descricao: `Abatimento em boleto registrado. Linhas: ${linhas
+            .map((l) => `${l.nf} Parcela ${l.parcela} - Vencimento: ${formatDate(l.vencimento)} - Valor: ${formatCurrency(l.valor)}`)
+            .join(" | ")}.`,
+        });
+        await updateStatus(garantia.status, {
+          abatimentos: linhas,
+          valor_credito_utilizado: novoUtilizado,
+          numero_nf_credito: linhas[0]?.nf,
+        });
+        setAbaterCreditoVisible(false);
+        setAbaterNf("");
+        setAbaterValor("");
+        setAbaterRows([newAbatimentoRow()]);
+      } catch (err) {
+        window.alert(err instanceof Error ? err.message : "Nao foi possivel registrar o abatimento.");
+      } finally {
+        setAbaterSaving(false);
+      }
       return;
     }
+
+    // Fluxo padrao (status 8/9/10)
+    const nf = abaterNf.trim();
+    const valor = parseCurrencyInput(abaterValor);
+    if (!nf) {
+      window.alert("Informe o numero da NF abatida.");
+      return;
+    }
+    if (!valor || valor <= 0) {
+      window.alert("Informe um valor valido para abater.");
+      return;
+    }
+    const novoUtilizado = utilizadoAtual + valor;
+    if (novoUtilizado - totalAtual > SALDO_TOLERANCE) {
+      window.alert("O valor informado excede o credito disponivel.");
+      return;
+    }
+    setAbaterSaving(true);
+    try {
+      await QualidadeApi.enviarAtualizacao(garantia.id, {
+        descricao: `Credito abatido. NF: ${nf}. Valor: ${formatCurrency(valor)}. Novo utilizado: ${formatCurrency(novoUtilizado)}.`,
+      });
+      await updateStatus(garantia.status, {
+        valor_credito_utilizado: novoUtilizado,
+        numero_nf_credito: nf,
+      });
+      setAbaterCreditoVisible(false);
+      setAbaterNf("");
+      setAbaterValor("");
+      setAbaterRows([newAbatimentoRow()]);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Nao foi possivel registrar o abatimento.");
+    } finally {
+      setAbaterSaving(false);
+    }
+  };
+
+  const handleLiberarCredito = () => {
+    setLiberarStatus(STATUS_CODES.produtoProximaCompra);
+    setLiberarValor("");
+    setLiberarNf("");
+    setLiberarVisible(true);
+  };
+
+  const submitLiberarCredito = async () => {
+    if (!garantia) return;
     const valor = parseCurrencyInput(liberarValor);
+
+    // Validação específica para Abatimento em Próximo Pedido e Abatimento em Boleto
+    if (liberarStatus === STATUS_CODES.abatimentoProximoPedido || liberarStatus === STATUS_CODES.abatimentoEmBoleto) {
+      if (!valor || valor <= 0) {
+        window.alert("Informe o valor do crédito.");
+        return;
+      }
+    }
+
     const precisaNf = NF_REQUIRED_STATUS.has(liberarStatus);
     const nfInformada = liberarNf.trim();
-    if (precisaNf && !nfInformada) {
+    if (liberarStatus !== STATUS_CODES.abatimentoEmBoleto && precisaNf && !nfInformada) {
       window.alert("Informe o número da NF recebida.");
       return;
     }
-    if (precisaNf) {
+    if (precisaNf && liberarStatus !== STATUS_CODES.abatimentoEmBoleto) {
       const statusLabel = STATUS_FLOW.find((item) => item.code === liberarStatus)?.label ?? "Status final";
       await QualidadeApi.enviarAtualizacao(garantia.id, {
         descricao: `NF informada para conclusão (${statusLabel}): ${nfInformada}.`,
@@ -762,9 +881,13 @@ export default function GarantiaDetalhePage() {
     }
     const payload: Record<string, unknown> = {};
     if (valor && valor > 0) {
-      payload.valor_credito_utilizado = valor;
+      if (liberarStatus === STATUS_CODES.abatimentoProximoPedido || liberarStatus === STATUS_CODES.abatimentoEmBoleto) {
+        payload.valor_credito_total = valor;
+      } else {
+        payload.valor_credito_utilizado = valor;
+      }
     }
-    if (nfInformada) {
+    if (liberarStatus !== STATUS_CODES.abatimentoEmBoleto && nfInformada) {
       payload.numero_nf_credito = nfInformada;
     }
     await updateStatus(liberarStatus, Object.keys(payload).length > 0 ? payload : undefined);
@@ -974,7 +1097,18 @@ export default function GarantiaDetalhePage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Valores de Crédito">
+            <SectionCard
+              title="Valores de Crédito"
+              trailing={
+                <ActionButton
+                  label="Registrar abatimento"
+                  icon={<MdAttachFile size={16} />}
+                  onClick={handleAbaterCredito}
+                  disabled={!garantia}
+                  className="px-3 py-2"
+                />
+              }
+            >
               <div className="grid gap-4 md:grid-cols-3">
                 <ResumoCard label="Crédito Total" value={formatCurrency(total)} />
                 <ResumoCard label="Utilizado" value={formatCurrency(utilizado)} />
@@ -1312,17 +1446,32 @@ export default function GarantiaDetalhePage() {
         <FormModal
           open={concluirVisible}
           title="Concluir Garantia"
-          onClose={() => setConcluirVisible(false)}
+          onClose={() => {
+            setConcluirVisible(false);
+            setConcluirNf("");
+            setConcluirValor("");
+          }}
           width="sm"
           footer={
             <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setConcluirVisible(false)} />
+              <ActionButton
+                label="Cancelar"
+                variant="ghost"
+                shape="rounded"
+                onClick={() => {
+                  setConcluirVisible(false);
+                  setConcluirNf("");
+                  setConcluirValor("");
+                }}
+              />
               <ActionButton label="Concluir" shape="rounded" onClick={submitConcluir} />
             </>
           }
         >
           <div className="space-y-4 px-1">
-            <p className="text-sm text-slate-600">Informe a NF recebida para concluir o processo.</p>
+            <p className="text-sm text-slate-600">
+              Informe a NF e o valor recebido para concluir o processo.
+            </p>
             <input
               type="text"
               value={concluirNf}
@@ -1330,6 +1479,15 @@ export default function GarantiaDetalhePage() {
               placeholder="Número da NF *"
               className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {garantia && NF_E_VALOR_REQUIRED_STATUS.has(garantia.status) && (
+              <input
+                type="text"
+                value={concluirValor}
+                onChange={(event) => setConcluirValor(formatCurrencyMask(event.target.value))}
+                placeholder="Valor (R$) *"
+                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
         </FormModal>
 
@@ -1645,6 +1803,136 @@ export default function GarantiaDetalhePage() {
         </FormModal>
 
         <FormModal
+          open={abaterCreditoVisible}
+          title="Registrar abatimento"
+          onClose={() => {
+            setAbaterCreditoVisible(false);
+            setAbaterNf("");
+            setAbaterValor("");
+            setAbaterRows([newAbatimentoRow()]);
+          }}
+          width="sm"
+          footer={
+            <>
+              <ActionButton
+                label="Cancelar"
+                variant="ghost"
+                shape="rounded"
+                onClick={() => {
+                  setAbaterCreditoVisible(false);
+                  setAbaterNf("");
+                  setAbaterValor("");
+                  setAbaterRows([newAbatimentoRow()]);
+                }}
+              />
+              <ActionButton
+                label="Salvar"
+                shape="rounded"
+                onClick={submitAbaterCredito}
+                loading={abaterSaving}
+              />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            {garantia?.status === STATUS_CODES.abatimentoEmBoleto ? (
+              <>
+                <p className="text-sm text-slate-600">
+                  Registre as linhas de abatimento do boleto. O saldo será atualizado conforme os valores informados.
+                </p>
+                <div className="space-y-3">
+                  {abaterRows.map((row, index) => (
+                    <div key={index} className="rounded-2xl border border-slate-200 p-3 space-y-2 relative">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          type="text"
+                          placeholder="NF *"
+                          value={row.nf}
+                          onChange={(event) =>
+                            setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, nf: event.target.value } : item)))
+                          }
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Parcela *"
+                          value={row.parcela}
+                          onChange={(event) =>
+                            setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, parcela: event.target.value } : item)))
+                          }
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Vencimento (dd/mm/aaaa) *"
+                          value={row.vencimento}
+                          onChange={(event) =>
+                            setAbaterRows((prev) =>
+                              prev.map((item, idx) =>
+                                idx === index ? { ...item, vencimento: formatDateMask(event.target.value) } : item,
+                              ),
+                            )
+                          }
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Valor *"
+                          value={row.valor}
+                          onChange={(event) =>
+                            setAbaterRows((prev) =>
+                              prev.map((item, idx) =>
+                                idx === index ? { ...item, valor: formatCurrencyMask(event.target.value) } : item,
+                              ),
+                            )
+                          }
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="absolute top-2 right-2 rounded-full border border-red-200 bg-white px-3 py-1 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-30"
+                        onClick={() => setAbaterRows((prev) => prev.filter((_, idx) => idx !== index))}
+                        disabled={abaterRows.length === 1}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                  <ActionButton
+                    label="Adicionar linha"
+                    variant="ghost"
+                    icon={<MdAdd size={18} />}
+                    onClick={() => setAbaterRows((prev) => [...prev, newAbatimentoRow()])}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Informe a NF abatida e o valor que será debitado do crédito disponível.
+                </p>
+                <input
+                  type="text"
+                  value={abaterNf}
+                  onChange={(event) => setAbaterNf(event.target.value)}
+                  placeholder="NF abatida *"
+                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  value={abaterValor}
+                  onChange={(event) => setAbaterValor(formatCurrencyMask(event.target.value))}
+                  placeholder="Valor abatido (R$) *"
+                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </>
+            )}
+            <p className="text-xs text-slate-500">Saldo atual: {formatCurrency(saldo)}</p>
+          </div>
+        </FormModal>
+
+        <FormModal
           open={liberarVisible}
           title="Liberar Crédito"
           onClose={() => setLiberarVisible(false)}
@@ -1670,91 +1958,34 @@ export default function GarantiaDetalhePage() {
               <option value={STATUS_CODES.abatimentoEmBoleto}>Abatimento em Boleto</option>
             </select>
 
-            {liberarStatus === STATUS_CODES.abatimentoEmBoleto ? (
-              <div className="mt-4 space-y-4">
-                {liberarRows.map((row, index) => (
-                  <div key={index} className="rounded-2xl border border-slate-200 p-4 space-y-2 relative">
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <input
-                        type="text"
-                        placeholder="NF *"
-                        value={row.nf}
-                        onChange={(event) =>
-                          setLiberarRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, nf: event.target.value } : item)))
-                        }
-                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Parcela *"
-                        value={row.parcela}
-                        onChange={(event) =>
-                          setLiberarRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, parcela: event.target.value } : item)))
-                        }
-                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Vencimento (dd/mm/aaaa) *"
-                        value={row.vencimento}
-                        onChange={(event) =>
-                          setLiberarRows((prev) =>
-                            prev.map((item, idx) =>
-                              idx === index ? { ...item, vencimento: formatDateMask(event.target.value) } : item,
-                            ),
-                          )
-                        }
-                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Valor *"
-                        value={row.valor}
-                        onChange={(event) =>
-                          setLiberarRows((prev) =>
-                            prev.map((item, idx) =>
-                              idx === index ? { ...item, valor: formatCurrencyMask(event.target.value) } : item,
-                            ),
-                          )
-                        }
-                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="absolute top-2 right-2 rounded-full border border-red-200 bg-white px-3 py-1 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-30"
-                      onClick={() => setLiberarRows((prev) => prev.filter((_, idx) => idx !== index))}
-                      disabled={liberarRows.length === 1}
-                    >
-                      Remover
-                    </button>
-                  </div>
-                ))}
-                <ActionButton
-                  label="Adicionar linha"
-                  variant="ghost"
-                  icon={<MdAdd size={18} />}
-                  onClick={() => setLiberarRows((prev) => [...prev, newAbatimentoRow()])}
-                />
-              </div>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={liberarValor}
-                  onChange={(event) => setLiberarValor(formatCurrencyMask(event.target.value))}
-                  placeholder="Valor utilizado (opcional)"
-                  className="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <div className="space-y-3">
+              {liberarStatus === STATUS_CODES.abatimentoEmBoleto && (
+                <p className="text-xs text-slate-600">
+                  Informe o valor do crédito. Os detalhes do boleto abatido serão registrados no botão
+                  &quot;Registrar abatimento&quot; até zerar o saldo.
+                </p>
+              )}
+              <input
+                type="text"
+                value={liberarValor}
+                onChange={(event) => setLiberarValor(formatCurrencyMask(event.target.value))}
+                placeholder={
+                  liberarStatus === STATUS_CODES.abatimentoProximoPedido || liberarStatus === STATUS_CODES.abatimentoEmBoleto
+                    ? "Valor do Crédito"
+                    : "Valor utilizado (opcional)"
+                }
+                className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {liberarStatus !== STATUS_CODES.abatimentoEmBoleto && (
                 <input
                   type="text"
                   value={liberarNf}
                   onChange={(event) => setLiberarNf(event.target.value)}
                   placeholder={`NF recebida${NF_REQUIRED_STATUS.has(liberarStatus) ? " *" : " (opcional)"}`}
-                  className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </>
-            )}
+              )}
+            </div>
           </div>
         </FormModal>
       </div>
