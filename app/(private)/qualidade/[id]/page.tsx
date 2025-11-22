@@ -634,7 +634,8 @@ export default function GarantiaDetalhePage() {
       await updateStatus(STATUS_CODES.aguardandoColeta, {
         frete_por_conta_de: "fornecedor",
         transportadora_razao_social: "Correios",
-        codigo_objeto: codigo,
+        codigo_coleta_envio: codigo,
+        obs: `Código de Rastreio: ${codigo}`,
       });
       setEnvioVisible(false);
       return;
@@ -910,11 +911,61 @@ export default function GarantiaDetalhePage() {
                 <InfoLine label="Tipo de Garantia" value={garantia.tipoGarantia ?? "N/A"} />
                 {garantia.protocoloFornecedor && <InfoLine label="Protocolo" value={garantia.protocoloFornecedor} />}
                 <InfoLine label="Criado em" value={formatDateTime(garantia.dataCriacao)} />
-                <div className="md:col-span-2">
-                  <InfoLine label="Produtos" value={garantia.produtos.replace(/; /g, " // ")} />
-                </div>
               </div>
               <div className="mt-4">{actionButtons}</div>
+            </SectionCard>
+
+            <SectionCard title="Produtos">
+              {garantia.produtos ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {garantia.produtos.split(';').map((p) => p.trim()).filter(Boolean).map((prod, idx) => {
+                    // Regex para extrair campos: Base (Tipo) (Qtd: N) (NF Compra: X) (Ref: Y)
+                    const match = prod.match(/^(.*?)(?:\s+\((Avaria|Anomalia)\))?(?:\s+\(Qtd:\s*(\d+)\))?(?:\s+\(NF Compra:\s*([^)]+)\))?(?:\s+\(Ref:\s*([^)]+)\))?$/i);
+
+                    const base = match ? match[1].trim() : prod;
+                    const tipo = match ? match[2] : null;
+                    const qtd = match ? match[3] : null;
+                    const nf = match ? match[4] : null;
+                    const ref = match ? match[5] : null;
+
+                    const parts = base.split(' - ');
+                    const codigo = parts.length > 1 ? parts[0].trim() : null;
+                    const descricao = parts.length > 1 ? parts.slice(1).join(' - ').trim() : base;
+
+                    return (
+                      <div key={idx} className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 p-3 relative overflow-hidden">
+                        {tipo && (
+                          <div className={`absolute top-0 right-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white ${tipo.toLowerCase() === 'anomalia' ? 'bg-purple-500' : 'bg-orange-500'} rounded-bl-xl`}>
+                            {tipo}
+                          </div>
+                        )}
+                        {codigo && <span className="text-xs font-bold text-slate-500 mb-1">{codigo}</span>}
+                        <span className="text-sm font-medium text-slate-800 mb-2 pr-12">{descricao}</span>
+
+                        <div className="mt-auto flex flex-wrap gap-2 text-xs text-slate-600">
+                          {qtd && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200">
+                              <span className="font-semibold">Qtd:</span> {qtd}
+                            </span>
+                          )}
+                          {nf && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200">
+                              <span className="font-semibold">NF:</span> {nf}
+                            </span>
+                          )}
+                          {ref && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200">
+                              <span className="font-semibold">Ref:</span> {ref}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">Nenhum produto registrado.</p>
+              )}
             </SectionCard>
 
             <SectionCard title="Status">
