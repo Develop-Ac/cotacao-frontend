@@ -50,10 +50,9 @@ type ColetaFormState = {
 };
 
 const toggleButtonClasses = (active: boolean) =>
-  `keep-color px-3 py-1.5 rounded-full border transition-colors duration-200 ${
-    active
-      ? "bg-[var(--primary-600)] border-[var(--primary-600)] text-white"
-      : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
+  `keep-color px-3 py-1.5 rounded-full border transition-colors duration-200 ${active
+    ? "bg-[var(--primary-600)] border-[var(--primary-600)] text-white"
+    : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
   }`;
 
 const fileToAttachment = (file: File): UploadAttachment => ({
@@ -486,13 +485,13 @@ export default function GarantiaDetalhePage() {
   };
 
   const submitAprovarModal = async () => {
-    if (!aprovarCfop.trim()) {
+    if (aprovarPrecisaNF && !aprovarCfop.trim()) {
       window.alert("Informe o CFOP.");
       return;
     }
     const payload: Record<string, unknown> = {
       precisa_nota_fiscal: aprovarPrecisaNF,
-      cfop: aprovarCfop.trim(),
+      ...(aprovarPrecisaNF ? { cfop: aprovarCfop.trim() } : {}),
       ...(freteCortesiaSelecionado ? { frete_por_conta_de: "cortesia" } : {}),
     };
     setAprovarModalVisible(false);
@@ -500,7 +499,7 @@ export default function GarantiaDetalhePage() {
       await updateStatus(STATUS_CODES.emissaoNotaFiscal, payload);
       return;
     }
-    await updateStatus(STATUS_CODES.aprovacaoNotaFiscal, payload);
+    await updateStatus(STATUS_CODES.descarteMercadoria, payload);
   };
 
   const closeNotaModal = () => {
@@ -780,15 +779,15 @@ export default function GarantiaDetalhePage() {
     () =>
       garantia
         ? {
-            nomeFornecedor: garantia.nomeFornecedor,
-            notaInterna: garantia.notaInterna,
-            emailFornecedor: garantia.emailFornecedor ?? "",
-            copiasEmail: garantia.copiasEmail ?? "",
-            produtos: garantia.produtos,
-            tipoGarantia: garantia.tipoGarantia ?? "Avaria",
-            protocoloFornecedor: garantia.protocoloFornecedor ?? "",
-            nfsCompra: garantia.nfsCompra ?? "",
-          }
+          nomeFornecedor: garantia.nomeFornecedor,
+          notaInterna: garantia.notaInterna,
+          emailFornecedor: garantia.emailFornecedor ?? "",
+          copiasEmail: garantia.copiasEmail ?? "",
+          produtos: garantia.produtos,
+          tipoGarantia: garantia.tipoGarantia ?? "Avaria",
+          protocoloFornecedor: garantia.protocoloFornecedor ?? "",
+          nfsCompra: garantia.nfsCompra ?? "",
+        }
         : undefined,
     [garantia],
   );
@@ -898,134 +897,134 @@ export default function GarantiaDetalhePage() {
           </div>
         ) : garantia ? (
           <div className="space-y-6">
-          <SectionCard
-            title="Resumo do Processo"
-            trailing={
-              statusAtual && <StatusChip label={statusAtual.label} color={statusAtual.color} background={statusAtual.background} />
-            }
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <InfoLine label="Fornecedor" value={garantia.nomeFornecedor} />
-              <InfoLine label="Nota Interna" value={garantia.notaInterna} />
-              <InfoLine label="NF Compra" value={garantia.nfsCompra ?? "N/A"} />
-              <InfoLine label="Tipo de Garantia" value={garantia.tipoGarantia ?? "N/A"} />
-              {garantia.protocoloFornecedor && <InfoLine label="Protocolo" value={garantia.protocoloFornecedor} />}
-              <InfoLine label="Criado em" value={formatDateTime(garantia.dataCriacao)} />
-              <div className="md:col-span-2">
-                <InfoLine label="Produtos" value={garantia.produtos.replace(/; /g, " // ")} />
+            <SectionCard
+              title="Resumo do Processo"
+              trailing={
+                statusAtual && <StatusChip label={statusAtual.label} color={statusAtual.color} background={statusAtual.background} />
+              }
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <InfoLine label="Fornecedor" value={garantia.nomeFornecedor} />
+                <InfoLine label="Nota Interna" value={garantia.notaInterna} />
+                <InfoLine label="NF Compra" value={garantia.nfsCompra ?? "N/A"} />
+                <InfoLine label="Tipo de Garantia" value={garantia.tipoGarantia ?? "N/A"} />
+                {garantia.protocoloFornecedor && <InfoLine label="Protocolo" value={garantia.protocoloFornecedor} />}
+                <InfoLine label="Criado em" value={formatDateTime(garantia.dataCriacao)} />
+                <div className="md:col-span-2">
+                  <InfoLine label="Produtos" value={garantia.produtos.replace(/; /g, " // ")} />
+                </div>
               </div>
-            </div>
-            <div className="mt-4">{actionButtons}</div>
-          </SectionCard>
+              <div className="mt-4">{actionButtons}</div>
+            </SectionCard>
 
-          <SectionCard title="Status">
-            <div className="w-full overflow-x-auto pb-2">
-              <StatusStepper current={garantia.status} completed={completedStatusCodes} />
-            </div>
-          </SectionCard>
+            <SectionCard title="Status">
+              <div className="w-full overflow-x-auto pb-2">
+                <StatusStepper current={garantia.status} completed={completedStatusCodes} />
+              </div>
+            </SectionCard>
 
-          <SectionCard title="Valores de Crédito">
-            <div className="grid gap-4 md:grid-cols-3">
-              <ResumoCard label="Crédito Total" value={formatCurrency(total)} />
-              <ResumoCard label="Utilizado" value={formatCurrency(utilizado)} />
-              <ResumoCard label="Saldo" value={formatCurrency(saldo)} highlight />
-            </div>
-          </SectionCard>
+            <SectionCard title="Valores de Crédito">
+              <div className="grid gap-4 md:grid-cols-3">
+                <ResumoCard label="Crédito Total" value={formatCurrency(total)} />
+                <ResumoCard label="Utilizado" value={formatCurrency(utilizado)} />
+                <ResumoCard label="Saldo" value={formatCurrency(saldo)} highlight />
+              </div>
+            </SectionCard>
 
-          <SectionCard title="Linha do Tempo">
-            {garantia.timeline.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhuma interação registrada ainda.</p>
-            ) : (
-              garantia.timeline.map((item) => <TimelineItemCard key={item.id} item={item} />)
-            )}
-          </SectionCard>
-
-          <SectionCard title="Atualizações internas">
-            <textarea
-              value={mensagem}
-              onChange={(event) => setMensagem(event.target.value)}
-              placeholder="Descreva a atualização e ela será registrada neste processo."
-              className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
-            />
-            <div className="mt-3 flex flex-col gap-2 text-sm">
-              <input
-                ref={mensagemFileInputRef}
-                id="mensagem-anexos-input"
-                type="file"
-                multiple
-                onChange={handleMensagemFilesChange}
-                className="sr-only"
-              />
-              <button
-                type="button"
-                onClick={() => mensagemFileInputRef.current?.click()}
-                className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-slate-600 hover:border-slate-400"
-              >
-                <MdAttachFile size={16} />
-                Anexar arquivos
-              </button>
-              {mensagemAnexos.length > 0 && (
-                <ul className="space-y-2 text-xs text-slate-600">
-                  {mensagemAnexos.map((file, index) => (
-                    <li
-                      key={`${file.name}-${index}`}
-                      className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
-                    >
-                      <span className="truncate pr-3">{file.name}</span>
-                      <button
-                        type="button"
-                        className="keep-color text-red-600 hover:text-red-500"
-                        onClick={() => removeMensagemAnexo(index)}
-                      >
-                        Remover
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+            <SectionCard title="Linha do Tempo">
+              {garantia.timeline.length === 0 ? (
+                <p className="text-sm text-slate-500">Nenhuma interação registrada ainda.</p>
+              ) : (
+                garantia.timeline.map((item) => <TimelineItemCard key={item.id} item={item} />)
               )}
-            </div>
-            <ActionButton
-              label="Registrar atualização"
-              icon={<MdAttachFile size={18} />}
-              onClick={handleAtualizacao}
-              loading={enviando}
-              disabled={!mensagem.trim() && mensagemAnexos.length === 0}
-              className="rounded-2xl px-6 py-3"
-            />
-          </SectionCard>
+            </SectionCard>
 
-          <SectionCard title="Anexos">
-            {garantia.anexos.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhum anexo disponível.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {garantia.anexos.map((anexo, index) => {
-                  const hasPath = Boolean(anexo.caminho?.trim());
-                  return (
-                    <button
-                      key={anexo.id}
-                      type="button"
-                      className="keep-color text-left text-[var(--primary-600)] underline disabled:opacity-60"
-                      onClick={() => hasPath && openAnexoModal(index)}
-                      disabled={!hasPath}
-                    >
-                      {anexo.nome}
-                    </button>
-                  );
-                })}
+            <SectionCard title="Atualizações internas">
+              <textarea
+                value={mensagem}
+                onChange={(event) => setMensagem(event.target.value)}
+                placeholder="Descreva a atualização e ela será registrada neste processo."
+                className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
+              />
+              <div className="mt-3 flex flex-col gap-2 text-sm">
+                <input
+                  ref={mensagemFileInputRef}
+                  id="mensagem-anexos-input"
+                  type="file"
+                  multiple
+                  onChange={handleMensagemFilesChange}
+                  className="sr-only"
+                />
+                <button
+                  type="button"
+                  onClick={() => mensagemFileInputRef.current?.click()}
+                  className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-slate-600 hover:border-slate-400"
+                >
+                  <MdAttachFile size={16} />
+                  Anexar arquivos
+                </button>
+                {mensagemAnexos.length > 0 && (
+                  <ul className="space-y-2 text-xs text-slate-600">
+                    {mensagemAnexos.map((file, index) => (
+                      <li
+                        key={`${file.name}-${index}`}
+                        className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                      >
+                        <span className="truncate pr-3">{file.name}</span>
+                        <button
+                          type="button"
+                          className="keep-color text-red-600 hover:text-red-500"
+                          onClick={() => removeMensagemAnexo(index)}
+                        >
+                          Remover
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            )}
-          </SectionCard>
+              <ActionButton
+                label="Registrar atualização"
+                icon={<MdAttachFile size={18} />}
+                onClick={handleAtualizacao}
+                loading={enviando}
+                disabled={!mensagem.trim() && mensagemAnexos.length === 0}
+                className="rounded-2xl px-6 py-3"
+              />
+            </SectionCard>
 
-          <SectionCard title="Dados logísticos">
-            <div className="grid gap-4 md:grid-cols-2">
-              {garantia.fretePorContaDe && <InfoLine label="Frete por conta de" value={garantia.fretePorContaDe} />}
-              {garantia.transportadoraRazaoSocial && <InfoLine label="Transportadora" value={garantia.transportadoraRazaoSocial} />}
-              {garantia.dataColetaEnvio && <InfoLine label="Data de coleta/envio" value={formatDate(garantia.dataColetaEnvio)} />}
-              {garantia.numeroNfDevolucao && <InfoLine label="NF de devolução" value={garantia.numeroNfDevolucao} />}
-            </div>
-          </SectionCard>
-        </div>
+            <SectionCard title="Anexos">
+              {garantia.anexos.length === 0 ? (
+                <p className="text-sm text-slate-500">Nenhum anexo disponível.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {garantia.anexos.map((anexo, index) => {
+                    const hasPath = Boolean(anexo.caminho?.trim());
+                    return (
+                      <button
+                        key={anexo.id}
+                        type="button"
+                        className="keep-color text-left text-[var(--primary-600)] underline disabled:opacity-60"
+                        onClick={() => hasPath && openAnexoModal(index)}
+                        disabled={!hasPath}
+                      >
+                        {anexo.nome}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard title="Dados logísticos">
+              <div className="grid gap-4 md:grid-cols-2">
+                {garantia.fretePorContaDe && <InfoLine label="Frete por conta de" value={garantia.fretePorContaDe} />}
+                {garantia.transportadoraRazaoSocial && <InfoLine label="Transportadora" value={garantia.transportadoraRazaoSocial} />}
+                {garantia.dataColetaEnvio && <InfoLine label="Data de coleta/envio" value={formatDate(garantia.dataColetaEnvio)} />}
+                {garantia.numeroNfDevolucao && <InfoLine label="NF de devolução" value={garantia.numeroNfDevolucao} />}
+              </div>
+            </SectionCard>
+          </div>
         ) : (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center space-y-3">
             <p className="text-lg font-semibold text-slate-900">Nenhum dado encontrado.</p>
@@ -1101,9 +1100,8 @@ export default function GarantiaDetalhePage() {
                             <button
                               type="button"
                               key={idx}
-                              className={`h-2.5 rounded-full transition-all ${
-                                idx === anexoViewerIndex ? "w-6 bg-[var(--primary-600)]" : "w-2.5 bg-slate-300"
-                              }`}
+                              className={`h-2.5 rounded-full transition-all ${idx === anexoViewerIndex ? "w-6 bg-[var(--primary-600)]" : "w-2.5 bg-slate-300"
+                                }`}
                               onClick={() => setAnexoViewerIndex(idx)}
                               aria-label={`Ir para anexo ${idx + 1}`}
                             />
@@ -1168,543 +1166,545 @@ export default function GarantiaDetalhePage() {
         </FormModal>
 
         <FormModal
-        open={anomaliaVisible}
-        title="Aprovar (Anomalia)"
-        onClose={() => setAnomaliaVisible(false)}
-        width="sm"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAnomaliaVisible(false)} />
-            <ActionButton label="Continuar" shape="rounded" onClick={submitAnomalia} disabled={!anomaliaCfop.trim()} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-          <p className="text-sm font-semibold text-slate-600">Será necessária Nota Fiscal?</p>
-          <div className="flex gap-2 mt-3">
-          <button
-            type="button"
-            onClick={() => setAnomaliaPrecisaNF(false)}
-            className={toggleButtonClasses(!anomaliaPrecisaNF)}
-          >
-            Não
-          </button>
-          <button
-            type="button"
-            onClick={() => setAnomaliaPrecisaNF(true)}
-            className={toggleButtonClasses(anomaliaPrecisaNF)}
-          >
-            Sim
-          </button>
-        </div>
-        <input
-          type="text"
-          value={anomaliaCfop}
-          onChange={(event) => setAnomaliaCfop(event.target.value)}
-          placeholder="CFOP *"
-          className="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={aprovarModalVisible}
-        title="Aprovar Garantia"
-        onClose={() => setAprovarModalVisible(false)}
-        width="sm"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAprovarModalVisible(false)} />
-            <ActionButton label="Continuar" shape="rounded" onClick={submitAprovarModal} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-          <p className="text-sm font-semibold text-slate-600">O fornecedor precisa de Nota Fiscal?</p>
-          <div className="flex gap-2 mt-1">
-            <button
-              type="button"
-              onClick={() => setAprovarPrecisaNF(false)}
-              className={toggleButtonClasses(!aprovarPrecisaNF)}
-            >
-              Não
-            </button>
-            <button
-              type="button"
-              onClick={() => setAprovarPrecisaNF(true)}
-              className={toggleButtonClasses(aprovarPrecisaNF)}
-            >
-              Sim
-            </button>
-          </div>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-xs font-semibold text-slate-600">CFOP *</span>
-            <input
-              type="text"
-              value={aprovarCfop}
-              onChange={(event) => setAprovarCfop(event.target.value)}
-              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={freteCortesiaSelecionado}
-              onChange={(event) => setFreteCortesiaSelecionado(event.target.checked)}
-              className="h-4 w-4 accent-[var(--primary-600)]"
-            />
-            <span>Frete cortesia</span>
-          </label>
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={concluirVisible}
-        title="Concluir Garantia"
-        onClose={() => setConcluirVisible(false)}
-        width="sm"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setConcluirVisible(false)} />
-            <ActionButton label="Concluir" shape="rounded" onClick={submitConcluir} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-          <p className="text-sm text-slate-600">Informe a NF recebida para concluir o processo.</p>
-          <input
-            type="text"
-            value={concluirNf}
-            onChange={(event) => setConcluirNf(event.target.value)}
-            placeholder="Número da NF *"
-            className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={envioVisible}
-        title="Envio da Mercadoria"
-        onClose={() => setEnvioVisible(false)}
-        width="lg"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setEnvioVisible(false)} />
-            <ActionButton label="Salvar" shape="rounded" onClick={submitEnvio} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-          <p className="text-sm font-semibold text-slate-600">A mercadoria será enviada?</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setEnviarMercadoria(true)}
-              className={toggleButtonClasses(enviarMercadoria)}
-            >
-              Sim
-            </button>
-            <button
-              type="button"
-              onClick={() => setEnviarMercadoria(false)}
-              className={toggleButtonClasses(!enviarMercadoria)}
-            >
-              Não
-            </button>
-          </div>
-
-          {enviarMercadoria && (
+          open={anomaliaVisible}
+          title="Aprovar (Anomalia)"
+          onClose={() => setAnomaliaVisible(false)}
+          width="sm"
+          footer={
             <>
-              <p className="text-sm font-semibold text-slate-600">Frete por conta de</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEnvioFrete("fornecedor");
-                    setEnvioCorreio(false);
-                    setColetaForm((prev) => ({
-                      ...prev,
-                      razao: "",
-                      cnpj: "",
-                      endereco: "",
-                      cidade: "",
-                      uf: "",
-                      ie: "",
-                      codigo: "",
-                      obs: "",
-                    }));
-                  }}
-                  className={toggleButtonClasses(envioFrete === "fornecedor")}
-                >
-                  Fornecedor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEnvioFrete("loja");
-                    setEnvioCorreio(false);
-                  }}
-                  className={toggleButtonClasses(envioFrete === "loja")}
-                >
-                  Loja
-                </button>
-              </div>
-
-              {envioFrete === "loja" ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                  <p className="font-semibold">Transportadora padrão ST</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Dados serão preenchidos automaticamente para a coleta.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={envioCorreio}
-                      onChange={(event) => setEnvioCorreio(event.target.checked)}
-                      className="h-4 w-4 accent-[var(--primary-600)]"
-                    />
-                    <span>Envio pelos Correios</span>
-                  </label>
-                  {envioCorreio ? (
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-xs font-semibold text-slate-600">Código do objeto *</span>
-                      <input
-                        type="text"
-                        value={codigoObjeto}
-                        onChange={(event) => setCodigoObjeto(event.target.value)}
-                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </label>
-                  ) : (
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        placeholder="Transportadora *"
-                        value={coletaForm.razao}
-                        onChange={(event) => setColetaForm((prev) => ({ ...prev, razao: event.target.value }))}
-                        className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <input
-                          type="text"
-                          placeholder="CNPJ *"
-                          value={coletaForm.cnpj}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, cnpj: event.target.value }))}
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="I.E. (opcional)"
-                          value={coletaForm.ie}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, ie: event.target.value }))}
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Endereço *"
-                        value={coletaForm.endereco}
-                        onChange={(event) => setColetaForm((prev) => ({ ...prev, endereco: event.target.value }))}
-                        className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <input
-                          type="text"
-                          placeholder="Cidade *"
-                          value={coletaForm.cidade}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, cidade: event.target.value }))}
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="UF *"
-                          value={coletaForm.uf}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, uf: event.target.value.toUpperCase() }))}
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Código de coleta/envio (opcional)"
-                        value={coletaForm.codigo}
-                        onChange={(event) => setColetaForm((prev) => ({ ...prev, codigo: event.target.value }))}
-                        className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <textarea
-                        rows={3}
-                        placeholder="Observações (opcional)"
-                        value={coletaForm.obs}
-                        onChange={(event) => setColetaForm((prev) => ({ ...prev, obs: event.target.value }))}
-                        className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAnomaliaVisible(false)} />
+              <ActionButton label="Continuar" shape="rounded" onClick={submitAnomalia} disabled={!anomaliaCfop.trim()} />
             </>
-          )}
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={notaVisible}
-        title="Registrar Nota Fiscal"
-        onClose={closeNotaModal}
-        width="sm"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={closeNotaModal} />
-            <ActionButton label="Salvar" shape="rounded" onClick={submitNota} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-          <input
-          type="text"
-          value={notaNumero}
-          onChange={(event) => setNotaNumero(event.target.value)}
-          placeholder="Número da NF *"
-          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <div className="mt-4 flex flex-col gap-2 text-sm">
-          <span className="font-semibold text-slate-500">Comprovantes (opcional)</span>
-          <input
-            ref={notaFileInputRef}
-            id="nota-comprovante-input"
-            type="file"
-            accept="image/*,application/pdf"
-            multiple
-            onChange={handleNotaFilesChange}
-            className="sr-only"
-          />
-          <button
-            type="button"
-            onClick={() => notaFileInputRef.current?.click()}
-            className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-slate-400"
-          >
-            <MdAttachFile size={16} />
-            Escolher arquivo
-          </button>
-          {notaAnexos.length === 0 ? (
-            <p className="text-xs text-slate-400">Nenhum arquivo selecionado.</p>
-          ) : (
-            <ul className="space-y-2 text-xs text-slate-600">
-              {notaAnexos.map((file, index) => (
-                <li
-                  key={`${file.name}-${index}`}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
-                >
-                  <span className="truncate pr-3">{file.name}</span>
-                  <button
-                    type="button"
-                    className="keep-color text-red-600 hover:text-red-500"
-                    onClick={() => removeNotaAnexo(index)}
-                  >
-                    Remover
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={descarteVisible}
-        title="Confirmar Descarte"
-        onClose={() => setDescarteVisible(false)}
-        width="sm"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDescarteVisible(false)} />
-            <ActionButton label="Confirmar" shape="rounded" onClick={submitDescarte} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-          <label className="flex flex-col gap-1 text-sm">
-          <span className="font-semibold text-slate-500">Comprovantes *</span>
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            multiple
-            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              setDescarteAnexos(event.target.files ? Array.from(event.target.files) : [])
-            }
-          />
-          </label>
-          {descarteAnexos.length > 0 && (
-          <ul className="mt-3 list-disc pl-5 text-sm text-slate-600 space-y-1">
-            {descarteAnexos.map((file) => (
-              <li key={file.name}>{file.name}</li>
-            ))}
-          </ul>
-          )}
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={dataEnvioVisible}
-        title="Data de Coleta/Envio"
-        onClose={() => setDataEnvioVisible(false)}
-        width="sm"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDataEnvioVisible(false)} />
-            <ActionButton label="Salvar" shape="rounded" onClick={submitDataEnvio} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-        <input
-          type="text"
-          value={dataEnvioInput}
-          onChange={(event) => setDataEnvioInput(formatDateMask(event.target.value))}
-          placeholder="Data (dd/mm/aaaa)"
-          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={valorCreditoVisible}
-        title="Valor de Crédito"
-        onClose={() => setValorCreditoVisible(false)}
-        width="sm"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setValorCreditoVisible(false)} />
-            <ActionButton label="Confirmar" shape="rounded" onClick={submitValorCredito} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-        <input
-          type="text"
-          value={valorCreditoInput}
-          onChange={(event) => setValorCreditoInput(formatCurrencyMask(event.target.value))}
-          placeholder="Valor (R$)"
-          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        </div>
-      </FormModal>
-
-      <FormModal
-        open={liberarVisible}
-        title="Liberar Crédito"
-        onClose={() => setLiberarVisible(false)}
-        width="lg"
-        footer={
-          <>
-            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setLiberarVisible(false)} />
-            <ActionButton label="Confirmar" shape="rounded" onClick={submitLiberarCredito} />
-          </>
-        }
-      >
-        <div className="space-y-4 px-1">
-          <label className="text-sm font-semibold text-slate-600">Status final</label>
-          <select
-          value={liberarStatus}
-          onChange={(event) => setLiberarStatus(Number(event.target.value))}
-          className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-          <option value={STATUS_CODES.produtoProximaCompra}>Produto em Próxima Compra</option>
-          <option value={STATUS_CODES.trocaProduto}>Troca de Produto</option>
-          <option value={STATUS_CODES.abatimentoProximoPedido}>Abatimento em Próximo Pedido</option>
-          <option value={STATUS_CODES.creditoEmConta}>Crédito em Conta</option>
-          <option value={STATUS_CODES.abatimentoEmBoleto}>Abatimento em Boleto</option>
-          </select>
-
-          {liberarStatus === STATUS_CODES.abatimentoEmBoleto ? (
-          <div className="mt-4 space-y-4">
-            {liberarRows.map((row, index) => (
-              <div key={index} className="rounded-2xl border border-slate-200 p-4 space-y-2 relative">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    type="text"
-                    placeholder="NF *"
-                    value={row.nf}
-                    onChange={(event) =>
-                      setLiberarRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, nf: event.target.value } : item)))
-                    }
-                    className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Parcela *"
-                    value={row.parcela}
-                    onChange={(event) =>
-                      setLiberarRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, parcela: event.target.value } : item)))
-                    }
-                    className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Vencimento (dd/mm/aaaa) *"
-                    value={row.vencimento}
-                    onChange={(event) =>
-                      setLiberarRows((prev) =>
-                        prev.map((item, idx) =>
-                          idx === index ? { ...item, vencimento: formatDateMask(event.target.value) } : item,
-                        ),
-                      )
-                    }
-                    className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Valor *"
-                    value={row.valor}
-                    onChange={(event) =>
-                      setLiberarRows((prev) =>
-                        prev.map((item, idx) =>
-                          idx === index ? { ...item, valor: formatCurrencyMask(event.target.value) } : item,
-                        ),
-                      )
-                    }
-                    className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="absolute top-2 right-2 rounded-full border border-red-200 bg-white px-3 py-1 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-30"
-                  onClick={() => setLiberarRows((prev) => prev.filter((_, idx) => idx !== index))}
-                  disabled={liberarRows.length === 1}
-                >
-                  Remover
-                </button>
-              </div>
-            ))}
-            <ActionButton
-              label="Adicionar linha"
-              variant="ghost"
-              icon={<MdAdd size={18} />}
-              onClick={() => setLiberarRows((prev) => [...prev, newAbatimentoRow()])}
-            />
-          </div>
-        ) : (
-          <>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <p className="text-sm font-semibold text-slate-600">Será necessária Nota Fiscal?</p>
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setAnomaliaPrecisaNF(false)}
+                className={toggleButtonClasses(!anomaliaPrecisaNF)}
+              >
+                Não
+              </button>
+              <button
+                type="button"
+                onClick={() => setAnomaliaPrecisaNF(true)}
+                className={toggleButtonClasses(anomaliaPrecisaNF)}
+              >
+                Sim
+              </button>
+            </div>
             <input
               type="text"
-              value={liberarValor}
-              onChange={(event) => setLiberarValor(formatCurrencyMask(event.target.value))}
-              placeholder="Valor utilizado (opcional)"
+              value={anomaliaCfop}
+              onChange={(event) => setAnomaliaCfop(event.target.value)}
+              placeholder="CFOP *"
               className="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={aprovarModalVisible}
+          title="Aprovar Garantia"
+          onClose={() => setAprovarModalVisible(false)}
+          width="sm"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAprovarModalVisible(false)} />
+              <ActionButton label="Continuar" shape="rounded" onClick={submitAprovarModal} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <p className="text-sm font-semibold text-slate-600">O fornecedor precisa de Nota Fiscal?</p>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setAprovarPrecisaNF(false)}
+                className={toggleButtonClasses(!aprovarPrecisaNF)}
+              >
+                Não
+              </button>
+              <button
+                type="button"
+                onClick={() => setAprovarPrecisaNF(true)}
+                className={toggleButtonClasses(aprovarPrecisaNF)}
+              >
+                Sim
+              </button>
+            </div>
+            {aprovarPrecisaNF && (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-xs font-semibold text-slate-600">CFOP *</span>
+                <input
+                  type="text"
+                  value={aprovarCfop}
+                  onChange={(event) => setAprovarCfop(event.target.value)}
+                  className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </label>
+            )}
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={freteCortesiaSelecionado}
+                onChange={(event) => setFreteCortesiaSelecionado(event.target.checked)}
+                className="h-4 w-4 accent-[var(--primary-600)]"
+              />
+              <span>Frete cortesia</span>
+            </label>
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={concluirVisible}
+          title="Concluir Garantia"
+          onClose={() => setConcluirVisible(false)}
+          width="sm"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setConcluirVisible(false)} />
+              <ActionButton label="Concluir" shape="rounded" onClick={submitConcluir} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <p className="text-sm text-slate-600">Informe a NF recebida para concluir o processo.</p>
             <input
               type="text"
-              value={liberarNf}
-              onChange={(event) => setLiberarNf(event.target.value)}
-              placeholder={`NF recebida${NF_REQUIRED_STATUS.has(liberarStatus) ? " *" : " (opcional)"}`}
-              className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={concluirNf}
+              onChange={(event) => setConcluirNf(event.target.value)}
+              placeholder="Número da NF *"
+              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </>
-        )}
-        </div>
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={envioVisible}
+          title="Envio da Mercadoria"
+          onClose={() => setEnvioVisible(false)}
+          width="lg"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setEnvioVisible(false)} />
+              <ActionButton label="Salvar" shape="rounded" onClick={submitEnvio} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <p className="text-sm font-semibold text-slate-600">A mercadoria será enviada?</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEnviarMercadoria(true)}
+                className={toggleButtonClasses(enviarMercadoria)}
+              >
+                Sim
+              </button>
+              <button
+                type="button"
+                onClick={() => setEnviarMercadoria(false)}
+                className={toggleButtonClasses(!enviarMercadoria)}
+              >
+                Não
+              </button>
+            </div>
+
+            {enviarMercadoria && (
+              <>
+                <p className="text-sm font-semibold text-slate-600">Frete por conta de</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEnvioFrete("fornecedor");
+                      setEnvioCorreio(false);
+                      setColetaForm((prev) => ({
+                        ...prev,
+                        razao: "",
+                        cnpj: "",
+                        endereco: "",
+                        cidade: "",
+                        uf: "",
+                        ie: "",
+                        codigo: "",
+                        obs: "",
+                      }));
+                    }}
+                    className={toggleButtonClasses(envioFrete === "fornecedor")}
+                  >
+                    Fornecedor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEnvioFrete("loja");
+                      setEnvioCorreio(false);
+                    }}
+                    className={toggleButtonClasses(envioFrete === "loja")}
+                  >
+                    Loja
+                  </button>
+                </div>
+
+                {envioFrete === "loja" ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    <p className="font-semibold">Transportadora padrão ST</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Dados serão preenchidos automaticamente para a coleta.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={envioCorreio}
+                        onChange={(event) => setEnvioCorreio(event.target.checked)}
+                        className="h-4 w-4 accent-[var(--primary-600)]"
+                      />
+                      <span>Envio pelos Correios</span>
+                    </label>
+                    {envioCorreio ? (
+                      <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-xs font-semibold text-slate-600">Código do objeto *</span>
+                        <input
+                          type="text"
+                          value={codigoObjeto}
+                          onChange={(event) => setCodigoObjeto(event.target.value)}
+                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </label>
+                    ) : (
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          placeholder="Transportadora *"
+                          value={coletaForm.razao}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, razao: event.target.value }))}
+                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input
+                            type="text"
+                            placeholder="CNPJ *"
+                            value={coletaForm.cnpj}
+                            onChange={(event) => setColetaForm((prev) => ({ ...prev, cnpj: event.target.value }))}
+                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            type="text"
+                            placeholder="I.E. (opcional)"
+                            value={coletaForm.ie}
+                            onChange={(event) => setColetaForm((prev) => ({ ...prev, ie: event.target.value }))}
+                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Endereço *"
+                          value={coletaForm.endereco}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, endereco: event.target.value }))}
+                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input
+                            type="text"
+                            placeholder="Cidade *"
+                            value={coletaForm.cidade}
+                            onChange={(event) => setColetaForm((prev) => ({ ...prev, cidade: event.target.value }))}
+                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            type="text"
+                            placeholder="UF *"
+                            value={coletaForm.uf}
+                            onChange={(event) => setColetaForm((prev) => ({ ...prev, uf: event.target.value.toUpperCase() }))}
+                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Código de coleta/envio (opcional)"
+                          value={coletaForm.codigo}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, codigo: event.target.value }))}
+                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <textarea
+                          rows={3}
+                          placeholder="Observações (opcional)"
+                          value={coletaForm.obs}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, obs: event.target.value }))}
+                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={notaVisible}
+          title="Registrar Nota Fiscal"
+          onClose={closeNotaModal}
+          width="sm"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={closeNotaModal} />
+              <ActionButton label="Salvar" shape="rounded" onClick={submitNota} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <input
+              type="text"
+              value={notaNumero}
+              onChange={(event) => setNotaNumero(event.target.value)}
+              placeholder="Número da NF *"
+              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="mt-4 flex flex-col gap-2 text-sm">
+              <span className="font-semibold text-slate-500">Comprovantes (opcional)</span>
+              <input
+                ref={notaFileInputRef}
+                id="nota-comprovante-input"
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                onChange={handleNotaFilesChange}
+                className="sr-only"
+              />
+              <button
+                type="button"
+                onClick={() => notaFileInputRef.current?.click()}
+                className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-slate-400"
+              >
+                <MdAttachFile size={16} />
+                Escolher arquivo
+              </button>
+              {notaAnexos.length === 0 ? (
+                <p className="text-xs text-slate-400">Nenhum arquivo selecionado.</p>
+              ) : (
+                <ul className="space-y-2 text-xs text-slate-600">
+                  {notaAnexos.map((file, index) => (
+                    <li
+                      key={`${file.name}-${index}`}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                    >
+                      <span className="truncate pr-3">{file.name}</span>
+                      <button
+                        type="button"
+                        className="keep-color text-red-600 hover:text-red-500"
+                        onClick={() => removeNotaAnexo(index)}
+                      >
+                        Remover
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={descarteVisible}
+          title="Confirmar Descarte"
+          onClose={() => setDescarteVisible(false)}
+          width="sm"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDescarteVisible(false)} />
+              <ActionButton label="Confirmar" shape="rounded" onClick={submitDescarte} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-semibold text-slate-500">Comprovantes *</span>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                  setDescarteAnexos(event.target.files ? Array.from(event.target.files) : [])
+                }
+              />
+            </label>
+            {descarteAnexos.length > 0 && (
+              <ul className="mt-3 list-disc pl-5 text-sm text-slate-600 space-y-1">
+                {descarteAnexos.map((file) => (
+                  <li key={file.name}>{file.name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={dataEnvioVisible}
+          title="Data de Coleta/Envio"
+          onClose={() => setDataEnvioVisible(false)}
+          width="sm"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDataEnvioVisible(false)} />
+              <ActionButton label="Salvar" shape="rounded" onClick={submitDataEnvio} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <input
+              type="text"
+              value={dataEnvioInput}
+              onChange={(event) => setDataEnvioInput(formatDateMask(event.target.value))}
+              placeholder="Data (dd/mm/aaaa)"
+              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={valorCreditoVisible}
+          title="Valor de Crédito"
+          onClose={() => setValorCreditoVisible(false)}
+          width="sm"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setValorCreditoVisible(false)} />
+              <ActionButton label="Confirmar" shape="rounded" onClick={submitValorCredito} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <input
+              type="text"
+              value={valorCreditoInput}
+              onChange={(event) => setValorCreditoInput(formatCurrencyMask(event.target.value))}
+              placeholder="Valor (R$)"
+              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </FormModal>
+
+        <FormModal
+          open={liberarVisible}
+          title="Liberar Crédito"
+          onClose={() => setLiberarVisible(false)}
+          width="lg"
+          footer={
+            <>
+              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setLiberarVisible(false)} />
+              <ActionButton label="Confirmar" shape="rounded" onClick={submitLiberarCredito} />
+            </>
+          }
+        >
+          <div className="space-y-4 px-1">
+            <label className="text-sm font-semibold text-slate-600">Status final</label>
+            <select
+              value={liberarStatus}
+              onChange={(event) => setLiberarStatus(Number(event.target.value))}
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={STATUS_CODES.produtoProximaCompra}>Produto em Próxima Compra</option>
+              <option value={STATUS_CODES.trocaProduto}>Troca de Produto</option>
+              <option value={STATUS_CODES.abatimentoProximoPedido}>Abatimento em Próximo Pedido</option>
+              <option value={STATUS_CODES.creditoEmConta}>Crédito em Conta</option>
+              <option value={STATUS_CODES.abatimentoEmBoleto}>Abatimento em Boleto</option>
+            </select>
+
+            {liberarStatus === STATUS_CODES.abatimentoEmBoleto ? (
+              <div className="mt-4 space-y-4">
+                {liberarRows.map((row, index) => (
+                  <div key={index} className="rounded-2xl border border-slate-200 p-4 space-y-2 relative">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input
+                        type="text"
+                        placeholder="NF *"
+                        value={row.nf}
+                        onChange={(event) =>
+                          setLiberarRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, nf: event.target.value } : item)))
+                        }
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Parcela *"
+                        value={row.parcela}
+                        onChange={(event) =>
+                          setLiberarRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, parcela: event.target.value } : item)))
+                        }
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Vencimento (dd/mm/aaaa) *"
+                        value={row.vencimento}
+                        onChange={(event) =>
+                          setLiberarRows((prev) =>
+                            prev.map((item, idx) =>
+                              idx === index ? { ...item, vencimento: formatDateMask(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Valor *"
+                        value={row.valor}
+                        onChange={(event) =>
+                          setLiberarRows((prev) =>
+                            prev.map((item, idx) =>
+                              idx === index ? { ...item, valor: formatCurrencyMask(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="absolute top-2 right-2 rounded-full border border-red-200 bg-white px-3 py-1 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-30"
+                      onClick={() => setLiberarRows((prev) => prev.filter((_, idx) => idx !== index))}
+                      disabled={liberarRows.length === 1}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))}
+                <ActionButton
+                  label="Adicionar linha"
+                  variant="ghost"
+                  icon={<MdAdd size={18} />}
+                  onClick={() => setLiberarRows((prev) => [...prev, newAbatimentoRow()])}
+                />
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={liberarValor}
+                  onChange={(event) => setLiberarValor(formatCurrencyMask(event.target.value))}
+                  placeholder="Valor utilizado (opcional)"
+                  className="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  value={liberarNf}
+                  onChange={(event) => setLiberarNf(event.target.value)}
+                  placeholder={`NF recebida${NF_REQUIRED_STATUS.has(liberarStatus) ? " *" : " (opcional)"}`}
+                  className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </>
+            )}
+          </div>
         </FormModal>
       </div>
     </div>
