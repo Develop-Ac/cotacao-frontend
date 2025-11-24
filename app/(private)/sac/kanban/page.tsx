@@ -325,6 +325,36 @@ function ImageGallery({ previews, imagens }: { previews: string[]; imagens: stri
   );
 }
 
+// Função utilitária para pegar permissões da tela atual
+type Permissao = {
+  id: string;
+  usuario_id: string;
+  modulo: string;
+  tela: string;
+  visualizar: boolean;
+  editar: boolean;
+  criar: boolean;
+  deletar: boolean;
+};
+function getPermissoesTelaAtual() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("userData");
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const permissoes: Permissao[] = data.permissoes || [];
+    // Pega o path da url atual (sem query/hash)
+    let path = window.location.pathname;
+    // Remove "/app" do início se existir (Next.js pode ter isso)
+    if (path.startsWith("/app")) path = path.slice(4);
+    // Busca permissão exata para a tela
+    const found = permissoes.find((p: Permissao) => p.tela === path);
+    return found || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Page() {
   const [board, setBoard] = useState<BoardState>({
     aguardando_atendimento: [],
@@ -710,6 +740,9 @@ export default function Page() {
         })()
       : "";
 
+  // Permissões da tela atual
+  const permissoesTela = typeof window !== "undefined" ? getPermissoesTelaAtual() : null;
+
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950 text-gray-900 dark:text-gray-100">
       <div className="max-w-[1400px] px-6 py-8 mx-auto">
@@ -744,7 +777,7 @@ export default function Page() {
         {/* Modal: Detalhes/Edição do Card */}
         {showTaskModal && selected && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-              <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[520px] shadow-lg max-h-[80vh] overflow-y-auto">
+            <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[520px] shadow-lg max-h-[80vh] overflow-y-auto">
               <h2 className="text-lg font-semibold mb-4">Detalhes do Card</h2>
 
               <div className="grid grid-cols-2 gap-3">
@@ -825,6 +858,29 @@ export default function Page() {
                 >
                   Salvar
                 </button>
+                {/* Botão de excluir, só aparece se permissoesTela?.deletar === true */}
+                {permissoesTela?.deletar && (
+                  <button
+                    onClick={async () => {
+                      if (!selected) return;
+                      // Remove do board local
+                      setBoard((prev) => ({
+                        ...prev,
+                        [selected.col]: prev[selected.col].filter((t) => t.id !== selected.id),
+                      }));
+                      // Chama DELETE na API
+                      try {
+                        await fetch(`${KANBAN_URL}/kanban/${selected.id}`, {
+                          method: "DELETE"
+                        });
+                      } catch {}
+                      setShowTaskModal(false);
+                    }}
+                    className="px-4 py-2 text-sm rounded-xl bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Excluir
+                  </button>
+                )}
               </div>
             </div>
           </div>
