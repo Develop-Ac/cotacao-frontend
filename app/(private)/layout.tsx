@@ -159,8 +159,10 @@ export default function RootLayout({
           { label: 'Central', href: '/qualidade' },
           { label: 'Inbox', href: '/qualidade/caixa' },
         ];
+      case 'Sac':
+        return [{ label: 'Nova Solicitação', href: '/sac/kanban' }];
       case 'Sistema':
-        return [{ label: 'Usu�rios', href: '/usuario' }];
+        return [{ label: 'Usuários', href: '/usuario' }];
       default:
         return [];
     }
@@ -507,7 +509,7 @@ export default function RootLayout({
                           e.preventDefault();
                           e.stopPropagation();
                           const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Expedicao' });
+                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Sac' });
                         }
                       }}
                       className={summaryClasses(sectionActive.expedicao)}
