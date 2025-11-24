@@ -1,9 +1,11 @@
 "use client";
 import React, { useEffect, useMemo, useState, useRef } from "react";
+
+
 import { serviceUrl } from "@/lib/services";
 
-const KANBAN_URL = serviceUrl("sac");
-// const KANBAN_URL = "http://localhost:8000";
+// const KANBAN_URL = serviceUrl("sac");
+const KANBAN_URL = "http://localhost:8000";
 
 // --- Types ---
 type ColumnKey = "aguardando_atendimento" | "em_analise" | "finalizado";
@@ -35,7 +37,7 @@ type Task = {
   dptoResponsavel?: string;
   tipo?: string;
   vendedor?: string;
-  imagem?: any; // Pode ser File, string (base64), ou null
+  imagens?: string[]; // Array de base64
 };
 
 type DragData = { taskId: string; from: ColumnKey };
@@ -267,6 +269,55 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
 // ...existing code...
         // (Remove this duplicated block entirely, as the input and button logic already exists inside the Column component)
 
+// Simple ImageGallery component for previewing images
+function ImageGallery({ previews, imagens }: { previews: string[]; imagens: string[] }) {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const allImages = [...(imagens || []), ...(previews || [])];
+  if (allImages.length === 0) return null;
+  return (
+    <div>
+      <div className="flex gap-2 mt-2 flex-wrap">
+        {allImages.map((src, idx) => (
+          <img
+            key={idx}
+            src={src}
+            alt={`Imagem ${idx + 1}`}
+            className={`w-16 h-16 object-cover rounded border cursor-pointer ${selectedIdx === idx ? "ring-2 ring-blue-500" : ""}`}
+            onClick={() => setSelectedIdx(idx)}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex justify-center">
+        <img
+          src={allImages[selectedIdx]}
+          alt={`Imagem grande ${selectedIdx + 1}`}
+          className="max-h-48 rounded shadow"
+        />
+      </div>
+      {allImages.length > 1 && (
+        <div className="flex justify-center gap-2 mt-1">
+          <button
+            type="button"
+            className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-900"
+            disabled={selectedIdx === 0}
+            onClick={() => setSelectedIdx((idx) => Math.max(0, idx - 1))}
+          >
+            &lt;
+          </button>
+          <button
+            type="button"
+            className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-900"
+            disabled={selectedIdx === allImages.length - 1}
+            onClick={() => setSelectedIdx((idx) => Math.min(allImages.length - 1, idx + 1))}
+          >
+            &gt;
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Page() {
   const [board, setBoard] = useState<BoardState>({
     aguardando_atendimento: [],
@@ -342,8 +393,9 @@ export default function Page() {
     dptoResponsavel: string;
     tipo: string;
     vendedor: string;
-    imagem: File | null;
-    imagemPreview?: string;
+    imagens: string[]; // base64
+    files: File[];
+    previews: string[];
   }>({
     data: "",
     venda: "",
@@ -356,11 +408,10 @@ export default function Page() {
     dptoResponsavel: "",
     tipo: "",
     vendedor: "",
-    imagem: null,
-    imagemPreview: ""
+    imagens: [],
+    files: [],
+    previews: []
   });
-
-  // Persistência do board via PUT
   useEffect(() => {
     if (loading) return; // não envia enquanto carrega
     async function putBoard() {
@@ -539,8 +590,9 @@ export default function Page() {
         dptoResponsavel: t?.dptoResponsavel || "",
         tipo: t?.tipo || "",
         vendedor: t?.vendedor || "",
-        imagem: t?.imagem || null,
-        imagemPreview: ""
+        imagens: t?.imagens || [],
+        files: [],
+        previews: []
       });
       return prev; // não altera o estado aqui
     });
@@ -548,9 +600,10 @@ export default function Page() {
   }
   async function saveTaskModal() {
     if (!selected) return;
-    // Se houver imagem, converte para base64 antes de enviar
+    // Se houver arquivos, converte todos para base64 antes de enviar
     const sendUpdate = async (updated: any) => {
-      if (taskForm.imagem) {
+      let imagens: string[] = Array.isArray(updated.imagens) ? [...updated.imagens] : [];
+      if (taskForm.files && taskForm.files.length > 0) {
         const toBase64 = (file: File) => {
           return new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -560,10 +613,11 @@ export default function Page() {
           });
         };
         try {
-          const base64 = await toBase64(taskForm.imagem);
-          updated.imagem = base64;
+          const filesBase64 = await Promise.all(taskForm.files.map(toBase64));
+          imagens = imagens.concat(filesBase64);
         } catch {}
       }
+      updated.imagens = imagens;
       fetch(`${KANBAN_URL}/kanban`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -572,7 +626,7 @@ export default function Page() {
     };
     setBoard((prev) => {
       const list = prev[selected.col].map((t) =>
-        t.id === selected.id ? { ...t, ...taskForm } : t
+        t.id === selected.id ? { ...t, ...taskForm, imagens: t.imagens || [] } : t
       );
       // PUT com o card atualizado
       const updated = list.find((t) => t.id === selected.id);
@@ -688,15 +742,6 @@ export default function Page() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm mb-1">DATA</label>
-                  <input
-                    type="date"
-                    value={taskForm.data ? new Date(taskForm.data).toISOString().slice(0, 10) : ""}
-                    onChange={e => setTaskForm({ ...taskForm, data: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
-                  />
-                </div>
-                <div>
                   <label className="block text-sm mb-1">VENDA</label>
                   <input value={taskForm.venda} onChange={e => setTaskForm({ ...taskForm, venda: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
@@ -721,28 +766,26 @@ export default function Page() {
                   <textarea value={taskForm.reclamacao} onChange={e => setTaskForm({ ...taskForm, reclamacao: e.target.value })} rows={2} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm mb-1">Imagem</label>
+                  <label className="block text-sm mb-1">Imagens</label>
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={e => {
-                      const file = e.target.files?.[0] || null;
+                      const files = Array.from(e.target.files || []);
                       setTaskForm(prev => ({
                         ...prev,
-                        imagem: file,
-                        imagemPreview: file ? URL.createObjectURL(file) : ""
+                        files: files,
+                        previews: files.map(f => URL.createObjectURL(f))
                       }));
                     }}
                     className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
                   />
-                  {taskForm.imagemPreview && (
-                    <img src={taskForm.imagemPreview} alt="Preview" className="mt-2 max-h-40 rounded-lg border" />
-                  )}
-                  {
-                    taskForm.imagem && !taskForm.imagemPreview && (
-                      <img src={taskForm.imagem} alt="Preview" className="mt-2 max-h-40 rounded-lg border" />
-                    )
-                  }
+                  {/* Visualização de imagem grande com navegação */}
+                  <ImageGallery
+                    previews={taskForm.previews}
+                    imagens={taskForm.imagens}
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm mb-1">SOLUÇÃO</label>

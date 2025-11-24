@@ -2,9 +2,93 @@
 
 import { FaPlusSquare, FaTrash, FaEdit, FaFilePdf, FaSync , FaListUl, FaCaretDown, FaFilter } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import React from "react";
 import { serviceUrl } from "@/lib/services";
 
 export default function Login() {
+    // === MAPA DE PERMISSÕES POR SETOR ===
+    const PERMISSOES_SETORES: Record<string, Array<{ modulo: string; telas: string[] }>> = {
+      Estoque: [
+        { modulo: "Estoque", telas: ["/estoque/contagem"] },
+      ],
+      Oficina: [
+        { modulo: "Oficina", telas: ["/oficina/checkList"] },
+      ],
+      Compras: [
+        { modulo: "Compras", telas: [
+          "/compras/cotacao",
+          "/compras/cotacao/comparativo",
+          "/compras/cotacao/pedido",
+          "/compras/notaFiscal/notaFiscal",
+          "/compras/kanban",
+        ] },
+      ],
+      Admin: [
+        { modulo: "Estoque", telas: ["/estoque/contagem"] },
+        { modulo: "Oficina", telas: ["/oficina/checkList"] },
+        { modulo: "Compras", telas: [
+          "/compras/cotacao",
+          "/compras/cotacao/comparativo",
+          "/compras/cotacao/pedido",
+          "/compras/notaFiscal/notaFiscal",
+          "/compras/kanban",
+        ] },
+        { modulo: "Sac", telas: ["/sac/kanban"] },
+        { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+        { modulo: "Atacado", telas: [] },
+        { modulo: "Varejo", telas: [] },
+        { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
+      ],
+      Sac: [
+        { modulo: "Sac", telas: ["/sac/kanban"] },
+        { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      ],
+      Qualidade: [
+        { modulo: "Sac", telas: ["/sac/kanban"] },
+        { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      ],
+      Atacado: [
+        { modulo: "Sac", telas: ["/sac/kanban"] },
+      ],
+      Varejo: [
+        { modulo: "Sac", telas: ["/sac/kanban"] },
+      ],
+      "Expedição": [
+        { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
+      ],
+    };
+
+    // Estado do modal de permissões
+    const [modalPermissoesAberto, setModalPermissoesAberto] = useState(false);
+    const [permissoes, setPermissoes] = useState<Record<string, Record<string, boolean>>>({});
+    const [modulosTelas, setModulosTelas] = useState<Array<{ modulo: string; telas: string[] }>>([]);
+
+    // Abre o modal ao selecionar setor
+    const handleSetorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const novoSetor = e.target.value;
+      setSetor(novoSetor);
+      if (novoSetor && PERMISSOES_SETORES[novoSetor]) {
+        setModulosTelas(PERMISSOES_SETORES[novoSetor]);
+        setModalPermissoesAberto(true);
+      } else {
+        setModulosTelas([]);
+        setModalPermissoesAberto(false);
+      }
+    };
+
+    // Permissões possíveis
+    const TIPOS_PERMISSAO = ["visualizar", "editar", "criar", "excluir"];
+
+    // Atualiza permissão
+    const handlePermissaoChange = (tela: string, tipo: string) => {
+      setPermissoes(prev => ({
+        ...prev,
+        [tela]: {
+          ...prev[tela],
+          [tipo]: !prev[tela]?.[tipo],
+        },
+      }));
+    };
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [nome, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
@@ -72,8 +156,6 @@ export default function Login() {
         body: JSON.stringify({ nome, codigo, setor, senha }),
       });
 
-      console.log(JSON.stringify({ nome, codigo, setor, senha }))
-
       if (!response.ok) {
         let msg = `Erro HTTP: ${response.status}`;
         try {
@@ -83,11 +165,49 @@ export default function Login() {
         throw new Error(msg);
       }
 
-      try { await response.json(); } catch {}
+      // Pega o id do usuário criado
+      let usuarioCriado;
+      try {
+        usuarioCriado = await response.json();
+      } catch {
+        throw new Error("Não foi possível obter o id do usuário criado.");
+      }
+      const usuarioId = usuarioCriado?.data?.id;
+      if (!usuarioId) throw new Error("ID do usuário não retornado pelo backend.");
+
+      // Envia permissões para cada tela marcada
+      const permissoesRequests = [];
+      for (const [tela, tipos] of Object.entries(permissoes)) {
+        // Descobre o módulo da tela
+        let modulo = "";
+        for (const m of modulosTelas) {
+          if (m.telas.includes(tela)) {
+            modulo = m.modulo;
+            break;
+          }
+        }
+        if (!modulo) continue;
+        // Monta o body
+        const body = {
+          visualizar: !!tipos["visualizar"],
+          editar: !!tipos["editar"],
+          criar: !!tipos["criar"],
+          deletar: !!tipos["deletar"],
+        };
+        permissoesRequests.push(
+          fetch(`${SISTEMA_API}/permissoes/${usuarioId}?modulo=${encodeURIComponent(modulo)}&tela=${encodeURIComponent(tela)}`, {
+            method: "POST",
+            headers: { "Accept": "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+        );
+      }
+      // Aguarda todas as permissões serem salvas
+      await Promise.all(permissoesRequests);
 
       setNome(""); setCodigo(""); setSetor(""); setSenha("");
       setFormularioAberto(false);
-      
+      setPermissoes({});
       // Recarregar a lista de usuários após criar um novo
       await carregarUsuarios();
     } catch (error) {
@@ -189,7 +309,7 @@ export default function Login() {
                     <select
                       id="setor"
                       value={setor}
-                      onChange={e => setSetor(e.target.value)}
+                      onChange={handleSetorChange}
                       className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Selecione um setor</option>
@@ -206,6 +326,53 @@ export default function Login() {
                       <option value="Expedição">Expedição</option>
                     </select>
                   </div>
+                        {/* Modal de Permissões - fora do select para overlay funcionar corretamente */}
+                        {modalPermissoesAberto && (
+                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl relative">
+                              <h4 className="text-lg font-bold mb-4">Permissões de Telas do Setor</h4>
+                              <div className="max-h-96 overflow-y-auto">
+                                {modulosTelas.map(({ modulo, telas }) => (
+                                  <div key={modulo} className="mb-4">
+                                    <div className="font-semibold text-blue-700 mb-2">Módulo: {modulo}</div>
+                                    <table className="w-full border mb-2">
+                                      <thead>
+                                        <tr>
+                                          <th className="p-2 text-left">Tela</th>
+                                          {TIPOS_PERMISSAO.map(tipo => (
+                                            <th key={tipo} className="p-2 text-center capitalize">{tipo}</th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {telas.map(tela => (
+                                          <tr key={tela}>
+                                            <td className="p-2 text-sm">{tela}</td>
+                                            {TIPOS_PERMISSAO.map(tipo => (
+                                              <td key={tipo} className="p-2 text-center">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={!!permissoes[tela]?.[tipo]}
+                                                  onChange={() => handlePermissaoChange(tela, tipo)}
+                                                />
+                                              </td>
+                                            ))}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex justify-end gap-2 mt-4">
+                                <button
+                                  className="px-4 py-2 rounded bg-gray-200 text-gray-700"
+                                  onClick={() => setModalPermissoesAberto(false)}
+                                >Fechar</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                   <div>
                     <label htmlFor="password" className="block font-medium">Senha</label>
                     <input
