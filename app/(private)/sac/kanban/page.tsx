@@ -137,7 +137,7 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [pendingTitle, setPendingTitle] = useState("");
   const [pendingCol, setPendingCol] = useState<ColumnKey | null>(null);
-  const [typeChoice, setTypeChoice] = useState<"garantia" | "devolucao" | null>(null);
+  const [typeChoice, setTypeChoice] = useState<"garantia" | "devolucao" | "pendencia" | null>(null);
   const canCreate = (userSetor === "Atacado" || userSetor === "Varejo") ? colKey === "aguardando_atendimento" : true;
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -220,6 +220,10 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
                 className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "devolucao" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
                 onClick={() => setTypeChoice("devolucao")}
               >Devolução</button>
+              <button
+                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "pendencia" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
+                onClick={() => setTypeChoice("pendencia")}
+              >Pendência</button>
             </div>
             <div className="flex justify-end gap-2 mt-6">
               <button
@@ -235,13 +239,16 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
                 onClick={() => {
                   if (!pendingCol) return;
                   // Busca o maior número global entre todas as colunas para o tipo
-                  const prefix = typeChoice === "garantia" ? "garantia #" : "devolucao #";
+                  let prefix = "";
+                  if (typeChoice === "garantia") prefix = "garantia #";
+                  else if (typeChoice === "devolucao") prefix = "devolucao #";
+                  else if (typeChoice === "pendencia") prefix = "pendencia #";
                   const allTasks = Object.values(board).flat() as Task[];
                   const nums = allTasks
                     .map((t: Task) => t.title)
                     .filter(t => t.startsWith(prefix))
                     .map(t => {
-                      const m = t.match(/(garantia|devolucao) #(\d{3})/);
+                      const m = t.match(/(garantia|devolucao|pendencia) #(\d{3})/);
                       return m ? parseInt(m[2], 10) : null;
                     })
                     .filter(n => n !== null);
