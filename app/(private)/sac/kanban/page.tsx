@@ -1,6 +1,10 @@
 "use client";
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Guard } from "../../../components/Guard";
+import { Can } from "../../../components/Can";
+import { usePermissions } from "../../../hooks/usePermissions";
 
+import { usePathname } from "next/navigation";
 
 import { serviceUrl } from "@/lib/services";
 
@@ -743,6 +747,11 @@ export default function Page() {
   // Permissões da tela atual
   const permissoesTela = typeof window !== "undefined" ? getPermissoesTelaAtual() : null;
 
+  const pathname = usePathname(); // usa a rota atual
+  const { canView, canEdit, canCreate, canDelete } = usePermissions(pathname);
+
+  console.log("Permissões do Kanban:", { canView, canEdit, canCreate, canDelete });
+
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950 text-gray-900 dark:text-gray-100">
       <div className="max-w-[1400px] px-6 py-8 mx-auto">
@@ -859,7 +868,7 @@ export default function Page() {
                   Salvar
                 </button>
                 {/* Botão de excluir, só aparece se permissoesTela?.deletar === true */}
-                {permissoesTela?.deletar && (
+                {canDelete && (
                   <button
                     onClick={async () => {
                       if (!selected) return;

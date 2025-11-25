@@ -46,6 +46,7 @@ export default function Login() {
       Qualidade: [
         { modulo: "Sac", telas: ["/sac/kanban"] },
         { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+        { modulo: "Compras", telas: [ "/compras/kanban" ] },
       ],
       Atacado: [
         { modulo: "Sac", telas: ["/sac/kanban"] },

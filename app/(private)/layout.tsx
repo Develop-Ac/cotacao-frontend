@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import "../globals.css";
 import logo from './assets/images/logo.svg';
@@ -13,7 +13,11 @@ import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight 
 import { FaShoppingCart, FaWrench, FaBox, FaTruck, FaCog, FaChevronRight, FaClipboardCheck } from 'react-icons/fa';
 import { IoPersonSharp } from "react-icons/io5";
 import Link from "next/link";
-import { useState, useEffect, MouseEvent } from "react";
+import { useState, useEffect, MouseEvent, useContext, useMemo } from "react";
+
+// ⬇️ Permissão (sem alterar visuais)
+import { AbilityContext } from "../components/AbilityProvider";
+import { canOnPathPrefix, normalizePath } from "../lib/ability";
 
 export default function RootLayout({
   children,
@@ -24,16 +28,16 @@ export default function RootLayout({
   const pathname = usePathname();
   const [userData, setUserData] = useState<any>(null);
 
+  // Ability CASL
+  const ability = useContext(AbilityContext);
+
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem("userData");
-      if (stored) {
-        setUserData(JSON.parse(stored));
-      }
-    } catch {
-      // ignore
-    }
+      if (stored) setUserData(JSON.parse(stored));
+    } catch { /* ignore */ }
   }, []);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [popover, setPopover] = useState<{ top: number; left: number; section: string } | null>(null);
   const [subPopover, setSubPopover] = useState<{ top: number; left: number; items: { label: string; href: string }[] } | null>(null);
@@ -43,25 +47,19 @@ export default function RootLayout({
   const sidebarWidth = sidebarCollapsed ? collapsedSidebarWidth : expandedSidebarWidth;
   const navHeight = 64;
   const iconSpacingClass = sidebarCollapsed ? 'mr-0' : 'mr-3';
+
   const isPathActive = (target: string) =>
     target === '/'
       ? pathname === '/'
       : pathname === target || pathname.startsWith(`${target}/`);
 
   const sectionActive = {
-
     compras: isPathActive('/compras'),
-
     oficina: isPathActive('/oficina'),
-
     estoque: isPathActive('/estoque'),
-
     expedicao: isPathActive('/expedicao'),
-
     qualidade: isPathActive('/qualidade'),
-
     sistema: isPathActive('/usuario'),
-
   };
 
   const buttonMotionClasses = "transition-transform duration-200 ease-out hover:scale-105 active:scale-95";
@@ -76,12 +74,13 @@ export default function RootLayout({
 
   const linkClasses = (href: string, exact = false) => {
     const active = exact ? pathname === href : isPathActive(href);
-    return `text-gray-600 py-1 px-2 rounded hover:bg-blue-100 ${active ? 'bg-blue-100 text-[var(--primary-600)] font-medium' : ''
-      }`;
+    return `text-gray-600 py-1 px-2 rounded hover:bg-blue-100 ${active ? 'bg-blue-100 text-[var(--primary-600)] font-medium' : ''}`;
   };
+
   const textTransitionClass = sidebarCollapsed
     ? 'opacity-0 -translate-x-2 pointer-events-none'
     : 'opacity-100 translate-x-0 pointer-events-auto';
+
   const labelStyle = (order = 0) => ({
     display: 'inline-block',
     transition: 'opacity 280ms ease, transform 280ms ease, max-width 280ms ease',
@@ -94,66 +93,32 @@ export default function RootLayout({
   const cascadeItemClass = () =>
     `transition-all duration-300 ease-out opacity-0 -translate-y-2 group-open:opacity-100 group-open:translate-y-0`;
 
-  const handleNavigation = async (href: string, event?: MouseEvent<HTMLElement>) => {
-    if (event) {
-      if (
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      ) {
-        return;
-      }
-      event.preventDefault();
-    }
-    if (isNavigating || href === pathname) return;
-    setIsNavigating(true);
-    try {
-      await router.push(href);
-    } finally {
-      setIsNavigating(false);
-    }
+  // ---------- Permissões: helpers ----------
+  const canViewPath = (href: string) => {
+    const target = normalizePath(href);
+    return canOnPathPrefix(ability, "read", target); // read herda por prefixo
   };
 
-  const hasAccessToModule = (module: string): boolean => {
-    if (!userData || !userData.setor) return false;
-
-    if (userData.setor === 'Admin') return true;
-
-    // Permissões de acesso por setor
-    const moduleAccess: { [key: string]: string[] } = {
-      'Compras': ['Compras'],
-      'Oficina': ['Oficina'],
-      'Estoque': ['Estoque'],
-      'Expedição': ['Expedição'],
-      'Expedicao': ['Expedição'],
-      'Qualidade': ['Qualidade', 'Sac'],
-
-      'Sac': ['Sac', 'Qualidade'],
-      'Atacado': ['Sac'],
-      'Varejo': ['Sac'],
-    };
-
-    const userModules = moduleAccess[userData.setor] || [];
-    return userModules.includes(module);
-  };
-
+  // Submenus completos para cada seção (sem filtro)
   const getSubmenuItems = (section: string) => {
     switch (section) {
       case 'Compras':
         return [
-          { label: 'Criar Cota��o', href: '/compras/cotacao' },
+          { label: 'Criar Cotação', href: '/compras/cotacao' },
           { label: 'Comparativo', href: '/compras/cotacao/comparativo' },
           { label: 'Pedido', href: '/compras/cotacao/pedido' },
           { label: 'Kanban', href: '/compras/kanban' },
+          { label: 'NF - Lista', href: '/compras/notaFiscal/notaFiscal' },
         ];
       case 'Oficina':
         return [{ label: 'Check List', href: '/oficina/checkList' }];
       case 'Estoque':
         return [{ label: 'Contagem', href: '/estoque/contagem' }];
       case 'Expedicao':
-        return [{ label: 'Entregas', href: '/expedicao/entregas' }];
+        return [
+          { label: 'Dashboard', href: '/expedicao/dashboard' },
+          { label: 'Aplicativo', href: '/expedicao/aplicativo' },
+        ];
       case 'Qualidade':
         return [
           { label: 'Central', href: '/qualidade' },
@@ -168,12 +133,68 @@ export default function RootLayout({
     }
   };
 
+  // Submenus visíveis (filtrados por canView)
+  const getVisibleSubmenuItems = (section: string) =>
+    getSubmenuItems(section).filter(item => canViewPath(item.href));
+
+  // Seção só aparece se o usuário tiver acesso por setor E houver ao menos 1 link visível
+  const hasAnyVisibleInSection = (section: string) => getVisibleSubmenuItems(section).length > 0;
+
+  const hasAccessToModule = (module: string): boolean => {
+    if (!userData || !userData.setor) return false;
+    if (userData.setor === 'Admin') return true;
+
+    const moduleAccess: { [key: string]: string[] } = {
+      'Compras': ['Compras'],
+      'Oficina': ['Oficina'],
+      'Estoque': ['Estoque'],
+      'Expedição': ['Expedição'],
+      'Expedicao': ['Expedição'],
+      'Qualidade': ['Qualidade', 'Sac', 'Compras'],
+      'Sac': ['Sac', 'Qualidade'],
+      'Atacado': ['Sac'],
+      'Varejo': ['Sac'],
+    };
+
+    const userModules = moduleAccess[userData.setor] || [];
+    return userModules.includes(module);
+  };
+
+  // Para popover quando sidebar colapsada (já filtrado por canView)
+  const popoverItems = useMemo(() => {
+    if (!popover) return [];
+    return getVisibleSubmenuItems(popover.section);
+  }, [popover, ability, userData]); // ability muda quando user troca
+
   function deslogar() {
     window.localStorage.setItem('auth', 'false');
     window.localStorage.removeItem('userData');
     setUserData(null);
-    handleNavigation('/login');
+    router.replace('/login');
   }
+
+  const handleNavigation = async (href: string, event?: MouseEvent<HTMLElement>) => {
+    if (event) {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      event.preventDefault();
+    }
+    if (isNavigating || href === pathname) return;
+
+    // bloqueio por canView (somente navega se puder ver)
+    // if (!canViewPath(href)) {
+    //   router.replace("/403");
+    //   return;
+    // }
+
+    setIsNavigating(true);
+    try {
+      await router.push(href);
+    } finally {
+      setIsNavigating(false);
+    }
+  };
 
   return (
     <PrivateRoute>
@@ -256,7 +277,8 @@ export default function RootLayout({
               </div>
             </div>
             <ul className="flex flex-col gap-2 mt-4">
-              {hasAccessToModule('Compras') && (
+              {/* COMPRAS */}
+              {hasAccessToModule('Compras') && hasAnyVisibleInSection('Compras') && (
                 <li>
                   <details className="group">
                     <summary
@@ -280,65 +302,89 @@ export default function RootLayout({
                       </span>
                       {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
                     </summary>
+
                     {!sidebarCollapsed && (
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <details className="group">
-                              <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/cotacao') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
-                                <span className="font-medium">Cotação</span>
-                                <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
-                              </summary>
-                              <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                                <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                                  <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                                    <Link href="/compras/cotacao" onClick={(e) => handleNavigation('/compras/cotacao', e)} className={linkClasses('/compras/cotacao', true)}>
-                                      Criar Cotação
-                                    </Link>
-                                  </li>
-                                  <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                                    <Link href="/compras/cotacao/comparativo" onClick={(e) => handleNavigation('/compras/cotacao/comparativo', e)} className={linkClasses('/compras/cotacao/comparativo')}>
-                                      Comparativo
-                                    </Link>
-                                  </li>
-                                  <li className={cascadeItemClass()} style={cascadeStyle(2)}>
-                                    <Link href="/compras/cotacao/pedido" onClick={(e) => handleNavigation('/compras/cotacao/pedido', e)} className={linkClasses('/compras/cotacao/pedido')}>
-                                      Pedido
-                                    </Link>
-                                  </li>
-                                </ul>
-                              </div>
-                            </details>
-                          </li>
-                          <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                            <details className="group">
-                              <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/cotacao') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
-                                <span className="font-medium">Nota Fiscal</span>
-                                <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
-                              </summary>
-                              <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                                <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                                  <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                                    <Link href="/compras/notaFiscal/notaFiscal" onClick={(e) => handleNavigation('/compras/notaFiscal/notaFiscal', e)} className={linkClasses('/compras/notaFiscal/notaFiscal', true)}>
-                                      Lista
-                                    </Link>
-                                  </li>
-                                </ul>
-                              </div>
-                            </details>
-                          </li>
-                          <li className={cascadeItemClass()} style={cascadeStyle(2)}>
-                            <Link href="/compras/kanban" onClick={(e) => handleNavigation('/compras/kanban', e)} className={`${linkClasses('/compras/kanban')} px-4 block`}>
-                              Kanban
-                            </Link>
-                          </li>
+
+                          {/* Cotação (grupo) */}
+                          {(canViewPath('/compras/cotacao') ||
+                            canViewPath('/compras/cotacao/comparativo') ||
+                            canViewPath('/compras/cotacao/pedido')) && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <details className="group">
+                                <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/cotacao') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
+                                  <span className="font-medium">Cotação</span>
+                                  <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
+                                </summary>
+                                <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                                  <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
+                                    {canViewPath('/compras/cotacao') && (
+                                      <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                                        <Link href="/compras/cotacao" onClick={(e) => handleNavigation('/compras/cotacao', e)} className={linkClasses('/compras/cotacao', true)}>
+                                          Criar Cotação
+                                        </Link>
+                                      </li>
+                                    )}
+                                    {canViewPath('/compras/cotacao/comparativo') && (
+                                      <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                                        <Link href="/compras/cotacao/comparativo" onClick={(e) => handleNavigation('/compras/cotacao/comparativo', e)} className={linkClasses('/compras/cotacao/comparativo')}>
+                                          Comparativo
+                                        </Link>
+                                      </li>
+                                    )}
+                                    {canViewPath('/compras/cotacao/pedido') && (
+                                      <li className={cascadeItemClass()} style={cascadeStyle(2)}>
+                                        <Link href="/compras/cotacao/pedido" onClick={(e) => handleNavigation('/compras/cotacao/pedido', e)} className={linkClasses('/compras/cotacao/pedido')}>
+                                          Pedido
+                                        </Link>
+                                      </li>
+                                    )}
+                                  </ul>
+                                </div>
+                              </details>
+                            </li>
+                          )}
+
+                          {/* Nota Fiscal */}
+                          {canViewPath('/compras/notaFiscal/notaFiscal') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                              <details className="group">
+                                <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/notaFiscal') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
+                                  <span className="font-medium">Nota Fiscal</span>
+                                  <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
+                                </summary>
+                                <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                                  <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
+                                    <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                                      <Link href="/compras/notaFiscal/notaFiscal" onClick={(e) => handleNavigation('/compras/notaFiscal/notaFiscal', e)} className={linkClasses('/compras/notaFiscal/notaFiscal', true)}>
+                                        Lista
+                                      </Link>
+                                    </li>
+                                  </ul>
+                                </div>
+                              </details>
+                            </li>
+                          )}
+
+                          {/* Kanban */}
+                          {canViewPath('/compras/kanban') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(2)}>
+                              <Link href="/compras/kanban" onClick={(e) => handleNavigation('/compras/kanban', e)} className={`${linkClasses('/compras/kanban')} px-4 block`}>
+                                Kanban
+                              </Link>
+                            </li>
+                          )}
+
                         </ul>
                       </div>
                     )}
                   </details>
                 </li>
               )}
-              {hasAccessToModule('Oficina') && (
+
+              {/* OFICINA */}
+              {hasAccessToModule('Oficina') && hasAnyVisibleInSection('Oficina') && (
                 <li>
                   <details className="group">
                     <summary
@@ -353,11 +399,7 @@ export default function RootLayout({
                       className={summaryClasses(sectionActive.oficina)}
                     >
                       <FaWrench title="Oficina" className={`${iconSpacingClass} ${iconClasses(sectionActive.oficina)}`} />
-                      <span
-                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                        style={labelStyle(2)}
-                        aria-hidden={sidebarCollapsed ? true : undefined}
-                      >
+                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(2)} aria-hidden={sidebarCollapsed ? true : undefined}>
                         Oficina
                       </span>
                       {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
@@ -365,18 +407,22 @@ export default function RootLayout({
                     {!sidebarCollapsed && (
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/oficina/checkList" onClick={(e) => handleNavigation('/oficina/checkList', e)} className={linkClasses('/oficina/checkList')}>
-                              Check List
-                            </Link>
-                          </li>
+                          {canViewPath('/oficina/checkList') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <Link href="/oficina/checkList" onClick={(e) => handleNavigation('/oficina/checkList', e)} className={linkClasses('/oficina/checkList')}>
+                                Check List
+                              </Link>
+                            </li>
+                          )}
                         </ul>
                       </div>
                     )}
                   </details>
                 </li>
               )}
-              {hasAccessToModule('Estoque') && (
+
+              {/* ESTOQUE */}
+              {hasAccessToModule('Estoque') && hasAnyVisibleInSection('Estoque') && (
                 <li>
                   <details className="group">
                     <summary
@@ -391,11 +437,7 @@ export default function RootLayout({
                       className={summaryClasses(sectionActive.estoque)}
                     >
                       <FaBox title="Estoque" className={`${iconSpacingClass} ${iconClasses(sectionActive.estoque)}`} />
-                      <span
-                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                        style={labelStyle(3)}
-                        aria-hidden={sidebarCollapsed ? true : undefined}
-                      >
+                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(3)} aria-hidden={sidebarCollapsed ? true : undefined}>
                         Estoque
                       </span>
                       {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
@@ -403,18 +445,22 @@ export default function RootLayout({
                     {!sidebarCollapsed && (
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/estoque/contagem" onClick={(e) => handleNavigation('/estoque/contagem', e)} className={linkClasses('/estoque/contagem')}>
-                              Contagem
-                            </Link>
-                          </li>
+                          {canViewPath('/estoque/contagem') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <Link href="/estoque/contagem" onClick={(e) => handleNavigation('/estoque/contagem', e)} className={linkClasses('/estoque/contagem')}>
+                                Contagem
+                              </Link>
+                            </li>
+                          )}
                         </ul>
                       </div>
                     )}
                   </details>
                 </li>
               )}
-              {hasAccessToModule('Expedição') && (
+
+              {/* EXPEDIÇÃO */}
+              {hasAccessToModule('Expedição') && hasAnyVisibleInSection('Expedicao') && (
                 <li>
                   <details className="group">
                     <summary
@@ -429,11 +475,7 @@ export default function RootLayout({
                       className={summaryClasses(sectionActive.expedicao)}
                     >
                       <FaTruck title="Expedição" className={`${iconSpacingClass} ${iconClasses(sectionActive.expedicao)}`} />
-                      <span
-                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                        style={labelStyle(4)}
-                        aria-hidden={sidebarCollapsed ? true : undefined}
-                      >
+                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(4)} aria-hidden={sidebarCollapsed ? true : undefined}>
                         Expedição
                       </span>
                       {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
@@ -441,23 +483,29 @@ export default function RootLayout({
                     {!sidebarCollapsed && (
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/expedicao/dashboard" onClick={(e) => handleNavigation('/expedicao/dashboard', e)} className={linkClasses('/expedicao/dashboard')}>
-                              Dashboard
-                            </Link>
-                          </li>
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/expedicao/aplicativo" onClick={(e) => handleNavigation('/expedicao/aplicativo', e)} className={linkClasses('/expedicao/aplicativo')}>
-                              Aplicativo
-                            </Link>
-                          </li>
+                          {canViewPath('/expedicao/dashboard') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <Link href="/expedicao/dashboard" onClick={(e) => handleNavigation('/expedicao/dashboard', e)} className={linkClasses('/expedicao/dashboard')}>
+                                Dashboard
+                              </Link>
+                            </li>
+                          )}
+                          {canViewPath('/expedicao/aplicativo') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <Link href="/expedicao/aplicativo" onClick={(e) => handleNavigation('/expedicao/aplicativo', e)} className={linkClasses('/expedicao/aplicativo')}>
+                                Aplicativo
+                              </Link>
+                            </li>
+                          )}
                         </ul>
                       </div>
                     )}
                   </details>
                 </li>
               )}
-              {hasAccessToModule('Qualidade') && (
+
+              {/* QUALIDADE */}
+              {hasAccessToModule('Qualidade') && hasAnyVisibleInSection('Qualidade') && (
                 <li>
                   <details className="group">
                     <summary
@@ -472,11 +520,7 @@ export default function RootLayout({
                       className={summaryClasses(sectionActive.qualidade)}
                     >
                       <FaClipboardCheck title="Qualidade" className={`${iconSpacingClass} ${iconClasses(sectionActive.qualidade)}`} />
-                      <span
-                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                        style={labelStyle(5)}
-                        aria-hidden={sidebarCollapsed ? true : undefined}
-                      >
+                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(5)} aria-hidden={sidebarCollapsed ? true : undefined}>
                         Qualidade
                       </span>
                       {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
@@ -484,23 +528,29 @@ export default function RootLayout({
                     {!sidebarCollapsed && (
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/qualidade" onClick={(e) => handleNavigation('/qualidade', e)} className={linkClasses('/qualidade', true)}>
-                              Central
-                            </Link>
-                          </li>
-                          <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                            <Link href="/qualidade/caixa" onClick={(e) => handleNavigation('/qualidade/caixa', e)} className={linkClasses('/qualidade/caixa')}>
-                              Inbox
-                            </Link>
-                          </li>
+                          {canViewPath('/qualidade') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <Link href="/qualidade" onClick={(e) => handleNavigation('/qualidade', e)} className={linkClasses('/qualidade', true)}>
+                                Central
+                              </Link>
+                            </li>
+                          )}
+                          {canViewPath('/qualidade/caixa') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                              <Link href="/qualidade/caixa" onClick={(e) => handleNavigation('/qualidade/caixa', e)} className={linkClasses('/qualidade/caixa')}>
+                                Inbox
+                              </Link>
+                            </li>
+                          )}
                         </ul>
                       </div>
                     )}
                   </details>
                 </li>
               )}
-              {hasAccessToModule('Sac') && (
+
+              {/* SAC */}
+              {hasAccessToModule('Sac') && hasAnyVisibleInSection('Sac') && (
                 <li>
                   <details className="group">
                     <summary
@@ -515,11 +565,7 @@ export default function RootLayout({
                       className={summaryClasses(sectionActive.expedicao)}
                     >
                       <IoPersonSharp title="Sac" className={`${iconSpacingClass} ${iconClasses(sectionActive.expedicao)}`} />
-                      <span
-                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                        style={labelStyle(4)}
-                        aria-hidden={sidebarCollapsed ? true : undefined}
-                      >
+                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(4)} aria-hidden={sidebarCollapsed ? true : undefined}>
                         Sac
                       </span>
                       {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
@@ -527,18 +573,22 @@ export default function RootLayout({
                     {!sidebarCollapsed && (
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/sac/kanban" onClick={(e) => handleNavigation('/sac/kanban', e)} className={linkClasses('/sac/kanban')}>
-                              Nova Solicitação
-                            </Link>
-                          </li>
+                          {canViewPath('/sac/kanban') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <Link href="/sac/kanban" onClick={(e) => handleNavigation('/sac/kanban', e)} className={linkClasses('/sac/kanban')}>
+                                Nova Solicitação
+                              </Link>
+                            </li>
+                          )}
                         </ul>
                       </div>
                     )}
                   </details>
                 </li>
               )}
-              {userData?.setor === 'Admin' && (
+
+              {/* SISTEMA (Admin apenas) */}
+              {userData?.setor === 'Admin' && hasAnyVisibleInSection('Sistema') && (
                 <li>
                   <details className="group">
                     <summary
@@ -553,11 +603,7 @@ export default function RootLayout({
                       className={summaryClasses(sectionActive.sistema)}
                     >
                       <FaCog title="Sistema" className={`${iconSpacingClass} ${iconClasses(sectionActive.sistema)}`} />
-                      <span
-                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                        style={labelStyle(5)}
-                        aria-hidden={sidebarCollapsed ? true : undefined}
-                      >
+                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(5)} aria-hidden={sidebarCollapsed ? true : undefined}>
                         Sistema
                       </span>
                       {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
@@ -565,11 +611,13 @@ export default function RootLayout({
                     {!sidebarCollapsed && (
                       <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
                         <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                            <Link href="/usuario" onClick={(e) => handleNavigation('/usuario', e)} className={linkClasses('/usuario')}>
-                              Usuários
-                            </Link>
-                          </li>
+                          {canViewPath('/usuario') && (
+                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                              <Link href="/usuario" onClick={(e) => handleNavigation('/usuario', e)} className={linkClasses('/usuario')}>
+                                Usuários
+                              </Link>
+                            </li>
+                          )}
                         </ul>
                       </div>
                     )}
@@ -596,13 +644,27 @@ export default function RootLayout({
                 >
                   <ul className="py-2">
                     {(() => {
-                      const mainItems = getSubmenuItems(popover.section);
-                      const comprasSubmenu = popover.section === 'Compras' ? [
-                        { label: 'Cotação', items: [{ label: 'Criar Cotação', href: '/compras/cotacao' }, { label: 'Comparativo', href: '/compras/cotacao/comparativo' }, { label: 'Pedido', href: '/compras/cotacao/pedido' }] },
-                        { label: 'Kanban', href: '/compras/kanban' }
-                      ] : mainItems.map(item => ({ label: item.label, href: item.href }));
+                      // itens do popover, já filtrados por canView
+                      const mainItems = popoverItems;
 
-                      const itemsToRender = popover.section === 'Compras' ? comprasSubmenu : mainItems.map(item => ({ label: item.label, href: item.href }));
+                      // submenu especial de compras (2 níveis), mantendo apenas itens visíveis
+                      const comprasSubmenu = [
+                        {
+                          label: 'Cotação',
+                          items: [
+                            { label: 'Criar Cotação', href: '/compras/cotacao' },
+                            { label: 'Comparativo', href: '/compras/cotacao/comparativo' },
+                            { label: 'Pedido', href: '/compras/cotacao/pedido' }
+                          ].filter(i => canViewPath(i.href)),
+                        },
+                        ...(canViewPath('/compras/kanban') ? [{ label: 'Kanban', href: '/compras/kanban' } as const] : []),
+                        ...(canViewPath('/compras/notaFiscal/notaFiscal') ? [{ label: 'NF - Lista', href: '/compras/notaFiscal/notaFiscal' } as const] : []),
+                      ];
+
+                      const itemsToRender =
+                        popover?.section === 'Compras'
+                          ? comprasSubmenu.filter(item => ('items' in item && item.items?.length) || ('href' in item && item.href))
+                          : mainItems;
 
                       return itemsToRender.map(item => (
                         ('items' in item && item.items) ? (
@@ -623,12 +685,12 @@ export default function RootLayout({
                             </button>
                           </li>
                         ) : (
-                          <li key={item.href || item.label}>
+                          <li key={(item as any).href || item.label}>
                             <Link
-                              href={item.href!}
+                              href={(item as any).href!}
                               className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition"
                               onClick={(e) => {
-                                handleNavigation(item.href!, e);
+                                handleNavigation((item as any).href!, e);
                                 setSubPopover(null);
                                 setPopover(null);
                               }}
@@ -684,5 +746,3 @@ export default function RootLayout({
     </PrivateRoute>
   );
 }
-
-

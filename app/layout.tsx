@@ -1,15 +1,14 @@
+import React from "react";
 import "./globals.css";
-import type { Metadata } from "next";
-export const metadata: Metadata = {
-  title: "Cotação Frontend",
-};
+import { AbilityProvider } from "../app/components/AbilityProvider";
 
-export default function LoginLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="pt-BR">
-      <body className="">
-        {children}
-      </body>
-    </html>
-  );
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+return (
+<html lang="pt-BR">
+<body>
+<AbilityProvider>{children}</AbilityProvider>
+</body>
+</html>
+);
 }

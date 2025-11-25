@@ -12,6 +12,8 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@casl/ability": "^6.7.3",
+    "@casl/react": "^5.0.0",
     "@dr.pogodin/react-helmet": "^3.0.4",
     "@types/jsonwebtoken": "^9.0.10",
     "axios": "^1.10.0",
