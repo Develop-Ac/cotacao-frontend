@@ -171,7 +171,7 @@ export default function Tela() {
     const carregarUsuarios = async () => {
         setLoadingUsuarios(true);
         try {
-            const res = await fetch(estoqueUrl("/usuarios"), {
+            const res = await fetch("http://sistema-service.acacessorios.local/usuarios", {
                 headers: { Accept: "application/json" }
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);

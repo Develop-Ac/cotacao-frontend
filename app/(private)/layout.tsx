@@ -182,12 +182,6 @@ export default function RootLayout({
     }
     if (isNavigating || href === pathname) return;
 
-    // bloqueio por canView (somente navega se puder ver)
-    // if (!canViewPath(href)) {
-    //   router.replace("/403");
-    //   return;
-    // }
-
     setIsNavigating(true);
     try {
       await router.push(href);
@@ -195,6 +189,12 @@ export default function RootLayout({
       setIsNavigating(false);
     }
   };
+  
+  // bloqueio por canView (somente navega se puder ver)
+  if (pathname !== "/login" && pathname !== "/" && !canViewPath(pathname)) {
+    router.replace("/403");
+    return;
+  }
 
   return (
     <PrivateRoute>
