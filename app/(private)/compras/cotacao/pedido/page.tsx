@@ -1,6 +1,14 @@
 "use client";
 
-import { FaPlusSquare, FaSync } from "react-icons/fa";
+import {
+  FaBox,
+  FaCalendar,
+  FaFilePdf,
+  FaMoneyBill,
+  FaPlusSquare,
+  FaSync,
+  FaUser,
+} from "react-icons/fa";
 import { useEffect, useMemo, useState } from "react";
 import { serviceUrl } from "@/lib/services";
 
@@ -29,6 +37,100 @@ type PedidoListItem = {
   total_valor: number;
   total_valor_fmt: string; // já sem "R$"
 };
+
+// helper de data pt-BR
+const fmtDateTime = (iso: string) => {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso ?? "-";
+    return d.toLocaleString("pt-BR");
+  } catch {
+    return iso ?? "-";
+  }
+};
+
+function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
+  return (
+    <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-gray-100">
+      <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-start">
+        <div>
+          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
+            Pedido de Cotação
+          </div>
+          <div className="text-2xl font-bold text-gray-800">
+            #{pedido.pedido_cotacao}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 flex-1 flex flex-col gap-3">
+        <div className="flex items-start gap-2 text-gray-600">
+          <FaUser className="text-gray-400 mt-1 shrink-0" />
+          <span className="font-medium text-sm line-clamp-2" title={pedido.for_nome}>
+            {pedido.for_nome}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 text-gray-600">
+          <FaCalendar className="text-gray-400" />
+          <span className="text-sm">{fmtDateTime(pedido.created_at)}</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <div className="bg-gray-50 p-2 rounded-lg">
+            <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+              <FaBox /> Itens
+            </div>
+            <div className="font-semibold text-gray-800">{pedido.itens_count}</div>
+          </div>
+          <div className="bg-gray-50 p-2 rounded-lg">
+            <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+              <FaBox /> Qtd. Total
+            </div>
+            <div className="font-semibold text-gray-800">
+              {Number(pedido.total_qtd).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-1 pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-gray-600">
+              <FaMoneyBill className="text-gray-400" />
+              <span className="text-xs font-semibold uppercase">Total</span>
+            </div>
+            <span className="text-lg font-bold text-green-600">
+              {pedido.total_valor_fmt ?? "-"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 pt-0 mt-auto flex gap-2">
+        <a
+          href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=true`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 py-2 px-3 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
+          title="Abrir PDF (com marca)"
+        >
+          <FaFilePdf />
+          C/ Marca
+        </a>
+        <a
+          href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=false`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 py-2 px-3 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
+          title="Abrir PDF (sem marca)"
+        >
+          <FaFilePdf />
+          S/ Marca
+        </a>
+      </div>
+    </div>
+  );
+}
 
 export default function Tela() {
   const BTN =
@@ -97,7 +199,7 @@ export default function Tela() {
         try {
           const err = await res.json();
           if (err?.message) msg = err.message;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -132,8 +234,8 @@ export default function Tela() {
       const arr: PedidoListItem[] = Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
-        ? data.data
-        : [];
+          ? data.data
+          : [];
 
       setPedidos(arr);
       if (!arr.length) setMsgPedidos("Nenhum pedido encontrado.");
@@ -185,268 +287,201 @@ export default function Tela() {
     });
   }, [pedidos, fFor, fPed, fDe, fAte]);
 
-  // helper de data pt-BR
-  const fmtDateTime = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return iso ?? "-";
-      return d.toLocaleString("pt-BR");
-    } catch {
-      return iso ?? "-";
-    }
-  };
-
   const pagina = useMemo(() => pedidosFiltrados.slice(0, pageSize), [pedidosFiltrados, pageSize]);
 
   return (
-    <div className="main-panel min-h-screen text-black">
-      <div className="content-wrapper p-2">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h3 className="text-2xl font-semibold mb-3 md:mb-0">Criação de cotação</h3>
+    <div className="min-h-screen text-gray-900 p-4 md:p-8 space-y-8 bg-gray-50/50">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Listagem de Pedido</h1>
+          <p className="text-gray-500 mt-1">Gerencie e crie novas cotações</p>
+        </div>
 
-          <div className="flex gap-6">
-            {/* <div className="flex flex-col items-center mr-2">
-              <button
-                id="form_new_menu"
-                className={BTN_SQUARE}
-                title="Abrir box"
-                onClick={() => setFormularioAberto((v) => !v)}
-              >
-                <FaPlusSquare className="text-white text-xl" />
-              </button>
-              <span className="text-xs text-gray-700 mt-1">NOVO</span>
-            </div> */}
+        <div className="flex gap-3">
+          <button
+            onClick={carregarPedidos}
+            disabled={loadingPedidos}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all duration-200 disabled:opacity-50"
+            title="Atualizar Lista"
+          >
+            <FaSync className={loadingPedidos ? "animate-spin" : ""} size={18} />
+            <span className="text-sm font-medium">Atualizar</span>
+          </button>
+        </div>
+      </div>
 
-            <div className="flex flex-col items-center mr-2">
-              <button
-                id="refresh_pedidos_header"
-                className={BTN_SQUARE}
-                title="Atualizar lista"
-                onClick={carregarPedidos}
-                disabled={loadingPedidos}
-              >
-                <FaSync className="text-white text-xl" />
-              </button>
-              <span className="text-xs text-gray-700 mt-1">ATUALIZAR</span>
+      {/* BOX ABERTO */}
+      {formularioAberto && (
+        <div className="bg-white rounded-xl shadow-lg p-6 animate-in fade-in slide-in-from-top-4 duration-300 border border-gray-100">
+          <h2 className="text-xl font-semibold mb-4 border-b pb-2">Nova Cotação</h2>
+          <div className="flex flex-col md:flex-row gap-4 items-end mb-6">
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Número do Pedido
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Ex: 123456"
+                value={pedido}
+                onChange={(e) => setPedido(e.target.value.replace(/[^\d]/g, ""))}
+                className="w-full h-10 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              />
             </div>
+            <button
+              onClick={buscarCotacao}
+              disabled={loadingCot}
+              className="h-10 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
+            >
+              {loadingCot ? "Buscando..." : "Buscar"}
+            </button>
+            <button
+              onClick={criarCotacao}
+              disabled={postingCot || !itensCotacao.length || !pedido.trim()}
+              className="h-10 px-6 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 flex items-center gap-2"
+            >
+              {postingCot ? "Enviando..." : "Criar cotação"}
+            </button>
+          </div>
+
+          {msgCot && (
+            <div
+              className={`p-4 rounded-lg mb-6 ${msgCot.includes("sucesso") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                }`}
+            >
+              {msgCot}
+            </div>
+          )}
+
+          {itensCotacao.length > 0 && (
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-gray-600 font-medium border-b">
+                  <tr>
+                    <th className="px-4 py-3">Código</th>
+                    <th className="px-4 py-3">Descrição</th>
+                    <th className="px-4 py-3">Marca</th>
+                    <th className="px-4 py-3">Referência</th>
+                    <th className="px-4 py-3">Unidade</th>
+                    <th className="px-4 py-3 text-right">Qtd.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {itensCotacao.map((it, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-900">{it.PRO_CODIGO}</td>
+                      <td className="px-4 py-3 text-gray-700">{it.PRO_DESCRICAO}</td>
+                      <td className="px-4 py-3 text-gray-500">{it.MAR_DESCRICAO}</td>
+                      <td className="px-4 py-3 text-gray-500">{it.REFERENCIA}</td>
+                      <td className="px-4 py-3 text-gray-500">{it.UNIDADE}</td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-900">
+                        {it.QUANTIDADE}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* LISTAGEM INFERIOR */}
+      <div className="space-y-4">
+        <div className="bg-white shadow-md rounded-xl p-4 border border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+            <div className="col-span-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fornecedor</label>
+              <input
+                type="text"
+                placeholder="Filtrar por nome..."
+                value={fFor}
+                onChange={(e) => setFFor(e.target.value)}
+                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Pedido Cotação</label>
+              <input
+                type="text"
+                placeholder="Filtrar por número..."
+                value={fPed}
+                onChange={(e) => setFPed(e.target.value.replace(/[^\d]/g, ""))}
+                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">De</label>
+              <input
+                type="date"
+                value={fDe}
+                onChange={(e) => setFDe(e.target.value)}
+                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Até</label>
+              <input
+                type="date"
+                value={fAte}
+                onChange={(e) => setFAte(e.target.value)}
+                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div className="col-span-1 flex items-end gap-2">
+              <button
+                onClick={limparFiltros}
+                className="h-9 px-4 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-sm font-medium w-full transition-colors"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t pt-3">
+            <div className="text-sm text-gray-500">
+              Mostrando {pagina.length} de {pedidosFiltrados.length} registros
+            </div>
+            <select
+              className="h-9 border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+            >
+              <option value={5}>5 itens</option>
+              <option value={10}>10 itens</option>
+              <option value={20}>20 itens</option>
+              <option value={50}>50 itens</option>
+              <option value={100}>100 itens</option>
+            </select>
           </div>
         </div>
 
-        {/* BOX ABERTO */}
-        {formularioAberto && (
-          <div id="screen" className="mb-10">
-            <div className="w-full">
-              <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Número do pedido de cotação"
-                    value={pedido}
-                    onChange={(e) => setPedido(e.target.value.replace(/[^\d]/g, ""))}
-                    className="h-11 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button onClick={buscarCotacao} disabled={loadingCot} className={BTN}>
-                    {loadingCot ? "Buscando..." : "Buscar"}
-                  </button>
-                  <button
-                    onClick={criarCotacao}
-                    disabled={postingCot || !itensCotacao.length || !pedido.trim()}
-                    className="h-10 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-60"
-                    title={
-                      !pedido.trim()
-                        ? "Informe o pedido"
-                        : !itensCotacao.length
-                        ? "Busque itens antes"
-                        : "Criar cotação"
-                    }
-                  >
-                    {postingCot ? "Enviando..." : "Criar cotação"}
-                  </button>
-                </div>
-
-                {msgCot && <p className="text-sm text-gray-600">{msgCot}</p>}
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="p-2 text-start">Código</th>
-                        <th className="p-2 text-start">Descrição</th>
-                        <th className="p-2 text-start">Marca</th>
-                        <th className="p-2 text-start">Referência</th>
-                        <th className="p-2 text-start">Unidade</th>
-                        <th className="p-2 text-end" style={{ width: "110px" }}>
-                          Quantidade
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {itensCotacao.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="p-4 text-gray-500 text-center">
-                            Nenhum item
-                          </td>
-                        </tr>
-                      )}
-                      {itensCotacao.map((it, idx) => (
-                        <tr key={idx} className="border-t hover:bg-gray-50">
-                          <td className="p-2">{it.PRO_CODIGO}</td>
-                          <td className="p-2">{it.PRO_DESCRICAO}</td>
-                          <td className="p-2">{it.MAR_DESCRICAO}</td>
-                          <td className="p-2">{it.REFERENCIA}</td>
-                          <td className="p-2">{it.UNIDADE}</td>
-                          <td className="p-2 text-end">{it.QUANTIDADE}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+        {msgPedidos && (
+          <div className="p-4 bg-blue-50 text-blue-700 rounded-lg border border-blue-100 shadow-sm">
+            {msgPedidos}
           </div>
         )}
 
-        {/* LISTAGEM INFERIOR */}
-        <div id="list">
-          <div className="w-full">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              {/* Filtros */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-                <div className="col-span-1">
-                  <label className="block text-sm text-gray-700 mb-1">Fornecedor (for_codigo)</label>
-                  <input
-                    type="text"
-                    placeholder="Ex.: 199"
-                    value={fFor}
-                    onChange={(e) => setFFor(e.target.value.replace(/[^\d]/g, ""))}
-                    className="h-10 w-full border border-gray-300 rounded px-2"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <label className="block text-sm text-gray-700 mb-1">Pedido de Cotação</label>
-                  <input
-                    type="text"
-                    placeholder="Ex.: 1499"
-                    value={fPed}
-                    onChange={(e) => setFPed(e.target.value.replace(/[^\d]/g, ""))}
-                    className="h-10 w-full border border-gray-300 rounded px-2"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <label className="block text-sm text-gray-700 mb-1">Criado em (de)</label>
-                  <input
-                    type="date"
-                    value={fDe}
-                    onChange={(e) => setFDe(e.target.value)}
-                    className="h-10 w-full border border-gray-300 rounded px-2"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <label className="block text-sm text-gray-700 mb-1">Criado em (até)</label>
-                  <input
-                    type="date"
-                    value={fAte}
-                    onChange={(e) => setFAte(e.target.value)}
-                    className="h-10 w-full border border-gray-300 rounded px-2"
-                  />
-                </div>
-                <div className="col-span-1 flex items-end">
-                  <button
-                    onClick={limparFiltros}
-                    className="h-10 px-3 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 w-full"
-                  >
-                    Limpar filtros
-                  </button>
-                </div>
-              </div>
-
-              {/* Page size */}
-              <div className="flex items-center justify-end gap-2 mb-3">
-                <label htmlFor="pageSize" className="text-sm text-gray-700">Tamanho da listagem</label>
-                <select
-                  id="pageSize"
-                  className="h-10 border border-gray-300 rounded px-2"
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-
-              {msgPedidos && <p className="text-sm text-gray-600 mb-2">{msgPedidos}</p>}
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="p-2 text-start">Fornecedor</th>
-                      <th className="p-2 text-start">Pedido de Cotação</th>
-                      <th className="p-2 text-start">Criado em</th>
-                      <th className="p-2 text-end" style={{ width: 120 }}>Itens</th>
-                      <th className="p-2 text-end" style={{ width: 130 }}>Qtd Total</th>
-                      <th className="p-2 text-end" style={{ width: 160 }}>Total</th>
-                      {/* largura maior para dois botões */}
-                      <th className="p-2 text-end" style={{ width: 240 }}>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagina.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="p-4 text-gray-500 text-center">
-                          Nenhum pedido encontrado
-                        </td>
-                      </tr>
-                    )}
-                    {pagina.map((p) => (
-                      <tr key={p.id} className="border-t hover:bg-gray-50">
-                        <td className="p-3">{p.for_nome}</td>
-                        <td className="p-3">{p.pedido_cotacao}</td>
-                        <td className="p-3">{fmtDateTime(p.created_at)}</td>
-                        <td className="p-3 text-end">{p.itens_count}</td>
-                        <td className="p-3 text-end">
-                          {Number(p.total_qtd).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </td>
-                        <td className="p-3 text-end">{p.total_valor_fmt ?? "-"}</td>
-                        <td className="p-3">
-                          <div className="flex justify-end gap-2">
-                            {/* PDF com MARCA */}
-                            <a
-                              className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-                              href={`${comprasUrl(`/pedido/${encodeURIComponent(p.id)}`)}?marca=true`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Abrir PDF (com marca)"
-                            >
-                              C/ marca
-                            </a>
-
-                            {/* PDF sem MARCA */}
-                            <a
-                              className="h-9 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-                              href={`${comprasUrl(`/pedido/${encodeURIComponent(p.id)}`)}?marca=false`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Abrir PDF (sem marca)"
-                            >
-                              S/ marca
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {/* fim tabela pedidos */}
-            </div>
+        {loadingPedidos ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className="bg-white h-64 rounded-xl shadow-sm border border-gray-100 animate-pulse"
+              ></div>
+            ))}
           </div>
-        </div>
+        ) : pagina.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300 shadow-sm">
+            <p className="text-gray-500">Nenhum pedido encontrado.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {pagina.map((p) => (
+              <PedidoCard key={p.id} pedido={p} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -15,6 +15,7 @@
     "@casl/ability": "^6.7.3",
     "@casl/react": "^5.0.0",
     "@dr.pogodin/react-helmet": "^3.0.4",
+    "@hello-pangea/dnd": "^18.0.1",
     "@types/jsonwebtoken": "^9.0.10",
     "axios": "^1.10.0",
     "framer-motion": "^12.23.24",
