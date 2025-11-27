@@ -162,3 +162,8 @@ button.keep-color * svg,
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+.text-gray-500 {
+  font-weight: bold;
+    font-size: 15px;
+}

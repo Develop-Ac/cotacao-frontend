@@ -39,11 +39,70 @@ const SAVE_URL = `${COMPRAS_BASE}/compras/pedido`;
 const parseMoney = (v: string | number | null | undefined): number | null => {
   if (v === null || v === undefined) return null;
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
-  const s = String(v).trim();
+
+  let s = String(v).trim();
   if (!s) return null;
-  const normalized = s.replace(/\./g, "").replace(",", ".");
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : null;
+
+  // remove espaços e caracteres estranhos, mantém dígitos, . , e sinal
+  s = s.replace(/[^\d.,-]/g, "");
+
+  const onlyDigits = /^-?\d+$/;
+  const simpleDotDecimal = /^-?\d+\.\d{1,2}$/;
+
+  // 1) só dígitos -> inteiro puro
+  if (onlyDigits.test(s)) {
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // 2) formato tipo 200.00 / 2510.01 / 225.8 -> ponto decimal americano
+  if (simpleDotDecimal.test(s)) {
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  const hasComma = s.includes(",");
+  const hasDot = s.includes(".");
+
+  // 3) tem vírgula e ponto -> último separador é decimal, o resto é milhar
+  if (hasComma && hasDot) {
+    const lastSepIndex = Math.max(s.lastIndexOf(","), s.lastIndexOf("."));
+    const intPartRaw = s.slice(0, lastSepIndex).replace(/[.,]/g, "");
+    const fracPart = s.slice(lastSepIndex + 1);
+    const normalized = `${intPartRaw}.${fracPart}`;
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // 4) só vírgula -> formato BR (2.510,01 ou 200,00)
+  if (hasComma && !hasDot) {
+    const normalized = s.replace(/\./g, "").replace(",", ".");
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // 5) só ponto (caso ainda não pego pelo simpleDotDecimal)
+  if (hasDot && !hasComma) {
+    const parts = s.split(".");
+    if (parts.length === 2) {
+      // Ex.: "1.234" (provavelmente milhar, sem casas decimais relevantes)
+      // Tratamos como milhar -> remove ponto
+      const normalized = s.replace(/\./g, "");
+      const n = Number(normalized);
+      return Number.isFinite(n) ? n : null;
+    } else {
+      // múltiplos pontos -> último é decimal, anteriores são milhar
+      const last = parts.pop() as string;
+      const intPartRaw = parts.join("");
+      const normalized = `${intPartRaw}.${last}`;
+      const n = Number(normalized);
+      return Number.isFinite(n) ? n : null;
+    }
+  }
+
+  // fallback: tenta Number direto
+  const fallback = Number(s.replace(",", "."));
+  return Number.isFinite(fallback) ? fallback : null;
 };
 
 const fmtBRL = (n: number | null | undefined): string => {
@@ -93,9 +152,11 @@ const textClassByWinner = (isWinner: boolean, hasPrice: boolean) => {
 };
 /* ======================================================= */
 
+
 export default function ComparativoPage() {
   const [pedido, setPedido] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingSync, setLoadingSync] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const [pedidoCarregado, setPedidoCarregado] = useState<number | null>(null);
@@ -121,6 +182,26 @@ export default function ComparativoPage() {
   const [obsError, setObsError] = useState<string | null>(null);
   const [obsData, setObsData] = useState<any>(null);
   const [obsTarget, setObsTarget] = useState<{ for_codigo: number; for_nome: string } | null>(null);
+
+  // ===== Última compra por produto (pro_codigo) =====
+  const [ultimaCompra, setUltimaCompra] = useState<Record<string, string>>({});
+
+  // Busca a data da última compra para cada pro_codigo
+  const fetchUltimaCompra = useCallback(async (pro_codigo: string) => {
+    if (!pro_codigo) return;
+    setUltimaCompra((prev) => {
+      if (prev[pro_codigo] !== undefined) return prev; // já buscado
+      return { ...prev, [pro_codigo]: "..." };
+    });
+    try {
+      const res = await fetch(`${COMPRAS_BASE}/compras/itens/ultima-compra?pro_codigo=${encodeURIComponent(pro_codigo)}`);
+      if (!res.ok) throw new Error("Erro ao buscar última compra");
+      const data = await res.json();
+      setUltimaCompra((prev) => ({ ...prev, [pro_codigo]: data?.dt_ultima_compra || "-" }));
+    } catch {
+      setUltimaCompra((prev) => ({ ...prev, [pro_codigo]: "-" }));
+    }
+  }, []);
 
   const openObservacao = async (f: ApiFornecedor) => {
     if (!pedidoCarregado) return;
@@ -215,10 +296,7 @@ export default function ComparativoPage() {
           emissao: it.emissao,
           valor_unitario: preco ?? null,
           custo_fabrica: custoRaw ?? null,
-          preco_custo:
-            typeof it.preco_custo === "number"
-              ? it.preco_custo
-              : parseMoney(it.preco_custo as any),
+          preco_custo: it.preco_custo ?? null,
           for_codigo: f.for_codigo,
         };
       }
@@ -278,7 +356,10 @@ export default function ComparativoPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${COMPRAS_BASE}/compras/cotacao-sync/${encodeURIComponent(p)}`, { headers: { Accept: "application/json" } });
+      const res = await fetch(
+        `${COMPRAS_BASE}/compras/cotacao-sync/${encodeURIComponent(p)}`,
+        { headers: { Accept: "application/json" } }
+      );
       if (!res.ok) {
         let emsg = `HTTP ${res.status}`;
         try {
@@ -338,7 +419,10 @@ export default function ComparativoPage() {
       for (const it of f.itens) {
         const pc = String(it.pro_codigo);
         const price = parseMoney(it.valor_unitario);
-        const isMin = price != null && minByProd.has(pc) && Math.abs(price - (minByProd.get(pc)!)) < 1e-9;
+        const isMin =
+          price != null &&
+          minByProd.has(pc) &&
+          Math.abs(price - (minByProd.get(pc)!)) < 1e-9;
         if (!isMin) continue;
         const qty = parseMoney(it.quantidade as any);
         if (qty != null && qty > 0) {
@@ -347,6 +431,114 @@ export default function ComparativoPage() {
       }
     }
     return out;
+  };
+
+  // ===== Sincronizar (GET no compras-service e gerar mesma tela do buscar) =====
+  const sincronizar = async () => {
+    setMsg(null);
+    const p = pedido.trim();
+    if (!/^\d+$/.test(p)) {
+      setMsg("Informe um pedido numérico.");
+      return;
+    }
+    setLoadingSync(true);
+    try {
+      const res = await fetch(
+        `http://compras-service.acacessorios.local/compras/pedido/sincronizacao/${encodeURIComponent(
+          p
+        )}`,
+        { headers: { Accept: "application/json" } }
+      );
+      if (!res.ok) {
+        let emsg = `HTTP ${res.status}`;
+        try {
+          const e = await res.json();
+          if (e?.error) emsg = e.error;
+          else if (e?.message) emsg = e.message;
+        } catch {}
+        throw new Error(emsg);
+      }
+
+      const dataSync: any[] = await res.json();
+
+      if (!Array.isArray(dataSync) || dataSync.length === 0) {
+        setFornecedores([]);
+        setPedidoCarregado(Number(p));
+        setMsg("Nenhum dado retornado na sincronização para este pedido.");
+        setQuantities({});
+        setPriceOverrides({});
+        return;
+      }
+
+      // Map de nomes já conhecidos (caso tenha rodado buscar antes)
+      const currentNames = new Map<
+        number,
+        { for_nome: string; cpf_cnpj: string | null }
+      >();
+      for (const f of fornecedores) {
+        currentNames.set(f.for_codigo, {
+          for_nome: f.for_nome,
+          cpf_cnpj: f.cpf_cnpj,
+        });
+      }
+
+      const fornecedoresTransformados: ApiFornecedor[] = dataSync.map((f) => {
+        const info = currentNames.get(f.for_codigo);
+        return {
+          pedido_cotacao: f.pedido_cotacao,
+          for_codigo: f.for_codigo,
+          for_nome: info?.for_nome ?? `Fornecedor ${f.for_codigo}`,
+          cpf_cnpj: info?.cpf_cnpj ?? null,
+          itens: Array.isArray(f.itens)
+            ? f.itens.map((it: any): ApiItem => ({
+                id: it.id,
+                pro_codigo: it.pro_codigo,
+                pro_descricao: it.pro_descricao,
+                mar_descricao: it.mar_descricao ?? null,
+                referencia: it.referencia ?? null,
+                unidade: it.unidade ?? null,
+                quantidade: it.quantidade,
+                emissao: it.emissao,
+                valor_unitario: it.valor_unitario,
+                custo_fabrica:
+                  typeof it.custo_fabrica === "number"
+                    ? it.custo_fabrica
+                    : (parseMoney(it.custo_fabrica as any) ?? null),
+                preco_custo:
+                  it.preco_custo != null
+                    ? (typeof it.preco_custo === "number"
+                        ? it.preco_custo
+                        : parseMoney(it.preco_custo as any))
+                    : null,
+              }))
+            : [],
+        };
+      });
+
+      const pedidoCotacaoNumber =
+        dataSync[0]?.pedido_cotacao != null
+          ? Number(dataSync[0].pedido_cotacao)
+          : Number(p);
+
+      const responsePadronizada: ApiResponseTodos = {
+        pedido_cotacao: pedidoCotacaoNumber,
+        fornecedores: fornecedoresTransformados,
+      };
+
+      setFornecedores(responsePadronizada.fornecedores);
+      setPedidoCarregado(responsePadronizada.pedido_cotacao);
+
+      const seeds = buildSeedsOnlyCheapest(responsePadronizada.fornecedores);
+      setQuantities(seeds);
+      setPriceOverrides({});
+
+      requestAnimationFrame(() => focusFirstEditable());
+      setMsg("Sincronização concluída.");
+    } catch (e: any) {
+      setMsg(`Falha ao sincronizar: ${e?.message || "desconhecido"}`);
+    } finally {
+      setLoadingSync(false);
+    }
   };
 
   // ===== Navegação estilo Excel =====
@@ -647,12 +839,26 @@ export default function ComparativoPage() {
             />
             <button
               onClick={buscar}
-              disabled={loading || !pedido.trim()}
+              disabled={loading || loadingSync || !pedido.trim()}
               className={`h-11 rounded-lg px-4 text-white font-semibold transition
-                ${loading || !pedido.trim() ? "bg-gray-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                ${loading || loadingSync || !pedido.trim()
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-indigo-600 hover:bg-indigo-700"}`}
             >
               {loading ? "Buscando..." : "Buscar"}
             </button>
+
+            <button
+              onClick={sincronizar}
+              disabled={loadingSync || loading || !pedido.trim()}
+              className={`h-11 rounded-lg px-4 text-white font-semibold transition
+                ${loadingSync || loading || !pedido.trim()
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-emerald-600 hover:bg-emerald-700"}`}
+            >
+              {loadingSync ? "Sincronizando..." : "Sincronizar"}
+            </button>
+
             {pedidoCarregado && (
               <span className="text-sm text-gray-600">Pedido carregado: {pedidoCarregado}</span>
             )}
@@ -723,6 +929,18 @@ export default function ComparativoPage() {
                           const hasPrice = price != null && Number.isFinite(price);
                           const edited = priceOverrides[k] != null;
 
+                          // Cálculo da porcentagem de aumento
+                          let pctAumento: number | null = null;
+                          if (cost != null && Number.isFinite(cost) && cost !== 0 && price != null && Number.isFinite(price)) {
+                            pctAumento = ((Number(price) - Number(cost)) / Math.abs(Number(cost))) * 100;
+                          }
+
+                          // Buscar dt_ultima_compra se ainda não buscado
+                          if (ultimaCompra[row.pro_codigo] === undefined) {
+                            fetchUltimaCompra(row.pro_codigo);
+                          }
+                          const dtUltimaCompra = ultimaCompra[row.pro_codigo];
+
                           return (
                             <td
                               key={f.for_codigo}
@@ -738,7 +956,7 @@ export default function ComparativoPage() {
                                 className="group inline-flex items-center justify-end gap-2 w-full comparativo"
                                 title="Clique para editar o valor"
                               >
-                                <span className={`inline-block h-2.5 w-2.5 rounded-full ${dot}`} />
+                                {/* <span className={`inline-block h-2.5 w-2.5 rounded-full ${dot}`} /> */}
                                 <span className="min-w-[84px] text-right underline-offset-2 group-hover:underline">
                                   {fmtBRL(price)}
                                 </span>
@@ -748,6 +966,23 @@ export default function ComparativoPage() {
                                   </span>
                                 )}
                               </button>
+
+                              {/* Porcentagem de aumento */}
+                              <div className="mt-1 text-xs text-gray-700">
+                                {pctAumento != null && Number.isFinite(pctAumento) ? (
+                                  <span>
+                                    {pctAumento >= 0 ? "+" : ""}{pctAumento.toFixed(1)}%
+                                    <span className="text-gray-400 ml-1">vs custo</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </div>
+
+                              {/* Última compra */}
+                              <div className="mt-1 text-xs text-gray-500">
+                                Última compra: {dtUltimaCompra === undefined ? "..." : dtUltimaCompra}
+                              </div>
 
                               {/* Quantidade */}
                               <div className="mt-2 flex items-center justify-end gap-2">
