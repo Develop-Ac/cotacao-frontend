@@ -130,7 +130,7 @@ export default function ComparativoPage() {
     setObsData(null);
     setObsTarget({ for_codigo: f.for_codigo, for_nome: f.for_nome });
     try {
-      const url = `http://intranet-cotacao-fornecedor.naayqg.easypanel.host/api/cotacao/observacao?pedido_cotacao=${encodeURIComponent(
+      const url = `https://intranet-cotacao-fornecedor.naayqg.easypanel.host/api/cotacao/observacao?pedido_cotacao=${encodeURIComponent(
         pedidoCarregado
       )}&for_codigo=${encodeURIComponent(f.for_codigo)}`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
@@ -144,7 +144,7 @@ export default function ComparativoPage() {
         throw new Error(emsg);
       }
       const data = await res.json();
-      setObsData(data);
+      setObsData(data.observacao);
     } catch (e: any) {
       setObsError(e?.message || "Falha ao buscar observação.");
     } finally {
