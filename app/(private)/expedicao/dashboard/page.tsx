@@ -3,6 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { serviceUrl } from '@/lib/services';
+import { Bar } from 'react-chartjs-2';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 interface Entrega {
     id: number;
@@ -55,6 +67,26 @@ export default function EntregasPage() {
         const duracao = (dataFim.getTime() - dataInicio.getTime()) / 1000; // retorna em segundos
         return duracao > 0 ? duracao : 0; // garante que não retorne valores negativos
     };
+
+    // --- Gráfico de entregas por dia ---
+    const entregasPorDia = React.useMemo(() => {
+        const counts: { [date: string]: number } = {};
+        filteredData.forEach((entrega) => {
+            const data = entrega.criado_em.split('T')[0];
+            counts[data] = (counts[data] || 0) + 1;
+        });
+        // Ordena por data e formata para dd/mm/yyyy
+        return Object.entries(counts)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .reduce<{ labels: string[]; values: number[] }>((acc, [date, count]) => {
+                // date está em yyyy-mm-dd
+                const [y, m, d] = date.split('-');
+                const dataFormatada = `${d}/${m}/${y}`;
+                acc.labels.push(dataFormatada);
+                acc.values.push(count);
+                return acc;
+            }, { labels: [], values: [] });
+    }, [filteredData]);
 
     const formatarTempo = (segundos: number): string => {
         if (!segundos || segundos <= 0) return "0s";
@@ -314,6 +346,34 @@ export default function EntregasPage() {
     return (
         <div className="container mx-auto p-6">
             <h1 className="text-3xl font-bold mb-6">📦 Dashboard de Análise de Eficiência Logística</h1>
+            {/* Gráfico de Entregas por Dia */}
+            <div className="bg-white p-6 rounded-lg shadow mb-6">
+                <h2 className="text-xl font-semibold mb-4">📈 Entregas por Dia</h2>
+                <Bar
+                    data={{
+                        labels: entregasPorDia.labels,
+                        datasets: [
+                            {
+                                label: 'Entregas',
+                                data: entregasPorDia.values,
+                                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            },
+                        ],
+                    }}
+                    options={{
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: false },
+                        },
+                        scales: {
+                            x: { title: { display: true, text: 'Data' } },
+                            y: { title: { display: true, text: 'Entregas' }, beginAtZero: true },
+                        },
+                    }}
+                    height={80}
+                />
+            </div>
             
             {/* Filtros */}
             <div className="bg-white p-4 rounded-lg shadow mb-6">
