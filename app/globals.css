@@ -163,6 +163,7 @@ button.keep-color * svg,
   scrollbar-width: none;  /* Firefox */
 }
 
+<<<<<<< HEAD
 .priority-badge {
   display: inline-flex;
   width: auto !important;
@@ -182,3 +183,9 @@ button.keep-color * svg,
 .kanban-btn:hover {
   background-color: #E0E3E8 !important;  /* um tiquinho mais escuro no hover */
 }
+=======
+.text-gray-500 {
+  font-weight: bold;
+    font-size: 15px;
+}
+>>>>>>> 63f08f43be0b480a96235105f5740272e380265e
