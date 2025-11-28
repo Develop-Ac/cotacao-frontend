@@ -3,21 +3,21 @@
 /* Base design tokens*/
 :root {
   /* Surfaces */
-  --background: #f7f7f8;             
+  --background: #f7f7f8;
   --surface: #ffffff;
-  --foreground: #111827;             
+  --foreground: #111827;
 
   /* Brand palette */
-  --primary-600: #0D47A1;            
-  --primary-800: #0D47A1;            
-  --secondary-500: #B6C947;          
-  --success-500: #22C55E;            
-  --warning-500: #F59E0B;            
-  --danger-500: #DC2626;             
+  --primary-600: #0D47A1;
+  --primary-800: #0D47A1;
+  --secondary-500: #B6C947;
+  --success-500: #22C55E;
+  --warning-500: #F59E0B;
+  --danger-500: #DC2626;
 
   /* Shapes/spacing */
-  --radius-card: 16px;               
-  --radius-button: 9999px;           
+  --radius-card: 16px;
+  --radius-button: 9999px;
 }
 
 @theme inline {
@@ -63,15 +63,31 @@ body {
   font-weight: 700;
   transition: background-color 0.15s ease, transform 0.05s ease;
 }
-.btn-primary:hover { background: var(--primary-800); }
-.btn-primary:active { transform: translateY(1px); }
-.btn-primary:disabled {
-  background: #d1d5db; /* gray-300 */
-  color: #64748b;      /* gray-500 */
+
+.btn-primary:hover {
+  background: var(--primary-800);
 }
 
-.btn-warning { background: var(--warning-500); color: #fff; }
-.btn-success { background: var(--success-500); color: #fff; }
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-primary:disabled {
+  background: #d1d5db;
+  /* gray-300 */
+  color: #64748b;
+  /* gray-500 */
+}
+
+.btn-warning {
+  background: var(--warning-500);
+  color: #fff;
+}
+
+.btn-success {
+  background: var(--success-500);
+  color: #fff;
+}
 
 .gradient-header {
   background-image: linear-gradient(135deg, var(--primary-600), var(--secondary-500));
@@ -84,11 +100,18 @@ body {
 
 /* Collapsed sidebar behavior */
 /* Hide only text labels, keep icon wrappers visible */
-aside.collapsed summary .menu-label { display: none; }
-aside.collapsed details > ul { display: none; }
+aside.collapsed summary .menu-label {
+  display: none;
+}
+
+aside.collapsed details>ul {
+  display: none;
+}
 
 /* Soft sidebar background to match logistics app */
-.sidebar-soft { background-color: #f7f5fb; }
+.sidebar-soft {
+  background-color: #f7f5fb;
+}
 
 /* Global button styling override: blue background, white bold text/icons */
 /* Opt-out by adding .keep-color on the element */
@@ -106,8 +129,10 @@ a.button:not(.keep-color):not(.comparativo),
 a[aria-disabled][role="button"]:not(.keep-color):not(.comparativo),
 a[class*="btn"]:not(.keep-color):not(.comparativo),
 a[class*="button"]:not(.keep-color):not(.comparativo) {
-  background-color: var(--primary-600) !important; /* #3067C5 */
-  background-image: none !important; /* override tailwind gradients */
+  background-color: var(--primary-600) !important;
+  /* #3067C5 */
+  background-image: none !important;
+  /* override tailwind gradients */
   color: #ffffff !important;
   font-weight: 700 !important;
   border-color: var(--primary-600) !important;
@@ -122,7 +147,8 @@ a.button:hover:not(.keep-color):not(.comparativo),
 .button:hover:not(.keep-color):not(.comparativo),
 a[class*="btn"]:hover:not(.keep-color):not(.comparativo),
 a[class*="button"]:hover:not(.keep-color):not(.comparativo) {
-  background-color: var(--primary-800) !important; /* deeper blue */
+  background-color: var(--primary-800) !important;
+  /* deeper blue */
 }
 
 button:disabled,
@@ -159,11 +185,38 @@ button.keep-color * svg,
 
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.priority-badge {
+  display: inline-flex;
+  width: auto !important;
+  max-width: max-content;
+  align-self: flex-start;
+}
+
+/* Botões do Kanban – mesma cor das colunas */
+.kanban-btn {
+  background-color: #F2F3F5 !important;
+  /* mesma cor da coluna */
+  color: #374151 !important;
+  /* cinza escuro para o texto */
+  border: none !important;
+  /* borda suave */
+  font-weight: 500;
+  border-radius: 0.5rem;
+  /* equivalente a rounded-md/lg */
+}
+
+.kanban-btn:hover {
+  background-color: #E0E3E8 !important;
+  /* um tiquinho mais escuro no hover */
 }
 
 .text-gray-500 {
   font-weight: bold;
-    font-size: 15px;
+  font-size: 15px;
 }
