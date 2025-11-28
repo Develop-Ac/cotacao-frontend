@@ -318,11 +318,6 @@ function useDraggableScroll(ref: RefObject<HTMLDivElement | null>) {
       const target = e.target as HTMLElement | null;
       if (shouldIgnoreTarget(target)) return;
 
-      if (slider.scrollWidth <= slider.clientWidth) {
-        // não tem o que scrollar, só ignora
-        return;
-      }
-
       isDown = true;
       startX = e.clientX;
       scrollLeft = slider.scrollLeft;
