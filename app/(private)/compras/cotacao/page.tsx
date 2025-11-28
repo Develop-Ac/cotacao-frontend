@@ -215,8 +215,8 @@ export default function Tela() {
         })),
       };
 
-      // const res = await fetch(comprasPath("/pedidos-cotacao"), {
-      const res = await fetch("http://localhost:8000/compras/pedidos-cotacao", {
+      const res = await fetch(comprasPath("/pedidos-cotacao"), {
+      // const res = await fetch("http://localhost:8000/compras/pedidos-cotacao", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
