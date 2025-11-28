@@ -189,7 +189,7 @@ export default function RootLayout({
       setIsNavigating(false);
     }
   };
-  
+
   // bloqueio por canView (somente navega se puder ver)
   if (pathname !== "/login" && pathname !== "/" && !canViewPath(pathname)) {
     router.replace("/403");
@@ -233,7 +233,7 @@ export default function RootLayout({
 
         <div className="flex">
           <aside
-            className={`fixed top-0 left-0 h-screen bg-white shadow-xl flex flex-col overflow-y-auto overflow-x-visible transition-all duration-300 ${sidebarCollapsed ? 'no-scrollbar' : ''}`}
+            className={`fixed top-0 left-0 h-screen bg-white shadow-xl flex flex-col overflow-y-auto overflow-x-visible transition-all duration-300 z-40 ${sidebarCollapsed ? 'no-scrollbar' : ''}`}
             style={{ width: sidebarWidth }}
           >
             <div className="p-4 flex flex-col items-center gap-4 bg-white text-gray-700">
@@ -311,40 +311,40 @@ export default function RootLayout({
                           {(canViewPath('/compras/cotacao') ||
                             canViewPath('/compras/cotacao/comparativo') ||
                             canViewPath('/compras/cotacao/pedido')) && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <details className="group">
-                                <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/cotacao') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
-                                  <span className="font-medium">Cotação</span>
-                                  <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
-                                </summary>
-                                <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                                  <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                                    {canViewPath('/compras/cotacao') && (
-                                      <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                                        <Link href="/compras/cotacao" onClick={(e) => handleNavigation('/compras/cotacao', e)} className={linkClasses('/compras/cotacao', true)}>
-                                          Criar Cotação
-                                        </Link>
-                                      </li>
-                                    )}
-                                    {canViewPath('/compras/cotacao/comparativo') && (
-                                      <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                                        <Link href="/compras/cotacao/comparativo" onClick={(e) => handleNavigation('/compras/cotacao/comparativo', e)} className={linkClasses('/compras/cotacao/comparativo')}>
-                                          Comparativo
-                                        </Link>
-                                      </li>
-                                    )}
-                                    {canViewPath('/compras/cotacao/pedido') && (
-                                      <li className={cascadeItemClass()} style={cascadeStyle(2)}>
-                                        <Link href="/compras/cotacao/pedido" onClick={(e) => handleNavigation('/compras/cotacao/pedido', e)} className={linkClasses('/compras/cotacao/pedido')}>
-                                          Pedido
-                                        </Link>
-                                      </li>
-                                    )}
-                                  </ul>
-                                </div>
-                              </details>
-                            </li>
-                          )}
+                              <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                                <details className="group">
+                                  <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/cotacao') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
+                                    <span className="font-medium">Cotação</span>
+                                    <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
+                                  </summary>
+                                  <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                                    <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
+                                      {canViewPath('/compras/cotacao') && (
+                                        <li className={cascadeItemClass()} style={cascadeStyle(0)}>
+                                          <Link href="/compras/cotacao" onClick={(e) => handleNavigation('/compras/cotacao', e)} className={linkClasses('/compras/cotacao', true)}>
+                                            Criar Cotação
+                                          </Link>
+                                        </li>
+                                      )}
+                                      {canViewPath('/compras/cotacao/comparativo') && (
+                                        <li className={cascadeItemClass()} style={cascadeStyle(1)}>
+                                          <Link href="/compras/cotacao/comparativo" onClick={(e) => handleNavigation('/compras/cotacao/comparativo', e)} className={linkClasses('/compras/cotacao/comparativo')}>
+                                            Comparativo
+                                          </Link>
+                                        </li>
+                                      )}
+                                      {canViewPath('/compras/cotacao/pedido') && (
+                                        <li className={cascadeItemClass()} style={cascadeStyle(2)}>
+                                          <Link href="/compras/cotacao/pedido" onClick={(e) => handleNavigation('/compras/cotacao/pedido', e)} className={linkClasses('/compras/cotacao/pedido')}>
+                                            Pedido
+                                          </Link>
+                                        </li>
+                                      )}
+                                    </ul>
+                                  </div>
+                                </details>
+                              </li>
+                            )}
 
                           {/* Nota Fiscal */}
                           {canViewPath('/compras/notaFiscal/notaFiscal') && (
@@ -631,7 +631,12 @@ export default function RootLayout({
             className="flex-1 transition-all duration-300"
             style={{ marginLeft: sidebarWidth, paddingTop: navHeight }}
           >
-            <main className="p-8 bg-gray-50 min-h-screen">
+            <main
+              className={`bg-gray-50 ${pathname === '/compras/kanban'
+                  ? 'h-[calc(100vh-64px)] p-0 overflow-hidden'
+                  : 'min-h-screen p-8'
+                }`}
+            >
               {children}
             </main>
 

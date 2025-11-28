@@ -162,3 +162,23 @@ button.keep-color * svg,
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+.priority-badge {
+  display: inline-flex;
+  width: auto !important;
+  max-width: max-content;
+  align-self: flex-start;
+}
+
+/* Botões do Kanban – mesma cor das colunas */
+.kanban-btn {
+  background-color: #F2F3F5 !important;  /* mesma cor da coluna */
+  color: #374151 !important;             /* cinza escuro para o texto */
+  border: none !important;  /* borda suave */
+  font-weight: 500;
+  border-radius: 0.5rem;                 /* equivalente a rounded-md/lg */
+}
+
+.kanban-btn:hover {
+  background-color: #E0E3E8 !important;  /* um tiquinho mais escuro no hover */
+}
