@@ -744,6 +744,7 @@ export default function Tela() {
                                         <tr>
                                             <th className="p-2 text-start">Contagem</th>
                                             <th className="p-2 text-start">Usuário</th>
+                                            <th className="p-2 text-start">Data</th>
                                             <th className="p-2 text-start">Liberado</th>
                                         </tr>
                                     </thead>
@@ -759,6 +760,7 @@ export default function Tela() {
                                             <tr key={idx} className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => abrirModalLogs(item)}>
                                                 <td className="p-3">{item.contagem}</td>
                                                 <td className="p-3">{item.usuario.nome}</td>
+                                                <td className="p-3">{formatarData(item.created_at)}</td>
                                                 <td className="p-3">{item.liberado_contagem ? "Sim" : "Não"}</td>
                                             </tr>
                                         ))}
