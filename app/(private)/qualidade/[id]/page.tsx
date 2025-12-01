@@ -51,8 +51,8 @@ type ColetaFormState = {
 
 const toggleButtonClasses = (active: boolean) =>
   `keep-color px-3 py-1.5 rounded-full border transition-colors duration-200 ${active
-    ? "bg-[var(--primary-600)] border-[var(--primary-600)] text-white"
-    : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
+    ? "bg-primary border-primary text-white"
+    : "bg-white dark:bg-meta-4 border-gray-300 dark:border-strokedark text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
   }`;
 
 const fileToAttachment = (file: File): UploadAttachment => ({
@@ -999,718 +999,166 @@ export default function GarantiaDetalhePage() {
       );
     }
     if ([STATUS_CODES.concluida, STATUS_CODES.garantiaReprovada, STATUS_CODES.garantiaReprovadaAnalise].includes(status)) {
-      return <p className="text-sm font-semibold text-slate-500">Processo finalizado.</p>;
+      return <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Processo finalizado.</p>;
     }
-    return <p className="text-sm text-slate-500">Nenhuma ação disponível para este status.</p>;
+    return <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma ação disponível para este status.</p>;
   }, [garantia, updateStatus]);
 
   return (
-    <div className="px-4 py-6 lg:px-8">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
-        <PageHeader
-          title={garantia ? `Garantia #${garantia.id}` : "Detalhes da Garantia"}
-          subtitle="Acompanhe as interações e atualize o processo"
-          onBack={() => router.back()}
-        />
-        {alterandoStatus && <p className="text-sm text-slate-500">Atualizando status...</p>}
-        {loading ? (
-          <div className="space-y-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-32 rounded-3xl bg-white border border-slate-200 animate-pulse" />
-            ))}
-          </div>
-        ) : garantia ? (
-          <div className="space-y-6">
-            <SectionCard
-              title="Resumo do Processo"
-              trailing={
-                statusAtual && <StatusChip label={statusAtual.label} color={statusAtual.color} background={statusAtual.background} />
-              }
-            >
-              <div className="grid gap-4 md:grid-cols-2">
-                <InfoLine label="Fornecedor" value={garantia.nomeFornecedor} />
-                <InfoLine label="Nota Interna" value={garantia.notaInterna} />
-                <InfoLine label="NF Compra" value={garantia.nfsCompra ?? "N/A"} />
-                <InfoLine label="Tipo de Garantia" value={garantia.tipoGarantia ?? "N/A"} />
-                {garantia.protocoloFornecedor && <InfoLine label="Protocolo" value={garantia.protocoloFornecedor} />}
-                <InfoLine label="Criado em" value={formatDateTime(garantia.dataCriacao)} />
-              </div>
-              <div className="mt-4">{actionButtons}</div>
-            </SectionCard>
+    <div className="w-full space-y-6">
+      <PageHeader
+        title={garantia ? `Garantia #${garantia.id}` : "Detalhes da Garantia"}
+        subtitle="Acompanhe as interações e atualize o processo"
+        onBack={() => router.back()}
+      />
+      {alterandoStatus && <p className="text-sm text-gray-500 dark:text-gray-400">Atualizando status...</p>}
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-32 rounded-3xl bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark animate-pulse" />
+          ))}
+        </div>
+      ) : garantia ? (
+        <div className="space-y-6">
+          <SectionCard
+            title="Resumo do Processo"
+            trailing={
+              statusAtual && <StatusChip label={statusAtual.label} color={statusAtual.color} background={statusAtual.background} />
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <InfoLine label="Fornecedor" value={garantia.nomeFornecedor} />
+              <InfoLine label="Nota Interna" value={garantia.notaInterna} />
+              <InfoLine label="NF Compra" value={garantia.nfsCompra ?? "N/A"} />
+              <InfoLine label="Tipo de Garantia" value={garantia.tipoGarantia ?? "N/A"} />
+              {garantia.protocoloFornecedor && <InfoLine label="Protocolo" value={garantia.protocoloFornecedor} />}
+              <InfoLine label="Criado em" value={formatDateTime(garantia.dataCriacao)} />
+            </div>
+            <div className="mt-4">{actionButtons}</div>
+          </SectionCard>
 
-            <SectionCard title="Produtos">
-              {garantia.produtos ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {garantia.produtos.split(';').map((p) => p.trim()).filter(Boolean).map((prod, idx) => {
-                    // Regex para extrair campos: Base (Tipo) (Qtd: N) (NF Compra: X) (Ref: Y)
-                    const match = prod.match(/^(.*?)(?:\s+\((Avaria|Anomalia)\))?(?:\s+\(Qtd:\s*(\d+)\))?(?:\s+\(NF Compra:\s*([^)]+)\))?(?:\s+\(Ref:\s*([^)]+)\))?$/i);
+          <SectionCard title="Produtos">
+            {garantia.produtos ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {garantia.produtos.split(';').map((p) => p.trim()).filter(Boolean).map((prod, idx) => {
+                  // Regex para extrair campos: Base (Tipo) (Qtd: N) (NF Compra: X) (Ref: Y)
+                  const match = prod.match(/^(.*?)(?:\s+\((Avaria|Anomalia)\))?(?:\s+\(Qtd:\s*(\d+)\))?(?:\s+\(NF Compra:\s*([^)]+)\))?(?:\s+\(Ref:\s*([^)]+)\))?$/i);
 
-                    const base = match ? match[1].trim() : prod;
-                    const tipo = match ? match[2] : null;
-                    const qtd = match ? match[3] : null;
-                    const nf = match ? match[4] : null;
-                    const ref = match ? match[5] : null;
+                  const base = match ? match[1].trim() : prod;
+                  const tipo = match ? match[2] : null;
+                  const qtd = match ? match[3] : null;
+                  const nf = match ? match[4] : null;
+                  const ref = match ? match[5] : null;
 
-                    const parts = base.split(' - ');
-                    const codigo = parts.length > 1 ? parts[0].trim() : null;
-                    const descricao = parts.length > 1 ? parts.slice(1).join(' - ').trim() : base;
+                  const parts = base.split(' - ');
+                  const codigo = parts.length > 1 ? parts[0].trim() : null;
+                  const descricao = parts.length > 1 ? parts.slice(1).join(' - ').trim() : base;
 
-                    return (
-                      <div key={idx} className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 p-3 relative overflow-hidden">
-                        {tipo && (
-                          <div className={`absolute top-0 right-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white ${tipo.toLowerCase() === 'anomalia' ? 'bg-purple-500' : 'bg-orange-500'} rounded-bl-xl`}>
-                            {tipo}
-                          </div>
-                        )}
-                        {codigo && <span className="text-xs font-bold text-slate-500 mb-1">{codigo}</span>}
-                        <span className="text-sm font-medium text-slate-800 mb-2 pr-12">{descricao}</span>
-
-                        <div className="mt-auto flex flex-wrap gap-2 text-xs text-slate-600">
-                          {qtd && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200">
-                              <span className="font-semibold">Qtd:</span> {qtd}
-                            </span>
-                          )}
-                          {nf && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200">
-                              <span className="font-semibold">NF:</span> {nf}
-                            </span>
-                          )}
-                          {ref && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200">
-                              <span className="font-semibold">Ref:</span> {ref}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">Nenhum produto registrado.</p>
-              )}
-            </SectionCard>
-
-            <SectionCard title="Status">
-              <div className="w-full overflow-x-auto pb-2">
-                <StatusStepper current={garantia.status} completed={completedStatusCodes} />
-              </div>
-            </SectionCard>
-
-            <SectionCard
-              title="Valores de Crédito"
-              trailing={
-                <ActionButton
-                  label="Registrar abatimento"
-                  icon={<MdAttachFile size={16} />}
-                  onClick={handleAbaterCredito}
-                  disabled={!garantia}
-                  className="px-3 py-2"
-                />
-              }
-            >
-              <div className="grid gap-4 md:grid-cols-3">
-                <ResumoCard label="Crédito Total" value={formatCurrency(total)} />
-                <ResumoCard label="Utilizado" value={formatCurrency(utilizado)} />
-                <ResumoCard label="Saldo" value={formatCurrency(saldo)} highlight />
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Linha do Tempo">
-              {garantia.timeline.length === 0 ? (
-                <p className="text-sm text-slate-500">Nenhuma interação registrada ainda.</p>
-              ) : (
-                garantia.timeline.map((item) => <TimelineItemCard key={item.id} item={item} />)
-              )}
-            </SectionCard>
-
-            <SectionCard title="Atualizações internas">
-              <textarea
-                value={mensagem}
-                onChange={(event) => setMensagem(event.target.value)}
-                placeholder="Descreva a atualização e ela será registrada neste processo."
-                className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
-              />
-              <div className="mt-3 flex flex-col gap-2 text-sm">
-                <input
-                  ref={mensagemFileInputRef}
-                  id="mensagem-anexos-input"
-                  type="file"
-                  multiple
-                  onChange={handleMensagemFilesChange}
-                  className="sr-only"
-                />
-                <button
-                  type="button"
-                  onClick={() => mensagemFileInputRef.current?.click()}
-                  className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-slate-600 hover:border-slate-400"
-                >
-                  <MdAttachFile size={16} />
-                  Anexar arquivos
-                </button>
-                {mensagemAnexos.length > 0 && (
-                  <ul className="space-y-2 text-xs text-slate-600">
-                    {mensagemAnexos.map((file, index) => (
-                      <li
-                        key={`${file.name}-${index}`}
-                        className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
-                      >
-                        <span className="truncate pr-3">{file.name}</span>
-                        <button
-                          type="button"
-                          className="keep-color text-red-600 hover:text-red-500"
-                          onClick={() => removeMensagemAnexo(index)}
-                        >
-                          Remover
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <ActionButton
-                label="Registrar atualização"
-                icon={<MdAttachFile size={18} />}
-                onClick={handleAtualizacao}
-                loading={enviando}
-                disabled={!mensagem.trim() && mensagemAnexos.length === 0}
-                className="rounded-2xl px-6 py-3"
-              />
-            </SectionCard>
-
-            <SectionCard title="Anexos">
-              {garantia.anexos.length === 0 ? (
-                <p className="text-sm text-slate-500">Nenhum anexo disponível.</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {garantia.anexos.map((anexo, index) => {
-                    const hasPath = Boolean(anexo.caminho?.trim());
-                    return (
-                      <button
-                        key={anexo.id}
-                        type="button"
-                        className="keep-color text-left text-[var(--primary-600)] underline disabled:opacity-60"
-                        onClick={() => hasPath && openAnexoModal(index)}
-                        disabled={!hasPath}
-                      >
-                        {anexo.nome}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </SectionCard>
-
-            <SectionCard title="Dados logísticos">
-              <div className="grid gap-4 md:grid-cols-2">
-                {garantia.fretePorContaDe && <InfoLine label="Frete por conta de" value={garantia.fretePorContaDe} />}
-                {garantia.transportadoraRazaoSocial && <InfoLine label="Transportadora" value={garantia.transportadoraRazaoSocial} />}
-                {garantia.dataColetaEnvio && <InfoLine label="Data de coleta/envio" value={formatDate(garantia.dataColetaEnvio)} />}
-                {garantia.numeroNfDevolucao && <InfoLine label="NF de devolução" value={garantia.numeroNfDevolucao} />}
-              </div>
-            </SectionCard>
-          </div>
-        ) : (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center space-y-3">
-            <p className="text-lg font-semibold text-slate-900">Nenhum dado encontrado.</p>
-            <p className="text-sm text-slate-500">{error ?? "Tente atualizar para buscar novamente."}</p>
-            <ActionButton label="Tentar novamente" icon={<MdRefresh size={18} />} onClick={carregar} />
-          </div>
-        )}
-
-        {anexoViewerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
-            <div className="absolute inset-0 bg-black/60" onClick={closeAnexoModal} />
-            <div className="relative z-10 w-full max-w-4xl mx-4 rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between px-4 py-3 border-b">
-                <div className="font-semibold">
-                  Visualizar anexos{" "}
-                  {totalAnexos > 0 ? `(${Math.min(anexoViewerIndex + 1, totalAnexos)}/${totalAnexos})` : ""}
-                </div>
-                <button
-                  type="button"
-                  className="h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-slate-100"
-                  onClick={closeAnexoModal}
-                >
-                  <FaTimes />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                {currentAnexo ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                    <div className="lg:col-span-7">
-                      <div className="relative w-full aspect-[4/3] bg-slate-50 rounded-xl flex items-center justify-center overflow-hidden">
-                        {totalAnexos > 1 && (
-                          <>
-                            <button
-                              type="button"
-                              className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-slate-100"
-                              onClick={goToPrevAnexo}
-                              title="Anterior"
-                            >
-                              <FaChevronLeft />
-                            </button>
-                            <button
-                              type="button"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-slate-100"
-                              onClick={goToNextAnexo}
-                              title="Próximo"
-                            >
-                              <FaChevronRight />
-                            </button>
-                          </>
-                        )}
-                        {anexoViewerLoading && !currentAnexoUrl ? (
-                          <p className="text-sm text-slate-500">Carregando arquivo...</p>
-                        ) : currentAnexoEhImagem && currentAnexoUrl ? (
-                          <img
-                            src={currentAnexoUrl}
-                            alt={currentAnexo.nome ?? "Anexo"}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        ) : currentAnexoEhImagem ? (
-                          <p className="text-sm text-slate-500">Gerando link para visualização...</p>
-                        ) : (
-                          <div className="px-6 text-center text-sm text-slate-600">
-                            Pré-visualização disponível apenas para imagens. Utilize o botão para baixar o arquivo.
-                          </div>
-                        )}
-                      </div>
-                      {anexoViewerError && (
-                        <p className="mt-3 text-center text-sm text-red-600">{anexoViewerError}</p>
-                      )}
-                      {totalAnexos > 1 && (
-                        <div className="mt-4 flex items-center justify-center gap-2">
-                          {anexosDisponiveis.map((_, idx) => (
-                            <button
-                              type="button"
-                              key={idx}
-                              className={`h-2.5 rounded-full transition-all ${idx === anexoViewerIndex ? "w-6 bg-[var(--primary-600)]" : "w-2.5 bg-slate-300"
-                                }`}
-                              onClick={() => setAnexoViewerIndex(idx)}
-                              aria-label={`Ir para anexo ${idx + 1}`}
-                            />
-                          ))}
+                  return (
+                    <div key={idx} className="flex flex-col rounded-xl border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3 relative overflow-hidden">
+                      {tipo && (
+                        <div className={`absolute top-0 right-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white ${tipo.toLowerCase() === 'anomalia' ? 'bg-purple-500' : 'bg-orange-500'} rounded-bl-xl`}>
+                          {tipo}
                         </div>
                       )}
-                    </div>
-                    <div className="lg:col-span-5 space-y-3">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <p className="text-sm font-semibold text-slate-700">{currentAnexo.nome}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Tipo: {currentAnexoEhImagem ? "Imagem" : "Arquivo"}
-                        </p>
-                        {currentAnexo.caminho && (
-                          <p className="mt-2 text-xs text-slate-500 break-all">{currentAnexo.caminho}</p>
+                      {codigo && <span className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{codigo}</span>}
+                      <span className="text-sm font-medium text-gray-800 dark:text-white mb-2 pr-12">{descricao}</span>
+
+                      <div className="mt-auto flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
+                        {qtd && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-white dark:bg-boxdark px-2 py-1 border border-gray-200 dark:border-strokedark">
+                            <span className="font-semibold">Qtd:</span> {qtd}
+                          </span>
+                        )}
+                        {nf && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-white dark:bg-boxdark px-2 py-1 border border-gray-200 dark:border-strokedark">
+                            <span className="font-semibold">NF:</span> {nf}
+                          </span>
+                        )}
+                        {ref && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-white dark:bg-boxdark px-2 py-1 border border-gray-200 dark:border-strokedark">
+                            <span className="font-semibold">Ref:</span> {ref}
+                          </span>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--primary-600)] px-4 py-2.5 font-semibold text-white transition hover:bg-[var(--primary-700)] disabled:opacity-60"
-                        onClick={() => currentAnexo && handleDownloadAnexo(currentAnexo)}
-                        disabled={downloadingCurrentAnexo}
-                      >
-                        <FaDownload />
-                        {downloadingCurrentAnexo ? "Preparando download..." : "Baixar arquivo"}
-                      </button>
                     </div>
-                  </div>
-                ) : (
-                  <p className="py-10 text-center text-sm text-slate-600">Nenhum anexo selecionado.</p>
-                )}
+                  );
+                })}
               </div>
-              <div className="px-4 py-3 border-t flex items-center justify-end">
-                <button
-                  type="button"
-                  className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
-                  onClick={closeAnexoModal}
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <FormModal
-          open={editarDadosVisible}
-          title="Editar garantia"
-          onClose={() => setEditarDadosVisible(false)}
-          width="lg"
-        >
-          {garantia && (
-            <NovaGarantiaForm
-              variant="modal"
-              mode="edit"
-              garantiaId={garantia.id}
-              initialData={editFormData}
-              onSuccess={handleEditSuccess}
-              onCancel={() => setEditarDadosVisible(false)}
-            />
-          )}
-        </FormModal>
-
-        <FormModal
-          open={anomaliaVisible}
-          title="Aprovar (Anomalia)"
-          onClose={() => setAnomaliaVisible(false)}
-          width="sm"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAnomaliaVisible(false)} />
-              <ActionButton label="Continuar" shape="rounded" onClick={submitAnomalia} disabled={!anomaliaCfop.trim()} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            <p className="text-sm font-semibold text-slate-600">Será necessária Nota Fiscal?</p>
-            <div className="flex gap-2 mt-3">
-              <button
-                type="button"
-                onClick={() => setAnomaliaPrecisaNF(false)}
-                className={toggleButtonClasses(!anomaliaPrecisaNF)}
-              >
-                Não
-              </button>
-              <button
-                type="button"
-                onClick={() => setAnomaliaPrecisaNF(true)}
-                className={toggleButtonClasses(anomaliaPrecisaNF)}
-              >
-                Sim
-              </button>
-            </div>
-            <input
-              type="text"
-              value={anomaliaCfop}
-              onChange={(event) => setAnomaliaCfop(event.target.value)}
-              placeholder="CFOP *"
-              className="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </FormModal>
-
-        <FormModal
-          open={aprovarModalVisible}
-          title="Aprovar Garantia"
-          onClose={() => setAprovarModalVisible(false)}
-          width="sm"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAprovarModalVisible(false)} />
-              <ActionButton label="Continuar" shape="rounded" onClick={submitAprovarModal} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            <p className="text-sm font-semibold text-slate-600">O fornecedor precisa de Nota Fiscal?</p>
-            <div className="flex gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => setAprovarPrecisaNF(false)}
-                className={toggleButtonClasses(!aprovarPrecisaNF)}
-              >
-                Não
-              </button>
-              <button
-                type="button"
-                onClick={() => setAprovarPrecisaNF(true)}
-                className={toggleButtonClasses(aprovarPrecisaNF)}
-              >
-                Sim
-              </button>
-            </div>
-            {aprovarPrecisaNF && (
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs font-semibold text-slate-600">CFOP *</span>
-                <input
-                  type="text"
-                  value={aprovarCfop}
-                  onChange={(event) => setAprovarCfop(event.target.value)}
-                  className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </label>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Nenhum produto registrado.</p>
             )}
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={freteCortesiaSelecionado}
-                onChange={(event) => setFreteCortesiaSelecionado(event.target.checked)}
-                className="h-4 w-4 accent-[var(--primary-600)]"
-              />
-              <span>Frete cortesia</span>
-            </label>
-          </div>
-        </FormModal>
+          </SectionCard>
 
-        <FormModal
-          open={concluirVisible}
-          title="Concluir Garantia"
-          onClose={() => {
-            setConcluirVisible(false);
-            setConcluirNf("");
-            setConcluirValor("");
-          }}
-          width="sm"
-          footer={
-            <>
+          <SectionCard title="Status">
+            <div className="w-full overflow-x-auto pb-2">
+              <StatusStepper current={garantia.status} completed={completedStatusCodes} />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Valores de Crédito"
+            trailing={
               <ActionButton
-                label="Cancelar"
-                variant="ghost"
-                shape="rounded"
-                onClick={() => {
-                  setConcluirVisible(false);
-                  setConcluirNf("");
-                  setConcluirValor("");
-                }}
+                label="Registrar abatimento"
+                icon={<MdAttachFile size={16} />}
+                onClick={handleAbaterCredito}
+                disabled={!garantia}
+                className="px-3 py-2"
               />
-              <ActionButton label="Concluir" shape="rounded" onClick={submitConcluir} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            <p className="text-sm text-slate-600">
-              Informe a NF e o valor recebido para concluir o processo.
-            </p>
-            <input
-              type="text"
-              value={concluirNf}
-              onChange={(event) => setConcluirNf(event.target.value)}
-              placeholder="Número da NF *"
-              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {garantia && NF_E_VALOR_REQUIRED_STATUS.has(garantia.status) && (
-              <input
-                type="text"
-                value={concluirValor}
-                onChange={(event) => setConcluirValor(formatCurrencyMask(event.target.value))}
-                placeholder="Valor (R$) *"
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            )}
-          </div>
-        </FormModal>
-
-        <FormModal
-          open={envioVisible}
-          title="Envio da Mercadoria"
-          onClose={() => setEnvioVisible(false)}
-          width="lg"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setEnvioVisible(false)} />
-              <ActionButton label="Salvar" shape="rounded" onClick={submitEnvio} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            <p className="text-sm font-semibold text-slate-600">A mercadoria será enviada?</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setEnviarMercadoria(true)}
-                className={toggleButtonClasses(enviarMercadoria)}
-              >
-                Sim
-              </button>
-              <button
-                type="button"
-                onClick={() => setEnviarMercadoria(false)}
-                className={toggleButtonClasses(!enviarMercadoria)}
-              >
-                Não
-              </button>
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-3">
+              <ResumoCard label="Crédito Total" value={formatCurrency(total)} />
+              <ResumoCard label="Utilizado" value={formatCurrency(utilizado)} />
+              <ResumoCard label="Saldo" value={formatCurrency(saldo)} highlight />
             </div>
+          </SectionCard>
 
-            {enviarMercadoria && (
-              <>
-                <p className="text-sm font-semibold text-slate-600">Frete por conta de</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEnvioFrete("fornecedor");
-                      setEnvioCorreio(false);
-                      setColetaForm((prev) => ({
-                        ...prev,
-                        razao: "",
-                        cnpj: "",
-                        endereco: "",
-                        cidade: "",
-                        uf: "",
-                        ie: "",
-                        codigo: "",
-                        obs: "",
-                      }));
-                    }}
-                    className={toggleButtonClasses(envioFrete === "fornecedor")}
-                  >
-                    Fornecedor
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEnvioFrete("loja");
-                      setEnvioCorreio(false);
-                    }}
-                    className={toggleButtonClasses(envioFrete === "loja")}
-                  >
-                    Loja
-                  </button>
-                </div>
-
-                {envioFrete === "loja" ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                    <p className="font-semibold">Transportadora padrão ST</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Dados serão preenchidos automaticamente para a coleta.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={envioCorreio}
-                        onChange={(event) => setEnvioCorreio(event.target.checked)}
-                        className="h-4 w-4 accent-[var(--primary-600)]"
-                      />
-                      <span>Envio pelos Correios</span>
-                    </label>
-                    {envioCorreio ? (
-                      <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-semibold text-slate-600">Código do objeto *</span>
-                        <input
-                          type="text"
-                          value={codigoObjeto}
-                          onChange={(event) => setCodigoObjeto(event.target.value)}
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </label>
-                    ) : (
-                      <div className="space-y-3">
-                        <input
-                          type="text"
-                          placeholder="Transportadora *"
-                          value={coletaForm.razao}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, razao: event.target.value }))}
-                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <input
-                            type="text"
-                            placeholder="CNPJ *"
-                            value={coletaForm.cnpj}
-                            onChange={(event) => setColetaForm((prev) => ({ ...prev, cnpj: event.target.value }))}
-                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                          <input
-                            type="text"
-                            placeholder="I.E. (opcional)"
-                            value={coletaForm.ie}
-                            onChange={(event) => setColetaForm((prev) => ({ ...prev, ie: event.target.value }))}
-                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Endereço *"
-                          value={coletaForm.endereco}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, endereco: event.target.value }))}
-                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <input
-                            type="text"
-                            placeholder="Cidade *"
-                            value={coletaForm.cidade}
-                            onChange={(event) => setColetaForm((prev) => ({ ...prev, cidade: event.target.value }))}
-                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                          <input
-                            type="text"
-                            placeholder="UF *"
-                            value={coletaForm.uf}
-                            onChange={(event) => setColetaForm((prev) => ({ ...prev, uf: event.target.value.toUpperCase() }))}
-                            className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Código de coleta/envio (opcional)"
-                          value={coletaForm.codigo}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, codigo: event.target.value }))}
-                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <textarea
-                          rows={3}
-                          placeholder="Observações (opcional)"
-                          value={coletaForm.obs}
-                          onChange={(event) => setColetaForm((prev) => ({ ...prev, obs: event.target.value }))}
-                          className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
+          <SectionCard title="Linha do Tempo">
+            {garantia.timeline.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma interação registrada ainda.</p>
+            ) : (
+              garantia.timeline.map((item) => <TimelineItemCard key={item.id} item={item} />)
             )}
-          </div>
-        </FormModal>
+          </SectionCard>
 
-        <FormModal
-          open={notaVisible}
-          title="Registrar Nota Fiscal"
-          onClose={closeNotaModal}
-          width="sm"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={closeNotaModal} />
-              <ActionButton label="Salvar" shape="rounded" onClick={submitNota} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            <input
-              type="text"
-              value={notaNumero}
-              onChange={(event) => setNotaNumero(event.target.value)}
-              placeholder="Número da NF *"
-              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <SectionCard title="Atualizações internas">
+            <textarea
+              value={mensagem}
+              onChange={(event) => setMensagem(event.target.value)}
+              placeholder="Descreva a atualização e ela será registrada neste processo."
+              className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-3 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
             />
-            <div className="mt-4 flex flex-col gap-2 text-sm">
-              <span className="font-semibold text-slate-500">Comprovantes (opcional)</span>
+            <div className="mt-3 flex flex-col gap-2 text-sm">
               <input
-                ref={notaFileInputRef}
-                id="nota-comprovante-input"
+                ref={mensagemFileInputRef}
+                id="mensagem-anexos-input"
                 type="file"
-                accept="image/*,application/pdf"
                 multiple
-                onChange={handleNotaFilesChange}
+                onChange={handleMensagemFilesChange}
                 className="sr-only"
               />
               <button
                 type="button"
-                onClick={() => notaFileInputRef.current?.click()}
-                className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-slate-400"
+                onClick={() => mensagemFileInputRef.current?.click()}
+                className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-meta-4 px-4 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
               >
                 <MdAttachFile size={16} />
-                Escolher arquivo
+                Anexar arquivos
               </button>
-              {notaAnexos.length === 0 ? (
-                <p className="text-xs text-slate-400">Nenhum arquivo selecionado.</p>
-              ) : (
-                <ul className="space-y-2 text-xs text-slate-600">
-                  {notaAnexos.map((file, index) => (
+              {mensagemAnexos.length > 0 && (
+                <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
+                  {mensagemAnexos.map((file, index) => (
                     <li
                       key={`${file.name}-${index}`}
-                      className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                      className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-strokedark px-3 py-2"
                     >
                       <span className="truncate pr-3">{file.name}</span>
                       <button
                         type="button"
                         className="keep-color text-red-600 hover:text-red-500"
-                        onClick={() => removeNotaAnexo(index)}
+                        onClick={() => removeMensagemAnexo(index)}
                       >
                         Remover
                       </button>
@@ -1719,276 +1167,828 @@ export default function GarantiaDetalhePage() {
                 </ul>
               )}
             </div>
-          </div>
-        </FormModal>
+            <ActionButton
+              label="Registrar atualização"
+              icon={<MdAttachFile size={18} />}
+              onClick={handleAtualizacao}
+              loading={enviando}
+              disabled={!mensagem.trim() && mensagemAnexos.length === 0}
+              className="rounded-2xl px-6 py-3"
+            />
+          </SectionCard>
 
-        <FormModal
-          open={descarteVisible}
-          title="Confirmar Descarte"
-          onClose={() => setDescarteVisible(false)}
-          width="sm"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDescarteVisible(false)} />
-              <ActionButton label="Confirmar" shape="rounded" onClick={submitDescarte} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
+          <SectionCard title="Anexos">
+            {garantia.anexos.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Nenhum anexo disponível.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {garantia.anexos.map((anexo, index) => {
+                  const hasPath = Boolean(anexo.caminho?.trim());
+                  return (
+                    <button
+                      key={anexo.id}
+                      type="button"
+                      className="keep-color text-left text-primary underline disabled:opacity-60"
+                      onClick={() => hasPath && openAnexoModal(index)}
+                      disabled={!hasPath}
+                    >
+                      {anexo.nome}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Dados logísticos">
+            <div className="grid gap-4 md:grid-cols-2">
+              {garantia.fretePorContaDe && <InfoLine label="Frete por conta de" value={garantia.fretePorContaDe} />}
+              {garantia.transportadoraRazaoSocial && <InfoLine label="Transportadora" value={garantia.transportadoraRazaoSocial} />}
+              {garantia.dataColetaEnvio && <InfoLine label="Data de coleta/envio" value={formatDate(garantia.dataColetaEnvio)} />}
+              {garantia.numeroNfDevolucao && <InfoLine label="NF de devolução" value={garantia.numeroNfDevolucao} />}
+            </div>
+          </SectionCard>
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark p-10 text-center space-y-3">
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">Nenhum dado encontrado.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{error ?? "Tente atualizar para buscar novamente."}</p>
+          <ActionButton label="Tentar novamente" icon={<MdRefresh size={18} />} onClick={carregar} />
+        </div>
+      )}
+
+      {anexoViewerOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" aria-modal="true" role="dialog">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeAnexoModal} />
+          <div className="relative z-10 w-full max-w-4xl mx-4 rounded-2xl bg-white dark:bg-boxdark shadow-2xl max-h-[90vh] flex flex-col border border-gray-100 dark:border-strokedark">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-strokedark">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                Visualizar anexos{" "}
+                {totalAnexos > 0 ? `(${Math.min(anexoViewerIndex + 1, totalAnexos)}/${totalAnexos})` : ""}
+              </div>
+              <button
+                type="button"
+                className="h-10 w-10 inline-flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-meta-4 text-gray-500 dark:text-gray-400"
+                onClick={closeAnexoModal}
+              >
+                <FaTimes />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {currentAnexo ? (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                  <div className="lg:col-span-7">
+                    <div className="relative w-full aspect-[4/3] bg-gray-50 dark:bg-meta-4 rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 dark:border-strokedark">
+                      {totalAnexos > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-gray-600 dark:text-gray-300"
+                            onClick={goToPrevAnexo}
+                            title="Anterior"
+                          >
+                            <FaChevronLeft />
+                          </button>
+                          <button
+                            type="button"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-gray-600 dark:text-gray-300"
+                            onClick={goToNextAnexo}
+                            title="Próximo"
+                          >
+                            <FaChevronRight />
+                          </button>
+                        </>
+                      )}
+                      {anexoViewerLoading && !currentAnexoUrl ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Carregando arquivo...</p>
+                      ) : currentAnexoEhImagem && currentAnexoUrl ? (
+                        <img
+                          src={currentAnexoUrl}
+                          alt={currentAnexo.nome ?? "Anexo"}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : currentAnexoEhImagem ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Gerando link para visualização...</p>
+                      ) : (
+                        <div className="px-6 text-center text-sm text-gray-600 dark:text-gray-400">
+                          Pré-visualização disponível apenas para imagens. Utilize o botão para baixar o arquivo.
+                        </div>
+                      )}
+                    </div>
+                    {anexoViewerError && (
+                      <p className="mt-3 text-center text-sm text-red-600">{anexoViewerError}</p>
+                    )}
+                    {totalAnexos > 1 && (
+                      <div className="mt-4 flex items-center justify-center gap-2">
+                        {anexosDisponiveis.map((_, idx) => (
+                          <button
+                            type="button"
+                            key={idx}
+                            className={`h-2.5 rounded-full transition-all ${idx === anexoViewerIndex ? "w-6 bg-primary" : "w-2.5 bg-gray-300 dark:bg-gray-600"
+                              }`}
+                            onClick={() => setAnexoViewerIndex(idx)}
+                            aria-label={`Ir para anexo ${idx + 1}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="lg:col-span-5 space-y-3">
+                    <div className="rounded-xl border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3">
+                      <p className="text-sm font-semibold text-gray-700 dark:text-white">{currentAnexo.nome}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Tipo: {currentAnexoEhImagem ? "Imagem" : "Arquivo"}
+                      </p>
+                      {currentAnexo.caminho && (
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 break-all">{currentAnexo.caminho}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
+                      onClick={() => currentAnexo && handleDownloadAnexo(currentAnexo)}
+                      disabled={downloadingCurrentAnexo}
+                    >
+                      <FaDownload />
+                      {downloadingCurrentAnexo ? "Preparando download..." : "Baixar arquivo"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="py-10 text-center text-sm text-gray-600 dark:text-gray-400">Nenhum anexo selecionado.</p>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-gray-100 dark:border-strokedark flex items-center justify-end">
+              <button
+                type="button"
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                onClick={closeAnexoModal}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <FormModal
+        open={editarDadosVisible}
+        title="Editar garantia"
+        onClose={() => setEditarDadosVisible(false)}
+        width="lg"
+      >
+        {garantia && (
+          <NovaGarantiaForm
+            variant="modal"
+            mode="edit"
+            garantiaId={garantia.id}
+            initialData={editFormData}
+            onSuccess={handleEditSuccess}
+            onCancel={() => setEditarDadosVisible(false)}
+          />
+        )}
+      </FormModal>
+
+      <FormModal
+        open={anomaliaVisible}
+        title="Aprovar (Anomalia)"
+        onClose={() => setAnomaliaVisible(false)}
+        width="sm"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAnomaliaVisible(false)} />
+            <ActionButton label="Continuar" shape="rounded" onClick={submitAnomalia} disabled={!anomaliaCfop.trim()} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">Será necessária Nota Fiscal?</p>
+          <div className="flex gap-2 mt-3">
+            <button
+              type="button"
+              onClick={() => setAnomaliaPrecisaNF(false)}
+              className={toggleButtonClasses(!anomaliaPrecisaNF)}
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              onClick={() => setAnomaliaPrecisaNF(true)}
+              className={toggleButtonClasses(anomaliaPrecisaNF)}
+            >
+              Sim
+            </button>
+          </div>
+          <input
+            type="text"
+            value={anomaliaCfop}
+            onChange={(event) => setAnomaliaCfop(event.target.value)}
+            placeholder="CFOP *"
+            className="mt-4 w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </FormModal>
+
+      <FormModal
+        open={aprovarModalVisible}
+        title="Aprovar Garantia"
+        onClose={() => setAprovarModalVisible(false)}
+        width="sm"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setAprovarModalVisible(false)} />
+            <ActionButton label="Continuar" shape="rounded" onClick={submitAprovarModal} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">O fornecedor precisa de Nota Fiscal?</p>
+          <div className="flex gap-2 mt-1">
+            <button
+              type="button"
+              onClick={() => setAprovarPrecisaNF(false)}
+              className={toggleButtonClasses(!aprovarPrecisaNF)}
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              onClick={() => setAprovarPrecisaNF(true)}
+              className={toggleButtonClasses(aprovarPrecisaNF)}
+            >
+              Sim
+            </button>
+          </div>
+          {aprovarPrecisaNF && (
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-semibold text-slate-500">Comprovantes *</span>
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">CFOP *</span>
               <input
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  setDescarteAnexos(event.target.files ? Array.from(event.target.files) : [])
-                }
+                type="text"
+                value={aprovarCfop}
+                onChange={(event) => setAprovarCfop(event.target.value)}
+                className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </label>
-            {descarteAnexos.length > 0 && (
-              <ul className="mt-3 list-disc pl-5 text-sm text-slate-600 space-y-1">
-                {descarteAnexos.map((file) => (
-                  <li key={file.name}>{file.name}</li>
+          )}
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={freteCortesiaSelecionado}
+              onChange={(event) => setFreteCortesiaSelecionado(event.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            <span>Frete cortesia</span>
+          </label>
+        </div>
+      </FormModal>
+
+      <FormModal
+        open={concluirVisible}
+        title="Concluir Garantia"
+        onClose={() => {
+          setConcluirVisible(false);
+          setConcluirNf("");
+          setConcluirValor("");
+        }}
+        width="sm"
+        footer={
+          <>
+            <ActionButton
+              label="Cancelar"
+              variant="ghost"
+              shape="rounded"
+              onClick={() => {
+                setConcluirVisible(false);
+                setConcluirNf("");
+                setConcluirValor("");
+              }}
+            />
+            <ActionButton label="Concluir" shape="rounded" onClick={submitConcluir} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Informe a NF e o valor recebido para concluir o processo.
+          </p>
+          <input
+            type="text"
+            value={concluirNf}
+            onChange={(event) => setConcluirNf(event.target.value)}
+            placeholder="Número da NF *"
+            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {garantia && NF_E_VALOR_REQUIRED_STATUS.has(garantia.status) && (
+            <input
+              type="text"
+              value={concluirValor}
+              onChange={(event) => setConcluirValor(formatCurrencyMask(event.target.value))}
+              placeholder="Valor (R$) *"
+              className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          )}
+        </div>
+      </FormModal>
+
+      <FormModal
+        open={envioVisible}
+        title="Envio da Mercadoria"
+        onClose={() => setEnvioVisible(false)}
+        width="lg"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setEnvioVisible(false)} />
+            <ActionButton label="Salvar" shape="rounded" onClick={submitEnvio} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">A mercadoria será enviada?</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setEnviarMercadoria(true)}
+              className={toggleButtonClasses(enviarMercadoria)}
+            >
+              Sim
+            </button>
+            <button
+              type="button"
+              onClick={() => setEnviarMercadoria(false)}
+              className={toggleButtonClasses(!enviarMercadoria)}
+            >
+              Não
+            </button>
+          </div>
+
+          {enviarMercadoria && (
+            <>
+              <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">Frete por conta de</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEnvioFrete("fornecedor");
+                    setEnvioCorreio(false);
+                    setColetaForm((prev) => ({
+                      ...prev,
+                      razao: "",
+                      cnpj: "",
+                      endereco: "",
+                      cidade: "",
+                      uf: "",
+                      ie: "",
+                      codigo: "",
+                      obs: "",
+                    }));
+                  }}
+                  className={toggleButtonClasses(envioFrete === "fornecedor")}
+                >
+                  Fornecedor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEnvioFrete("loja");
+                    setEnvioCorreio(false);
+                  }}
+                  className={toggleButtonClasses(envioFrete === "loja")}
+                >
+                  Loja
+                </button>
+              </div>
+
+              {envioFrete === "loja" ? (
+                <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3 text-sm text-gray-700 dark:text-white">
+                  <p className="font-semibold">Transportadora padrão ST</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Dados serão preenchidos automaticamente para a coleta.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={envioCorreio}
+                      onChange={(event) => setEnvioCorreio(event.target.checked)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span>Envio pelos Correios</span>
+                  </label>
+                  {envioCorreio ? (
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Código do objeto *</span>
+                      <input
+                        type="text"
+                        value={codigoObjeto}
+                        onChange={(event) => setCodigoObjeto(event.target.value)}
+                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </label>
+                  ) : (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        placeholder="Transportadora *"
+                        value={coletaForm.razao}
+                        onChange={(event) => setColetaForm((prev) => ({ ...prev, razao: event.target.value }))}
+                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          type="text"
+                          placeholder="CNPJ *"
+                          value={coletaForm.cnpj}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, cnpj: event.target.value }))}
+                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="I.E. (opcional)"
+                          value={coletaForm.ie}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, ie: event.target.value }))}
+                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Endereço *"
+                        value={coletaForm.endereco}
+                        onChange={(event) => setColetaForm((prev) => ({ ...prev, endereco: event.target.value }))}
+                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          type="text"
+                          placeholder="Cidade *"
+                          value={coletaForm.cidade}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, cidade: event.target.value }))}
+                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="UF *"
+                          value={coletaForm.uf}
+                          onChange={(event) => setColetaForm((prev) => ({ ...prev, uf: event.target.value.toUpperCase() }))}
+                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Código de coleta/envio (opcional)"
+                        value={coletaForm.codigo}
+                        onChange={(event) => setColetaForm((prev) => ({ ...prev, codigo: event.target.value }))}
+                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <textarea
+                        rows={3}
+                        placeholder="Observações (opcional)"
+                        value={coletaForm.obs}
+                        onChange={(event) => setColetaForm((prev) => ({ ...prev, obs: event.target.value }))}
+                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </FormModal>
+
+      <FormModal
+        open={notaVisible}
+        title="Registrar Nota Fiscal"
+        onClose={closeNotaModal}
+        width="sm"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={closeNotaModal} />
+            <ActionButton label="Salvar" shape="rounded" onClick={submitNota} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <input
+            type="text"
+            value={notaNumero}
+            onChange={(event) => setNotaNumero(event.target.value)}
+            placeholder="Número da NF *"
+            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="mt-4 flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-gray-500 dark:text-gray-400">Comprovantes (opcional)</span>
+            <input
+              ref={notaFileInputRef}
+              id="nota-comprovante-input"
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              onChange={handleNotaFilesChange}
+              className="sr-only"
+            />
+            <button
+              type="button"
+              onClick={() => notaFileInputRef.current?.click()}
+              className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-meta-4 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+            >
+              <MdAttachFile size={16} />
+              Escolher arquivo
+            </button>
+            {notaAnexos.length === 0 ? (
+              <p className="text-xs text-gray-400">Nenhum arquivo selecionado.</p>
+            ) : (
+              <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
+                {notaAnexos.map((file, index) => (
+                  <li
+                    key={`${file.name}-${index}`}
+                    className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-strokedark px-3 py-2"
+                  >
+                    <span className="truncate pr-3">{file.name}</span>
+                    <button
+                      type="button"
+                      className="keep-color text-red-600 hover:text-red-500"
+                      onClick={() => removeNotaAnexo(index)}
+                    >
+                      Remover
+                    </button>
+                  </li>
                 ))}
               </ul>
             )}
           </div>
-        </FormModal>
+        </div>
+      </FormModal>
 
-        <FormModal
-          open={dataEnvioVisible}
-          title="Data de Coleta/Envio"
-          onClose={() => setDataEnvioVisible(false)}
-          width="sm"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDataEnvioVisible(false)} />
-              <ActionButton label="Salvar" shape="rounded" onClick={submitDataEnvio} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
+      <FormModal
+        open={descarteVisible}
+        title="Confirmar Descarte"
+        onClose={() => setDescarteVisible(false)}
+        width="sm"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDescarteVisible(false)} />
+            <ActionButton label="Confirmar" shape="rounded" onClick={submitDescarte} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-semibold text-gray-500 dark:text-gray-400">Comprovantes *</span>
             <input
-              type="text"
-              value={dataEnvioInput}
-              onChange={(event) => setDataEnvioInput(formatDateMask(event.target.value))}
-              placeholder="Data (dd/mm/aaaa)"
-              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setDescarteAnexos(event.target.files ? Array.from(event.target.files) : [])
+              }
+              className="text-gray-600 dark:text-gray-400"
             />
-          </div>
-        </FormModal>
+          </label>
+          {descarteAnexos.length > 0 && (
+            <ul className="mt-3 list-disc pl-5 text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              {descarteAnexos.map((file) => (
+                <li key={file.name}>{file.name}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </FormModal>
 
-        <FormModal
-          open={valorCreditoVisible}
-          title="Valor de Crédito"
-          onClose={() => setValorCreditoVisible(false)}
-          width="sm"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setValorCreditoVisible(false)} />
-              <ActionButton label="Confirmar" shape="rounded" onClick={submitValorCredito} />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            <input
-              type="text"
-              value={valorCreditoInput}
-              onChange={(event) => setValorCreditoInput(formatCurrencyMask(event.target.value))}
-              placeholder="Valor (R$)"
-              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <FormModal
+        open={dataEnvioVisible}
+        title="Data de Coleta/Envio"
+        onClose={() => setDataEnvioVisible(false)}
+        width="sm"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setDataEnvioVisible(false)} />
+            <ActionButton label="Salvar" shape="rounded" onClick={submitDataEnvio} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <input
+            type="text"
+            value={dataEnvioInput}
+            onChange={(event) => setDataEnvioInput(formatDateMask(event.target.value))}
+            placeholder="Data (dd/mm/aaaa)"
+            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </FormModal>
+
+      <FormModal
+        open={valorCreditoVisible}
+        title="Valor de Crédito"
+        onClose={() => setValorCreditoVisible(false)}
+        width="sm"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setValorCreditoVisible(false)} />
+            <ActionButton label="Confirmar" shape="rounded" onClick={submitValorCredito} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <input
+            type="text"
+            value={valorCreditoInput}
+            onChange={(event) => setValorCreditoInput(formatCurrencyMask(event.target.value))}
+            placeholder="Valor (R$)"
+            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </FormModal>
+
+      <FormModal
+        open={abaterCreditoVisible}
+        title="Registrar abatimento"
+        onClose={() => {
+          setAbaterCreditoVisible(false);
+          setAbaterNf("");
+          setAbaterValor("");
+          setAbaterRows([newAbatimentoRow()]);
+        }}
+        width="sm"
+        footer={
+          <>
+            <ActionButton
+              label="Cancelar"
+              variant="ghost"
+              shape="rounded"
+              onClick={() => {
+                setAbaterCreditoVisible(false);
+                setAbaterNf("");
+                setAbaterValor("");
+                setAbaterRows([newAbatimentoRow()]);
+              }}
             />
-          </div>
-        </FormModal>
-
-        <FormModal
-          open={abaterCreditoVisible}
-          title="Registrar abatimento"
-          onClose={() => {
-            setAbaterCreditoVisible(false);
-            setAbaterNf("");
-            setAbaterValor("");
-            setAbaterRows([newAbatimentoRow()]);
-          }}
-          width="sm"
-          footer={
+            <ActionButton
+              label="Salvar"
+              shape="rounded"
+              onClick={submitAbaterCredito}
+              loading={abaterSaving}
+            />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          {garantia?.status === STATUS_CODES.abatimentoEmBoleto ? (
             <>
-              <ActionButton
-                label="Cancelar"
-                variant="ghost"
-                shape="rounded"
-                onClick={() => {
-                  setAbaterCreditoVisible(false);
-                  setAbaterNf("");
-                  setAbaterValor("");
-                  setAbaterRows([newAbatimentoRow()]);
-                }}
-              />
-              <ActionButton
-                label="Salvar"
-                shape="rounded"
-                onClick={submitAbaterCredito}
-                loading={abaterSaving}
-              />
-            </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            {garantia?.status === STATUS_CODES.abatimentoEmBoleto ? (
-              <>
-                <p className="text-sm text-slate-600">
-                  Registre as linhas de abatimento do boleto. O saldo será atualizado conforme os valores informados.
-                </p>
-                <div className="space-y-3">
-                  {abaterRows.map((row, index) => (
-                    <div key={index} className="rounded-2xl border border-slate-200 p-3 space-y-2 relative">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <input
-                          type="text"
-                          placeholder="NF *"
-                          value={row.nf}
-                          onChange={(event) =>
-                            setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, nf: event.target.value } : item)))
-                          }
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Parcela *"
-                          value={row.parcela}
-                          onChange={(event) =>
-                            setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, parcela: event.target.value } : item)))
-                          }
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Vencimento (dd/mm/aaaa) *"
-                          value={row.vencimento}
-                          onChange={(event) =>
-                            setAbaterRows((prev) =>
-                              prev.map((item, idx) =>
-                                idx === index ? { ...item, vencimento: formatDateMask(event.target.value) } : item,
-                              ),
-                            )
-                          }
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Valor *"
-                          value={row.valor}
-                          onChange={(event) =>
-                            setAbaterRows((prev) =>
-                              prev.map((item, idx) =>
-                                idx === index ? { ...item, valor: formatCurrencyMask(event.target.value) } : item,
-                              ),
-                            )
-                          }
-                          className="rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="absolute top-2 right-2 rounded-full border border-red-200 bg-white px-3 py-1 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-30"
-                        onClick={() => setAbaterRows((prev) => prev.filter((_, idx) => idx !== index))}
-                        disabled={abaterRows.length === 1}
-                      >
-                        Remover
-                      </button>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Registre as linhas de abatimento do boleto. O saldo será atualizado conforme os valores informados.
+              </p>
+              <div className="space-y-3">
+                {abaterRows.map((row, index) => (
+                  <div key={index} className="rounded-2xl border border-gray-200 dark:border-strokedark p-3 space-y-2 relative">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input
+                        type="text"
+                        placeholder="NF *"
+                        value={row.nf}
+                        onChange={(event) =>
+                          setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, nf: event.target.value } : item)))
+                        }
+                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Parcela *"
+                        value={row.parcela}
+                        onChange={(event) =>
+                          setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, parcela: event.target.value } : item)))
+                        }
+                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Vencimento (dd/mm/aaaa) *"
+                        value={row.vencimento}
+                        onChange={(event) =>
+                          setAbaterRows((prev) =>
+                            prev.map((item, idx) =>
+                              idx === index ? { ...item, vencimento: formatDateMask(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Valor *"
+                        value={row.valor}
+                        onChange={(event) =>
+                          setAbaterRows((prev) =>
+                            prev.map((item, idx) =>
+                              idx === index ? { ...item, valor: formatCurrencyMask(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
-                  ))}
-                  <ActionButton
-                    label="Adicionar linha"
-                    variant="ghost"
-                    icon={<MdAdd size={18} />}
-                    onClick={() => setAbaterRows((prev) => [...prev, newAbatimentoRow()])}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-slate-600">
-                  Informe a NF abatida e o valor que será debitado do crédito disponível.
-                </p>
-                <input
-                  type="text"
-                  value={abaterNf}
-                  onChange={(event) => setAbaterNf(event.target.value)}
-                  placeholder="NF abatida *"
-                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <button
+                      type="button"
+                      className="absolute top-2 right-2 rounded-full border border-red-200 bg-white dark:bg-meta-4 px-3 py-1 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-30"
+                      onClick={() => setAbaterRows((prev) => prev.filter((_, idx) => idx !== index))}
+                      disabled={abaterRows.length === 1}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))}
+                <ActionButton
+                  label="Adicionar linha"
+                  variant="ghost"
+                  icon={<MdAdd size={18} />}
+                  onClick={() => setAbaterRows((prev) => [...prev, newAbatimentoRow()])}
                 />
-                <input
-                  type="text"
-                  value={abaterValor}
-                  onChange={(event) => setAbaterValor(formatCurrencyMask(event.target.value))}
-                  placeholder="Valor abatido (R$) *"
-                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </>
-            )}
-            <p className="text-xs text-slate-500">Saldo atual: {formatCurrency(saldo)}</p>
-          </div>
-        </FormModal>
-
-        <FormModal
-          open={liberarVisible}
-          title="Liberar Crédito"
-          onClose={() => setLiberarVisible(false)}
-          width="lg"
-          footer={
-            <>
-              <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setLiberarVisible(false)} />
-              <ActionButton label="Confirmar" shape="rounded" onClick={submitLiberarCredito} />
+              </div>
             </>
-          }
-        >
-          <div className="space-y-4 px-1">
-            <label className="text-sm font-semibold text-slate-600">Status final</label>
-            <select
-              value={liberarStatus}
-              onChange={(event) => setLiberarStatus(Number(event.target.value))}
-              className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value={STATUS_CODES.produtoProximaCompra}>Produto em Próxima Compra</option>
-              <option value={STATUS_CODES.trocaProduto}>Troca de Produto</option>
-              <option value={STATUS_CODES.abatimentoProximoPedido}>Abatimento em Próximo Pedido</option>
-              <option value={STATUS_CODES.creditoEmConta}>Crédito em Conta</option>
-              <option value={STATUS_CODES.abatimentoEmBoleto}>Abatimento em Boleto</option>
-            </select>
-
-            <div className="space-y-3">
-              {liberarStatus === STATUS_CODES.abatimentoEmBoleto && (
-                <p className="text-xs text-slate-600">
-                  Informe o valor do crédito. Os detalhes do boleto abatido serão registrados no botão
-                  &quot;Registrar abatimento&quot; até zerar o saldo.
-                </p>
-              )}
+          ) : (
+            <>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Informe a NF abatida e o valor que será debitado do crédito disponível.
+              </p>
               <input
                 type="text"
-                value={liberarValor}
-                onChange={(event) => setLiberarValor(formatCurrencyMask(event.target.value))}
-                placeholder={
-                  liberarStatus === STATUS_CODES.abatimentoProximoPedido || liberarStatus === STATUS_CODES.abatimentoEmBoleto
-                    ? "Valor do Crédito"
-                    : "Valor utilizado (opcional)"
-                }
-                className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={abaterNf}
+                onChange={(event) => setAbaterNf(event.target.value)}
+                placeholder="NF abatida *"
+                className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {liberarStatus !== STATUS_CODES.abatimentoEmBoleto && (
-                <input
-                  type="text"
-                  value={liberarNf}
-                  onChange={(event) => setLiberarNf(event.target.value)}
-                  placeholder={`NF recebida${NF_REQUIRED_STATUS.has(liberarStatus) ? " *" : " (opcional)"}`}
-                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              )}
-            </div>
+              <input
+                type="text"
+                value={abaterValor}
+                onChange={(event) => setAbaterValor(formatCurrencyMask(event.target.value))}
+                placeholder="Valor abatido (R$) *"
+                className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </>
+          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400">Saldo atual: {formatCurrency(saldo)}</p>
+        </div>
+      </FormModal>
+
+      <FormModal
+        open={liberarVisible}
+        title="Liberar Crédito"
+        onClose={() => setLiberarVisible(false)}
+        width="lg"
+        footer={
+          <>
+            <ActionButton label="Cancelar" variant="ghost" shape="rounded" onClick={() => setLiberarVisible(false)} />
+            <ActionButton label="Confirmar" shape="rounded" onClick={submitLiberarCredito} />
+          </>
+        }
+      >
+        <div className="space-y-4 px-1">
+          <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Status final</label>
+          <select
+            value={liberarStatus}
+            onChange={(event) => setLiberarStatus(Number(event.target.value))}
+            className="mt-2 w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={STATUS_CODES.produtoProximaCompra}>Produto em Próxima Compra</option>
+            <option value={STATUS_CODES.trocaProduto}>Troca de Produto</option>
+            <option value={STATUS_CODES.abatimentoProximoPedido}>Abatimento em Próximo Pedido</option>
+            <option value={STATUS_CODES.creditoEmConta}>Crédito em Conta</option>
+            <option value={STATUS_CODES.abatimentoEmBoleto}>Abatimento em Boleto</option>
+          </select>
+
+          <div className="space-y-3">
+            {liberarStatus === STATUS_CODES.abatimentoEmBoleto && (
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Informe o valor do crédito. Os detalhes do boleto abatido serão registrados no botão
+                &quot;Registrar abatimento&quot; até zerar o saldo.
+              </p>
+            )}
+            <input
+              type="text"
+              value={liberarValor}
+              onChange={(event) => setLiberarValor(formatCurrencyMask(event.target.value))}
+              placeholder={
+                liberarStatus === STATUS_CODES.abatimentoProximoPedido || liberarStatus === STATUS_CODES.abatimentoEmBoleto
+                  ? "Valor do Crédito"
+                  : "Valor utilizado (opcional)"
+              }
+              className="mt-1 w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {liberarStatus !== STATUS_CODES.abatimentoEmBoleto && (
+              <input
+                type="text"
+                value={liberarNf}
+                onChange={(event) => setLiberarNf(event.target.value)}
+                placeholder={`NF recebida${NF_REQUIRED_STATUS.has(liberarStatus) ? " *" : " (opcional)"}`}
+                className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
-        </FormModal>
-      </div>
+        </div>
+      </FormModal>
     </div>
+
   );
 }

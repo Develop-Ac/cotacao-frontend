@@ -9,6 +9,12 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaDownload,
+  FaEdit,
+  FaCalendarAlt,
+  FaUser,
+  FaCar,
+  FaGasPump,
+  FaEye,
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { serviceUrl } from "@/lib/services";
@@ -52,21 +58,106 @@ const API_BASE = `${OFICINA_BASE}/oficina/checklists`;
 const IMG_API_BASE = `${OFICINA_BASE}/oficina/img`;
 const UPLOADS_API_BASE = `${OFICINA_BASE}/oficina/uploads/avarias/url`;
 
-export default function ChecklistsList() {
-  // ====== PADRÕES DE BOTÃO ======
-  const BTN =
-    "h-12 px-4 inline-flex items-center justify-center gap-2 rounded text-white font-semibold " +
-    "bg-gradient-to-r from-blue-500 to-purple-600 " +
-    "hover:from-blue-600 hover:to-purple-700 " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 " +
-    "disabled:opacity-50 disabled:cursor-not-allowed";
+function ChecklistCard({
+  item,
+  isAdmin,
+  onView,
+  onGallery,
+  onPdf,
+}: {
+  item: ChecklistRow;
+  isAdmin: boolean;
+  onView: (os: string) => void;
+  onGallery: (id: string) => void;
+  onPdf: (id: string) => void;
+}) {
+  const fmtDateTime = (iso?: string | null) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "-";
+    return d.toLocaleString("pt-BR");
+  };
 
-  const BTN_SQUARE =
-    "h-10 w-10 md:h-12 md:w-12 inline-flex items-center justify-center rounded text-white font-semibold " +
-    "bg-gradient-to-r from-blue-500 to-purple-600 " +
-    "hover:from-blue-600 hover:to-purple-700 " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 " +
-    "disabled:opacity-50 disabled:cursor-not-allowed";
+  return (
+    <div className="bg-white dark:bg-boxdark rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-gray-100 dark:border-strokedark">
+      <div className="bg-gray-50 dark:bg-meta-4 p-4 border-b border-gray-100 dark:border-strokedark flex justify-between items-start">
+        <div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">
+            OS Interna
+          </div>
+          <div className="text-xl font-bold text-gray-800 dark:text-white">
+            #{item.osInterna || "-"}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">
+            Entrada
+          </div>
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center justify-end gap-1">
+            <FaCalendarAlt className="text-gray-400" />
+            {fmtDateTime(item.dataHoraEntrada)}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 flex-1 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+          <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 dark:text-blue-400 shrink-0">
+            <FaUser size={14} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500 dark:text-gray-400">Cliente</p>
+            <p className="font-medium truncate">{item.clienteNome || "-"}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+          <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 dark:text-orange-400 shrink-0">
+            <FaCar size={14} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500 dark:text-gray-400">Placa</p>
+            <p className="font-medium truncate">{item.veiculoPlaca || "-"}</p>
+          </div>
+        </div>
+
+
+      </div>
+
+      <div className="p-4 pt-0 mt-auto grid grid-cols-3 gap-2">
+        <button
+          onClick={() => onView(String(item.osInterna))}
+          className="col-span-1 flex flex-col items-center justify-center gap-1 p-2 rounded-lg border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-600 dark:text-gray-300 transition-colors"
+          title="Visualizar"
+        >
+          <FaEye className="text-blue-500" />
+          <span className="text-[10px] font-medium uppercase">Ver</span>
+        </button>
+
+        <button
+          onClick={() => onGallery(String(item.id))}
+          className="col-span-1 flex flex-col items-center justify-center gap-1 p-2 rounded-lg border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-600 dark:text-gray-300 transition-colors"
+          title="Galeria de Avarias"
+        >
+          <FaImages className="text-purple-500" />
+          <span className="text-[10px] font-medium uppercase">Fotos</span>
+        </button>
+
+        <button
+          onClick={() => onPdf(String(item.id))}
+          className="col-span-1 flex flex-col items-center justify-center gap-1 p-2 rounded-lg border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-600 dark:text-gray-300 transition-colors"
+          title="Baixar PDF"
+        >
+          <FaFilePdf className="text-red-500" />
+          <span className="text-[10px] font-medium uppercase">PDF</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function ChecklistsList() {
+
 
   // Filtros (aplicados no front)
   const [qOsInterna, setQOSInterna] = useState("");
@@ -103,12 +194,13 @@ export default function ChecklistsList() {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editData, setEditData] = useState<any | null>(null);
-
-  // ====== MODAL DE VISUALIZAÇÃO (somente leitura) ======
+  // ====== VISUALIZAR: abrir/fechar ======
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
-  const [viewData, setViewData] = useState<any | null>(null);
+  const [viewData, setViewData] = useState<any>(null);
+  const [viewTab, setViewTab] = useState(0); // 0: Dados, 1: Itens, 2: Avarias
+  const [viewImages, setViewImages] = useState<AvariaImage[]>([]); // Imagens para a aba de avarias
 
   // ====== ADMIN? (lê localStorage uma vez) ======
   const [isAdmin, setIsAdmin] = useState(false);
@@ -202,7 +294,7 @@ export default function ChecklistsList() {
         try {
           const j = await res.json();
           if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -390,11 +482,16 @@ export default function ChecklistsList() {
 
   // ====== VISUALIZAR: abrir/fechar ======
   async function openViewModal(osInterna: string) {
+    if (!osInterna) return;
     setViewModalOpen(true);
     setViewLoading(true);
     setViewError(null);
     setViewData(null);
+    setViewTab(0);
+    setViewImages([]);
+
     try {
+      // 1. Buscar dados do checklist
       const res = await fetch(`${API_BASE}/${encodeURIComponent(osInterna)}`, {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -402,17 +499,53 @@ export default function ChecklistsList() {
       if (!res.ok) throw new Error(`Erro HTTP: ${res.status}`);
       const data = await res.json();
       setViewData(data);
+
+      // 2. Buscar imagens para a aba de avarias (se houver ID)
+      if (data.id) {
+        fetchViewImages(data.id);
+      }
     } catch (e: any) {
-      setViewError(e?.message || "Falha ao buscar dados");
+      setViewError(e?.message || "Erro ao carregar checklist");
     } finally {
       setViewLoading(false);
+    }
+  }
+
+  // Busca imagens para o modal de visualização (aba Avarias)
+  async function fetchViewImages(checklistId: string | number) {
+    try {
+      const res = await fetch(`${IMG_API_BASE}/${encodeURIComponent(checklistId)}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const data = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
+
+      const items: AvariaImage[] = (data as any[]).map((x) => ({
+        fotoKey: x.fotoBase64 || x.fotoKey,
+        peca: x.peca ?? null,
+        observacoes: x.observacoes ?? null,
+        tipo: x.tipo ?? null,
+      }));
+
+      // Buscar URLs
+      for (let i = 0; i < items.length; i++) {
+        const imageUrl = await fetchImageUrl(items[i].fotoKey);
+        if (imageUrl) {
+          items[i].imageUrl = imageUrl;
+        }
+      }
+      setViewImages(items);
+    } catch (e) {
+      console.error("Erro ao buscar imagens para visualização:", e);
     }
   }
 
   function closeViewModal() {
     setViewModalOpen(false);
     setViewData(null);
-    setViewError(null);
+    setViewImages([]);
   }
 
   // Função para atualizar campo do checklist (editar)
@@ -449,7 +582,7 @@ export default function ChecklistsList() {
           const err = await res.json();
           if (err?.message)
             msg = Array.isArray(err.message) ? err.message.join(", ") : err.message;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -522,7 +655,7 @@ export default function ChecklistsList() {
           const j = await res.json();
           if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
           if (j?.error) msg = j.error;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
       const json = await res.json();
@@ -640,7 +773,7 @@ export default function ChecklistsList() {
           const j = await res.json();
           if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
           if (j?.error) msg = j.error;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -664,233 +797,167 @@ export default function ChecklistsList() {
           <h3 className="text-2xl font-semibold mb-3 md:mb-0">Checklists (Oficina)</h3>
           <div className="flex items-center gap-2">
             {/* Recarregar */}
-            <button className={BTN_SQUARE} onClick={fetchAll} disabled={loading} title="Recarregar do servidor">
-              <FaSync className={loading ? "animate-spin" : ""} />
+            <button
+              onClick={fetchAll}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-meta-4 text-gray-700 dark:text-white border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-opacity-90 hover:border-gray-300 shadow-sm transition-all duration-200 disabled:opacity-50"
+              title="Recarregar do servidor"
+            >
+              <FaSync className={loading ? "animate-spin" : ""} size={18} />
+              <span className="text-sm font-medium">Atualizar</span>
             </button>
           </div>
         </div>
 
         {/* Listagem */}
-        <div id="list">
-          <div className="w-full">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              {/* Filtros */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
-                <div className="flex flex-1 max-w-5xl mx-2 gap-2 flex-wrap">
-                  <input
-                    type="text"
-                    value={qOsInterna}
-                    onChange={(e) => setQOSInterna(e.target.value)}
-                    className="flex-1 min-w-[160px] h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                    placeholder="OS Interna"
-                  />
-                  <input
-                    type="text"
-                    value={qPlaca}
-                    onChange={(e) => setQPlaca(e.target.value.toUpperCase().trim())}
-                    className="flex-1 min-w-[140px] h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Placa"
-                  />
-                  <input
-                    type="date"
-                    value={qDataDe}
-                    onChange={(e) => setQDataDe(e.target.value)}
-                    className="h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Data De"
-                  />
-                  <input
-                    type="date"
-                    value={qDataAte}
-                    onChange={(e) => setQDataAte(e.target.value)}
-                    className="h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Data Até"
-                  />
-                  <button className={BTN} onClick={onClear}>
-                    Limpar filtros
-                  </button>
-                </div>
-
-                {/* PageSize dropdown */}
-                <div className="flex items-center gap-2">
-                  <div className="relative" ref={pageSizeRef}>
-                    <button
-                      className={BTN}
-                      aria-haspopup="listbox"
-                      aria-expanded={pageSizeOpen}
-                      onClick={() => setPageSizeOpen((v) => !v)}
-                    >
-                      <span className="mr-1">{pageSize}</span>
-                      <FaCaretDown />
-                    </button>
-                    {pageSizeOpen && (
-                      <div className="absolute right-0 mt-2 w-28 bg-white border rounded shadow z-10" role="listbox" tabIndex={-1}>
-                        {pageSizes.map((n) => (
-                          <button
-                            key={n}
-                            role="option"
-                            aria-selected={pageSize === (n as 10 | 20 | 50)}
-                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${
-                              pageSize === n ? "bg-gray-50 font-semibold" : ""
-                            }`}
-                            onClick={() => {
-                              setPageSize(n as 10 | 20 | 50);
-                              setPage(1);
-                              setPageSizeOpen(false);
-                            }}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Info topo */}
-              <div className="text-sm text-gray-600 mb-2">
-                Registros carregados: <b>{rawItems.length}</b> · Filtrados: <b>{filtered.length}</b>
-                {!isDateRangeValid && <span className="ml-3 text-red-600">Intervalo de datas inválido.</span>}
-              </div>
-
-              {/* Tabela */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr>
-                      <th className="p-2 w-8">
-                        <input type="checkbox" />
-                      </th>
-                      <th className="p-2 text-start">OS Interna</th>
-                      <th className="p-2 text-start">Data/Hora Entrada</th>
-                      <th className="p-2 text-start">Cliente</th>
-                      <th className="p-2 text-start">Placa</th>
-                      <th className="p-2 text-start">Combustível (%)</th>
-                      <th className="p-2 text-start">Criado em</th>
-                      <th className="p-2 text-center" style={{ width: "200px" }}>
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paged.map((row, idx) => (
-                      <tr key={String(row.id ?? idx)} className="border-t">
-                        <td className="p-4">
-                          <input type="checkbox" />
-                        </td>
-                        <td className="p-4">{row.osInterna ?? "-"}</td>
-                        <td className="p-4">{fmtDateTime(row.dataHoraEntrada)}</td>
-                        <td className="p-4">{row.clienteNome ?? "-"}</td>
-                        <td className="p-4">{row.veiculoPlaca ?? "-"}</td>
-                        <td className="p-4">{row.combustivelPercentual ?? "-"}</td>
-                        <td className="p-4">{fmtDateTime(row.createdAt)}</td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-center gap-2">
-                            {/* Condicional: Admin = Editar; Não-admin = Visualizar */}
-                            {isAdmin ? (
-                              <button
-                                className={BTN_SQUARE}
-                                title="Ver/Editar"
-                                onClick={() => openEditModal(String(row.osInterna))}
-                              >
-                                Editar
-                              </button>
-                            ) : (
-                              <button
-                                className={BTN_SQUARE}
-                                title="Visualizar"
-                                onClick={() => openViewModal(String(row.osInterna))}
-                              >
-                                Ver
-                              </button>
-                            )}
-
-                            {/* PDF */}
-                            <button
-                              className={BTN_SQUARE}
-                              title="Baixar PDF"
-                              onClick={() => downloadChecklistPdf(String(row.id))}
-                              disabled={downloadingId === String(row.id ?? "")}
-                            >
-                              <FaFilePdf
-                                className={downloadingId === String(row.id ?? "") ? "opacity-60" : ""}
-                                style={{ minHeight: "24px", minWidth: "24px" }}
-                              />
-                            </button>
-                            {/* FOTOS (Galeria) */}
-                            <button
-                              className={BTN_SQUARE}
-                              title="Fotos (avarias)"
-                              onClick={() => openGallery(String(row.id))}
-                            >
-                              <FaImages style={{ minHeight: "24px", minWidth: "24px" }} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-
-                    {!loading && paged.length === 0 && (
-                      <tr>
-                        <td colSpan={8} className="p-6 text-center text-gray-500">
-                          Nenhum registro encontrado.
-                        </td>
-                      </tr>
-                    )}
-                    {loading && (
-                      <tr>
-                        <td colSpan={8} className="p-6 text-center text-gray-500">
-                          Carregando...
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Paginação (front) */}
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-gray-600">
-                  Total filtrado: <b>{filtered.length}</b> · Página <b>{page}</b> de <b>{totalPages}</b>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    className={BTN}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1 || loading}
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    className={BTN}
-                    onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))}
-                    disabled={page >= totalPages || loading}
-                  >
-                    Próxima
-                  </button>
-                </div>
-              </div>
-              {/* /Paginação */}
+        <div id="list" className="space-y-6">
+          {/* Filtros */}
+          <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex flex-1 gap-3 flex-wrap">
+              <input
+                type="text"
+                value={qOsInterna}
+                onChange={(e) => setQOSInterna(e.target.value)}
+                className="flex-1 min-w-[160px] h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+                placeholder="OS Interna"
+              />
+              <input
+                type="text"
+                value={qPlaca}
+                onChange={(e) => setQPlaca(e.target.value.toUpperCase().trim())}
+                className="flex-1 min-w-[140px] h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+                placeholder="Placa"
+              />
+              <input
+                type="date"
+                value={qDataDe}
+                onChange={(e) => setQDataDe(e.target.value)}
+                className="h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+                placeholder="Data De"
+              />
+              <input
+                type="date"
+                value={qDataAte}
+                onChange={(e) => setQDataAte(e.target.value)}
+                className="h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+                placeholder="Data Até"
+              />
+              <button
+                className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm"
+                onClick={onClear}
+              >
+                Limpar filtros
+              </button>
             </div>
+
+            {/* PageSize dropdown */}
+            <div className="flex items-center gap-2">
+              <div className="relative" ref={pageSizeRef}>
+                <button
+                  className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
+                  aria-haspopup="listbox"
+                  aria-expanded={pageSizeOpen}
+                  onClick={() => setPageSizeOpen((v) => !v)}
+                >
+                  <span className="mr-1">{pageSize} itens</span>
+                  <FaCaretDown />
+                </button>
+                {pageSizeOpen && (
+                  <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-lg shadow-xl z-10 overflow-hidden" role="listbox" tabIndex={-1}>
+                    {pageSizes.map((n) => (
+                      <button
+                        key={n}
+                        role="option"
+                        aria-selected={pageSize === (n as 10 | 20 | 50)}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-700 dark:text-gray-300 ${pageSize === n ? "bg-gray-50 dark:bg-meta-4 font-semibold" : ""
+                          }`}
+                        onClick={() => {
+                          setPageSize(n as 10 | 20 | 50);
+                          setPage(1);
+                          setPageSizeOpen(false);
+                        }}
+                      >
+                        {n} itens
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Info topo */}
+          <div className="text-sm text-gray-600 mb-2">
+            Registros carregados: <b>{rawItems.length}</b> · Filtrados: <b>{filtered.length}</b>
+            {!isDateRangeValid && <span className="ml-3 text-red-600">Intervalo de datas inválido.</span>}
+          </div>
+
+          {/* Grid de Cards */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white dark:bg-boxdark h-80 rounded-xl shadow-sm border border-gray-100 dark:border-strokedark animate-pulse"></div>
+              ))}
+            </div>
+          ) : paged.length === 0 ? (
+            <div className="text-center py-12 bg-white dark:bg-boxdark rounded-xl border border-dashed border-gray-300 dark:border-strokedark shadow-sm mb-6">
+              <p className="text-gray-500 dark:text-gray-400">Nenhum checklist encontrado.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+              {paged.map((row) => (
+                <ChecklistCard
+                  key={row.id}
+                  item={row}
+                  isAdmin={isAdmin}
+                  onView={openViewModal}
+                  onGallery={openGallery}
+                  onPdf={downloadChecklistPdf}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Paginação */}
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Página <b>{page}</b> de <b>{totalPages}</b>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+            >
+              Anterior
+            </button>
+            <button
+              className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))}
+              disabled={page >= totalPages || loading}
+            >
+              Próxima
+            </button>
           </div>
         </div>
       </div>
 
       {/* ====== MODAL GALERIA ====== */}
       {galleryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center" aria-modal="true" role="dialog">
           {/* overlay */}
-          <div className="absolute inset-0 bg-black/60" onClick={closeGallery} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeGallery} />
 
           {/* content */}
-          <div className="relative z-10 w-full max-w-5xl mx-4 rounded-xl bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-5xl mx-4 rounded-xl bg-white dark:bg-boxdark shadow-2xl">
             {/* header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <div className="font-semibold">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-strokedark">
+              <div className="font-semibold text-black dark:text-white">
                 Galeria de fotos {galleryItems.length ? `(${galleryIndex + 1}/${galleryItems.length})` : ""}
               </div>
               <button
-                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100"
+                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
                 onClick={closeGallery}
                 title="Fechar"
               >
@@ -911,10 +978,10 @@ export default function ChecklistsList() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
                   {/* área da imagem com navegação lateral */}
                   <div className="lg:col-span-8">
-                    <div className="relative w-full aspect-[4/3] bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center">
+                    <div className="relative w-full aspect-[4/3] bg-gray-50 dark:bg-meta-4 rounded-lg overflow-hidden flex items-center justify-center">
                       {/* seta esquerda */}
                       <button
-                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
                         onClick={prevImage}
                         title="Anterior"
                       >
@@ -934,7 +1001,7 @@ export default function ChecklistsList() {
 
                       {/* seta direita */}
                       <button
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-gray-100"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
                         onClick={nextImage}
                         title="Próxima"
                       >
@@ -948,9 +1015,8 @@ export default function ChecklistsList() {
                         {galleryItems.map((_, i) => (
                           <button
                             key={i}
-                            className={`h-2.5 rounded-full transition-all ${
-                              i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"
-                            }`}
+                            className={`h-2.5 rounded-full transition-all ${i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"
+                              }`}
                             onClick={() => setGalleryIndex(i)}
                             aria-label={`Ir para imagem ${i + 1}`}
                           />
@@ -959,11 +1025,11 @@ export default function ChecklistsList() {
                     )}
                   </div>
 
-                    {/* metadados + ações */}
+                  {/* metadados + ações */}
                   <div className="lg:col-span-4">
-                    <div className="rounded-lg border p-3 bg-gray-50">
-                      <div className="text-sm text-gray-600 mb-2">Informações da avaria</div>
-                      <dl className="text-sm">
+                    <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3 bg-gray-50 dark:bg-meta-4">
+                      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Informações da avaria</div>
+                      <dl className="text-sm text-black dark:text-white">
                         <dt className="font-semibold">Tipo</dt>
                         <dd className="mb-2">{galleryItems[galleryIndex]?.tipo ?? "—"}</dd>
 
@@ -979,7 +1045,7 @@ export default function ChecklistsList() {
 
                     <div className="mt-3">
                       <button
-                        className={BTN + " w-full"}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 w-full"
                         onClick={downloadCurrentImage}
                         title="Baixar esta imagem"
                         disabled={!galleryItems[galleryIndex]?.imageUrl}
@@ -994,321 +1060,408 @@ export default function ChecklistsList() {
             </div>
 
             {/* footer */}
-            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
-              <button className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeGallery}>
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-strokedark flex items-center justify-end gap-2">
+              <button className="h-10 px-4 rounded bg-gray-200 dark:bg-meta-4 hover:bg-gray-300 dark:hover:bg-opacity-90 text-black dark:text-white" onClick={closeGallery}>
                 Fechar
               </button>
             </div>
           </div>
         </div>
-      )}
+      )
+      }
 
       {/* ====== MODAL DE EDIÇÃO CHECKLIST ====== */}
-      {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
-          <div className="absolute inset-0 bg-black/60" onClick={closeEditModal} />
-          <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <div className="font-semibold">Checklist - Editar</div>
-              <button
-                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100"
-                onClick={closeEditModal}
-                title="Fechar"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="p-4 max-h-[70vh] overflow-y-auto">
-              {editLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
-              {editError && <div className="py-16 text-center text-red-600">{editError}</div>}
-              {editData && (
-                <form
-                  className="space-y-4"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    saveEditData();
-                  }}
+      {
+        editModalOpen && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center" aria-modal="true" role="dialog">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeEditModal} />
+            <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white dark:bg-boxdark shadow-2xl">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-strokedark">
+                <div className="font-semibold text-black dark:text-white">Checklist - Editar</div>
+                <button
+                  className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+                  onClick={closeEditModal}
+                  title="Fechar"
                 >
-                  {/* Campos principais */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="p-4 max-h-[70vh] overflow-y-auto">
+                {editLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
+                {editError && <div className="py-16 text-center text-red-600">{editError}</div>}
+                {editData && (
+                  <form
+                    className="space-y-4"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      saveEditData();
+                    }}
+                  >
+                    {/* Campos principais */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">OS Interna</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.osInterna ?? ""}
+                          onChange={(e) => handleEditChange("osInterna", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Data/Hora Entrada</label>
+                        <input
+                          type="datetime-local"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.dataHoraEntrada ? String(editData.dataHoraEntrada).slice(0, 16) : ""}
+                          onChange={(e) => handleEditChange("dataHoraEntrada", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Observações</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.observacoes ?? ""}
+                          onChange={(e) => handleEditChange("observacoes", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Combustível (%)</label>
+                        <input
+                          type="number"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.combustivelPercentual ?? ""}
+                          onChange={(e) => handleEditChange("combustivelPercentual", Number(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Cliente Nome</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.clienteNome ?? ""}
+                          onChange={(e) => handleEditChange("clienteNome", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Cliente Doc</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.clienteDoc ?? ""}
+                          onChange={(e) => handleEditChange("clienteDoc", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Cliente Tel</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.clienteTel ?? ""}
+                          onChange={(e) => handleEditChange("clienteTel", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Cliente Endereço</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.clienteEnd ?? ""}
+                          onChange={(e) => handleEditChange("clienteEnd", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Veículo Nome</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.veiculoNome ?? ""}
+                          onChange={(e) => handleEditChange("veiculoNome", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Veículo Placa</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.veiculoPlaca ?? ""}
+                          onChange={(e) => handleEditChange("veiculoPlaca", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Veículo Cor</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.veiculoCor ?? ""}
+                          onChange={(e) => handleEditChange("veiculoCor", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-white">Veículo KM</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                          value={editData.veiculoKm ?? ""}
+                          onChange={(e) => handleEditChange("veiculoKm", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    {/* Itens do checklist */}
                     <div>
-                      <label className="block text-sm font-semibold">OS Interna</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.osInterna ?? ""}
-                        onChange={(e) => handleEditChange("osInterna", e.target.value)}
-                      />
+                      <label className="block text-sm font-semibold mb-2 text-black dark:text-white">Itens do Checklist</label>
+                      <div className="space-y-2">
+                        {editData.ofi_checklists_items?.map((item: any, idx: number) => (
+                          <div key={item.id ?? idx} className="grid grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              className="border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                              value={item.item ?? ""}
+                              onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "item", e.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                              value={item.status ?? ""}
+                              onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "status", e.target.value)}
+                            />
+                            <span className="text-xs text-gray-400">ID: {item.id}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                    {/* Avarias */}
                     <div>
-                      <label className="block text-sm font-semibold">Data/Hora Entrada</label>
-                      <input
-                        type="datetime-local"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.dataHoraEntrada ? String(editData.dataHoraEntrada).slice(0, 16) : ""}
-                        onChange={(e) => handleEditChange("dataHoraEntrada", e.target.value)}
-                      />
+                      <label className="block text-sm font-semibold mb-2 text-black dark:text-white">Avarias</label>
+                      <div className="space-y-2">
+                        {editData.ofi_checklists_avarias?.map((av: any, idx: number) => (
+                          <div key={av.id ?? idx} className="grid grid-cols-4 gap-2">
+                            <input
+                              type="text"
+                              className="border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                              value={av.tipo ?? ""}
+                              onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "tipo", e.target.value)}
+                              placeholder="Tipo"
+                            />
+                            <input
+                              type="text"
+                              className="border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                              value={av.peca ?? ""}
+                              onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "peca", e.target.value)}
+                              placeholder="Peça"
+                            />
+                            <input
+                              type="text"
+                              className="border border-gray-300 dark:border-form-strokedark rounded px-2 py-1 bg-white dark:bg-form-input text-black dark:text-white focus:border-blue-500 focus:outline-none"
+                              value={av.observacoes ?? ""}
+                              onChange={(e) =>
+                                handleEditArrayChange("ofi_checklists_avarias", idx, "observacoes", e.target.value)
+                              }
+                              placeholder="Observações"
+                            />
+                            <span className="text-xs text-gray-400">ID: {av.id}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Observações</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.observacoes ?? ""}
-                        onChange={(e) => handleEditChange("observacoes", e.target.value)}
-                      />
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        className="h-10 px-4 rounded bg-gray-200 dark:bg-meta-4 hover:bg-gray-300 dark:hover:bg-opacity-90 text-black dark:text-white"
+                        onClick={closeEditModal}
+                      >
+                        Fechar
+                      </button>
+                      <button
+                        type="submit"
+                        className={`h-10 px-4 rounded text-white font-semibold ${editLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+                          }`}
+                        disabled={editLoading}
+                      >
+                        {editLoading ? "Salvando..." : "Salvar"}
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Combustível (%)</label>
-                      <input
-                        type="number"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.combustivelPercentual ?? ""}
-                        onChange={(e) => handleEditChange("combustivelPercentual", Number(e.target.value))}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Nome</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.clienteNome ?? ""}
-                        onChange={(e) => handleEditChange("clienteNome", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Doc</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.clienteDoc ?? ""}
-                        onChange={(e) => handleEditChange("clienteDoc", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Tel</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.clienteTel ?? ""}
-                        onChange={(e) => handleEditChange("clienteTel", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Cliente Endereço</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.clienteEnd ?? ""}
-                        onChange={(e) => handleEditChange("clienteEnd", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo Nome</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.veiculoNome ?? ""}
-                        onChange={(e) => handleEditChange("veiculoNome", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo Placa</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.veiculoPlaca ?? ""}
-                        onChange={(e) => handleEditChange("veiculoPlaca", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo Cor</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.veiculoCor ?? ""}
-                        onChange={(e) => handleEditChange("veiculoCor", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold">Veículo KM</label>
-                      <input
-                        type="text"
-                        className="w-full border rounded px-2 py-1"
-                        value={editData.veiculoKm ?? ""}
-                        onChange={(e) => handleEditChange("veiculoKm", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  {/* Itens do checklist */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Itens do Checklist</label>
-                    <div className="space-y-2">
-                      {editData.ofi_checklists_items?.map((item: any, idx: number) => (
-                        <div key={item.id ?? idx} className="grid grid-cols-3 gap-2">
-                          <input
-                            type="text"
-                            className="border rounded px-2 py-1"
-                            value={item.item ?? ""}
-                            onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "item", e.target.value)}
-                          />
-                          <input
-                            type="text"
-                            className="border rounded px-2 py-1"
-                            value={item.status ?? ""}
-                            onChange={(e) => handleEditArrayChange("ofi_checklists_items", idx, "status", e.target.value)}
-                          />
-                          <span className="text-xs text-gray-400">ID: {item.id}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Avarias */}
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Avarias</label>
-                    <div className="space-y-2">
-                      {editData.ofi_checklists_avarias?.map((av: any, idx: number) => (
-                        <div key={av.id ?? idx} className="grid grid-cols-4 gap-2">
-                          <input
-                            type="text"
-                            className="border rounded px-2 py-1"
-                            value={av.tipo ?? ""}
-                            onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "tipo", e.target.value)}
-                            placeholder="Tipo"
-                          />
-                          <input
-                            type="text"
-                            className="border rounded px-2 py-1"
-                            value={av.peca ?? ""}
-                            onChange={(e) => handleEditArrayChange("ofi_checklists_avarias", idx, "peca", e.target.value)}
-                            placeholder="Peça"
-                          />
-                          <input
-                            type="text"
-                            className="border rounded px-2 py-1"
-                            value={av.observacoes ?? ""}
-                            onChange={(e) =>
-                              handleEditArrayChange("ofi_checklists_avarias", idx, "observacoes", e.target.value)
-                            }
-                            placeholder="Observações"
-                          />
-                          <span className="text-xs text-gray-400">ID: {av.id}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300"
-                      onClick={closeEditModal}
-                    >
-                      Fechar
-                    </button>
-                    <button
-                      type="submit"
-                      className={`h-10 px-4 rounded text-white font-semibold ${
-                        editLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
-                      }`}
-                      disabled={editLoading}
-                    >
-                      {editLoading ? "Salvando..." : "Salvar"}
-                    </button>
-                  </div>
-                </form>
-              )}
+                  </form>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* ====== MODAL DE VISUALIZAÇÃO (somente leitura) ====== */}
-      {viewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
-          <div className="absolute inset-0 bg-black/60" onClick={closeViewModal} />
-          <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <div className="font-semibold">Checklist - Visualização</div>
-              <button
-                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100"
-                onClick={closeViewModal}
-                title="Fechar"
-              >
-                <FaTimes />
-              </button>
-            </div>
+      {
+        viewModalOpen && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center" aria-modal="true" role="dialog">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeViewModal} />
+            <div className="relative z-10 w-full max-w-3xl mx-4 rounded-xl bg-white dark:bg-boxdark shadow-2xl">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-strokedark">
+                <div className="font-semibold text-black dark:text-white">Checklist - Visualização</div>
+                <button
+                  className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+                  onClick={closeViewModal}
+                  title="Fechar"
+                >
+                  <FaTimes />
+                </button>
+              </div>
 
-            <div className="p-4 max-h-[70vh] overflow-y-auto">
-              {viewLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
-              {viewError && <div className="py-16 text-center text-red-600">{viewError}</div>}
+              <div className="p-4 max-h-[70vh] overflow-y-auto">
+                {viewLoading && <div className="py-16 text-center text-gray-600">Carregando...</div>}
+                {viewError && <div className="py-16 text-center text-red-600">{viewError}</div>}
 
-              {viewData && (
-                <div className="space-y-6">
-                  {/* Campos principais (read-only) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="OS Interna" value={viewData.osInterna} />
-                    <Field label="Data/Hora Entrada" value={fmtDateTime(viewData.dataHoraEntrada)} />
-                    <Field label="Observações" value={viewData.observacoes} />
-                    <Field label="Combustível (%)" value={viewData.combustivelPercentual} />
-                    <Field label="Cliente Nome" value={viewData.clienteNome} />
-                    <Field label="Cliente Doc" value={viewData.clienteDoc} />
-                    <Field label="Cliente Tel" value={viewData.clienteTel} />
-                    <Field label="Cliente Endereço" value={viewData.clienteEnd} />
-                    <Field label="Veículo Nome" value={viewData.veiculoNome} />
-                    <Field label="Veículo Placa" value={viewData.veiculoPlaca} />
-                    <Field label="Veículo Cor" value={viewData.veiculoCor} />
-                    <Field label="Veículo KM" value={viewData.veiculoKm} />
+                {viewData && (
+                  <div className="flex flex-col h-full">
+                    {/* Abas */}
+                    <div className="flex border-b border-gray-200 dark:border-strokedark mb-4">
+                      <button
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${viewTab === 0
+                          ? "border-b-2 border-blue-600 text-blue-600 dark:text-blue-400"
+                          : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                          }`}
+                        onClick={() => setViewTab(0)}
+                      >
+                        Dados Cadastrais
+                      </button>
+                      <button
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${viewTab === 1
+                          ? "border-b-2 border-blue-600 text-blue-600 dark:text-blue-400"
+                          : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                          }`}
+                        onClick={() => setViewTab(1)}
+                      >
+                        Itens do Checklist
+                      </button>
+                      <button
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${viewTab === 2
+                          ? "border-b-2 border-blue-600 text-blue-600 dark:text-blue-400"
+                          : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                          }`}
+                        onClick={() => setViewTab(2)}
+                      >
+                        Avarias
+                      </button>
+                    </div>
+
+                    {/* Conteúdo das Abas */}
+                    <div className="flex-1 overflow-y-auto">
+                      {/* Aba 0: Dados Cadastrais */}
+                      {viewTab === 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <Field label="OS Interna" value={viewData.osInterna} />
+                          <Field label="Data/Hora Entrada" value={fmtDateTime(viewData.dataHoraEntrada)} />
+                          <Field label="Nome/Razão Social" value={viewData.clienteNome} />
+                          <Field label="Documento" value={viewData.clienteDoc} />
+                          <Field label="Telefone" value={viewData.clienteTel} />
+                          <Field label="Endereço" value={viewData.clienteEnd} />
+                          <Field label="Veículo" value={viewData.veiculoNome} />
+                          <Field label="Placa" value={viewData.veiculoPlaca} />
+                          <Field label="Cor" value={viewData.veiculoCor} />
+                          <Field label="KM" value={viewData.veiculoKm} />
+                          <Field label="Combustível (%)" value={viewData.combustivelPercentual} />
+                          <Field label="Observações" value={viewData.observacoes} />
+                        </div>
+                      )}
+
+                      {/* Aba 1: Itens do Checklist */}
+                      {viewTab === 1 && (
+                        <div>
+                          <div className="block text-sm font-semibold mb-2 text-black dark:text-white">Itens do Checklist</div>
+                          {Array.isArray(viewData.ofi_checklists_items) && viewData.ofi_checklists_items.length > 0 ? (
+                            <div className="space-y-2">
+                              {viewData.ofi_checklists_items.map((item: any) => (
+                                <div key={item.id} className="grid grid-cols-3 gap-2 text-sm">
+                                  <Field label="Item" value={item.item} compact />
+                                  <Field label="Status" value={item.status} compact />
+                                  <div className="text-xs text-gray-400 self-center">ID: {item.id}</div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">Sem itens.</div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Aba 2: Avarias */}
+                      {viewTab === 2 && (
+                        <div>
+                          <div className="block text-sm font-semibold mb-2 text-black dark:text-white">Avarias</div>
+                          {Array.isArray(viewData.ofi_checklists_avarias) && viewData.ofi_checklists_avarias.length > 0 ? (
+                            <div className="space-y-4">
+                              {viewData.ofi_checklists_avarias.map((av: any) => {
+                                // Tentar encontrar imagem correspondente (por peça/tipo/obs ou apenas listar disponíveis)
+                                // Como não temos ID direto, vamos listar um botão que abre a imagem se encontrarmos correspondência
+                                // Ou melhor: listar todas as imagens associadas a este checklist se não conseguirmos vincular 1:1
+                                // Mas o usuário pediu "link para a imagem de CADA avaria".
+                                // Vamos tentar casar pelo índice ou conteúdo se possível.
+                                // O endpoint de imagens retorna lista. Vamos assumir que a ordem pode ser a mesma ou tentar casar campos.
+                                const matchingImg = viewImages.find(
+                                  (img) =>
+                                    (img.peca === av.peca && img.tipo === av.tipo && img.observacoes === av.observacoes)
+                                );
+
+                                return (
+                                  <div key={av.id} className="border border-gray-200 dark:border-strokedark rounded-lg p-3 bg-gray-50 dark:bg-meta-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm mb-2">
+                                      <Field label="Tipo" value={av.tipo} compact />
+                                      <Field label="Peça" value={av.peca} compact />
+                                      <Field label="Observações" value={av.observacoes} compact />
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2">
+                                      <div className="text-xs text-gray-400">ID: {av.id}</div>
+                                      {matchingImg?.imageUrl ? (
+                                        <a
+                                          href={matchingImg.imageUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                                        >
+                                          <FaImages /> Ver Imagem
+                                        </a>
+                                      ) : (
+                                        <span className="text-xs text-gray-400 italic">Sem imagem vinculada</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">Sem avarias.</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                )}
+              </div>
 
-                  {/* Itens do checklist */}
-                  <div>
-                    <div className="block text-sm font-semibold mb-2">Itens do Checklist</div>
-                    {Array.isArray(viewData.ofi_checklists_items) && viewData.ofi_checklists_items.length > 0 ? (
-                      <div className="space-y-2">
-                        {viewData.ofi_checklists_items.map((item: any) => (
-                          <div key={item.id} className="grid grid-cols-3 gap-2 text-sm">
-                            <Field label="Item" value={item.item} compact />
-                            <Field label="Status" value={item.status} compact />
-                            <div className="text-xs text-gray-400 self-center">ID: {item.id}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500">Sem itens.</div>
-                    )}
-                  </div>
-
-                  {/* Avarias */}
-                  <div>
-                    <div className="block text-sm font-semibold mb-2">Avarias</div>
-                    {Array.isArray(viewData.ofi_checklists_avarias) && viewData.ofi_checklists_avarias.length > 0 ? (
-                      <div className="space-y-2">
-                        {viewData.ofi_checklists_avarias.map((av: any) => (
-                          <div key={av.id} className="grid grid-cols-4 gap-2 text-sm">
-                            <Field label="Tipo" value={av.tipo} compact />
-                            <Field label="Peça" value={av.peca} compact />
-                            <Field label="Observações" value={av.observacoes} compact />
-                            <div className="text-xs text-gray-400 self-center">ID: {av.id}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500">Sem avarias.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
-              <button className="h-10 px-4 rounded bg-gray-200 hover:bg-gray-300" onClick={closeViewModal}>
-                Fechar
-              </button>
+              <div className="px-4 py-3 border-t border-gray-200 dark:border-strokedark flex items-center justify-end gap-2">
+                <button className="h-10 px-4 rounded bg-gray-200 dark:bg-meta-4 hover:bg-gray-300 dark:hover:bg-opacity-90 text-black dark:text-white" onClick={closeViewModal}>
+                  Fechar
+                </button>
+                {isAdmin && viewData && (
+                  <button
+                    className="h-10 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center gap-2"
+                    onClick={() => {
+                      const os = viewData.osInterna;
+                      closeViewModal();
+                      if (os) openEditModal(os);
+                    }}
+                  >
+                    <FaEdit />
+                    Editar
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
     </div>
+
   );
 }
 
@@ -1327,9 +1480,9 @@ function Field({
   const display =
     value === null || value === undefined || value === "" ? "—" : String(value);
   return (
-    <div className={compact ? "" : "border rounded px-3 py-2 bg-gray-50"}>
-      <div className={`text-xs ${compact ? "text-gray-500" : "text-gray-600"} mb-1`}>{label}</div>
-      <div className="text-sm">{display}</div>
+    <div className={compact ? "" : "border border-gray-200 dark:border-strokedark rounded px-3 py-2 bg-gray-50 dark:bg-meta-4"}>
+      <div className={`text-xs ${compact ? "text-gray-500 dark:text-gray-400" : "text-gray-600 dark:text-gray-300"} mb-1`}>{label}</div>
+      <div className="text-sm text-black dark:text-white">{display}</div>
     </div>
   );
 }

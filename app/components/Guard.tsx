@@ -6,18 +6,19 @@ import { canOnPathPrefix } from "../lib/ability";
 
 
 export function Guard({ children }: { children: React.ReactNode }) {
-const ability = React.useContext(AbilityContext);
-const path = usePathname();
-const router = useRouter();
+    const ability = React.useContext(AbilityContext);
+    const path = usePathname();
+    const router = useRouter();
 
 
-React.useEffect(() => {
-if (!canOnPathPrefix(ability, "read", path || "/")) {
-router.replace("/403");
-}
-}, [ability, path, router]);
+    React.useEffect(() => {
+        if (path === "/login" || path === "/403") return; // ✅ Allow public access
+        if (!canOnPathPrefix(ability, "read", path || "/")) {
+            router.replace("/403");
+        }
+    }, [ability, path, router]);
 
 
-if (!path) return null;
-return <>{children}</>;
+    if (!path) return null;
+    return <>{children}</>;
 }

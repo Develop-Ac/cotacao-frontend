@@ -77,16 +77,16 @@ function Card({
   let priorityClasses = "";
   switch (task.prioridade) {
     case "alta":
-      priorityClasses = "bg-red-100 text-red-700 border-red-200";
+      priorityClasses = "bg-red-100 text-red-700 border-red-200 dark:bg-red-500/15 dark:text-red-400 dark:border-transparent";
       break;
     case "media":
-      priorityClasses = "bg-amber-100 text-amber-700 border-amber-200";
+      priorityClasses = "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-transparent";
       break;
     case "baixa":
-      priorityClasses = "bg-emerald-100 text-emerald-700 border-emerald-200";
+      priorityClasses = "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-transparent";
       break;
     default:
-      priorityClasses = "bg-gray-100 text-gray-600 border-gray-200";
+      priorityClasses = "bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/5 dark:text-white/80 dark:border-transparent";
   }
   const dueDate = task.due ? new Date(task.due) : null;
   const isOverdue = dueDate ? dueDate < new Date() : false;
@@ -100,35 +100,35 @@ function Card({
       onClick={() => onOpen && onOpen()}
       data-kanban-card="true"
       className={`rounded-lg border border-gray-200 dark:border-neutral-700 p-3 
-                  bg-white dark:bg-neutral-800 
-                  transition-all duration-150 ease-out cursor-pointer group
+                  bg-white dark:bg-[#0e1116] 
+                  transition-all duration-300 ease-out cursor-pointer group
                   ${isDragging
           ? "shadow-xl ring-2 ring-blue-500 rotate-2 z-50"
           : "shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700"
         }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          {task.prioridade && (
-            <span
-              className={`priority-badge inline-flex items-center px-2 py-0.5 
-                          text-[10px] font-semibold rounded border uppercase ${priorityClasses}`}
-            >
-              {task.prioridade}
-            </span>
-          )}
-          <h4 className="text-sm font-medium leading-5 text-gray-900 dark:text-gray-100 line-clamp-3">
-            {task.title}
-          </h4>
-        </div>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <h4 className="text-sm font-medium leading-5 text-gray-900 dark:text-[#d6d6d8] line-clamp-3">
+          {task.title}
+        </h4>
+        {task.prioridade && (
+          <span
+            className={`priority-badge inline-flex items-center px-2 py-0.5 
+                        text-[10px] font-semibold rounded border uppercase shrink-0 ${priorityClasses}`}
+          >
+            {task.prioridade}
+          </span>
+        )}
+      </div>
 
-        <div className="flex items-start gap-2">
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div>
           {dueDate && (
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] leading-tight font-semibold border whitespace-nowrap
                 ${isOverdue
-                  ? "bg-red-500 text-white border-red-600"
-                  : "bg-gray-100 text-gray-700 border-gray-300"
+                  ? "bg-red-500 text-white border-red-600 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/20"
+                  : "bg-gray-100 text-gray-700 border-gray-300 dark:bg-white/5 dark:text-white/80 dark:border-white/10"
                 }
               `}
             >
@@ -136,15 +136,13 @@ function Card({
             </span>
           )}
         </div>
-      </div>
 
-      <div className="mt-3 flex items-center justify-end gap-2">
         {task.responsavel && (
           <div
             className="flex items-center"
             title={`Responsável: ${task.responsavel}`}
           >
-            <div className="inline-flex items-center justify-center rounded-md bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 px-2 py-1 min-h-[28px] min-w-[28px] whitespace-nowrap">
+            <div className="inline-flex items-center justify-center rounded-md bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 px-2 py-1 min-h-[28px] min-w-[28px] whitespace-nowrap dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/15">
               {task.responsavel}
             </div>
           </div>
@@ -177,8 +175,7 @@ function Column({
   return (
     <div
       data-col={colKey}
-      className="flex flex-col w-[280px] shrink-0 max-h-full rounded-xl bg-[#F2F3F5] dark:bg-neutral-900/50 border border-gray-200/60 dark:border-neutral-800"
-      style={{ backgroundColor: "#F2F3F5" }} // garante cor fixa no tema claro
+      className="flex flex-col w-[280px] shrink-0 max-h-full rounded-xl bg-gray-200 dark:bg-[#171c23] border border-gray-300/60 dark:border-neutral-700"
     >
       {/* Column Header */}
       <div className="p-3 flex items-center justify-between shrink-0">
@@ -241,7 +238,7 @@ function Column({
 
       <div className="p-2 shrink-0">
         {isAdding ? (
-          <div className="p-2 bg-white dark:bg-neutral-800 rounded-lg border border-blue-200 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+          <div className="p-2 bg-white dark:bg-neutral-800 rounded-lg border border-blue-200 shadow-sm animate-in fade-in zoom-in-95 duration-300">
             <textarea
               autoFocus
               value={value}
@@ -259,7 +256,7 @@ function Column({
                 }
               }}
               placeholder="Insira um título para este cartão..."
-              className="w-full text-sm bg-transparent border-none focus:ring-0 p-0 resize-none placeholder:text-gray-400"
+              className="w-full text-sm bg-transparent border-none focus:ring-0 p-0 resize-none placeholder:text-gray-400 text-gray-900 dark:text-gray-100"
               rows={3}
             />
             <div className="flex items-center gap-2 mt-2">
@@ -276,7 +273,7 @@ function Column({
               </button>
               <button
                 onClick={() => setIsAdding(false)}
-                className="p-1.5 text-gray-500 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded"
+                className="p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded"
               >
                 ✕
               </button>
@@ -674,8 +671,7 @@ export default function Page() {
 
   return (
     <div
-      className="h-full flex flex-col overflow-hidden"
-      style={{ backgroundColor: "#407595" }}
+      className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900"
     >
       {/* Header Toolbar DENTRO do container principal da intranet */}
       <div className="flex items-center gap-4 px-6 py-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur border-b border-gray-200 dark:border-neutral-800 shrink-0 z-10">
@@ -995,15 +991,15 @@ export default function Page() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-neutral-900 rounded-xl w-full max-w-md shadow-2xl">
               <div className="p-6 border-b border-gray-100 dark:border-neutral-800">
-                <h2 className="text-lg font-bold">Criar Automação</h2>
-                <p className="text-sm text-gray-500">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Criar Automação</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   Crie cards automaticamente em horários específicos.
                 </p>
               </div>
 
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     Título do card
                   </label>
                   <input
@@ -1011,13 +1007,13 @@ export default function Page() {
                     onChange={(e) =>
                       setAutomation({ ...automation, title: e.target.value })
                     }
-                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="Ex: Verificar estoque"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     Horário (HH:MM)
                   </label>
                   <input
@@ -1026,12 +1022,12 @@ export default function Page() {
                       setAutomation({ ...automation, time: e.target.value })
                     }
                     placeholder="08:30"
-                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
                     Coluna de destino
                   </label>
                   <select
@@ -1042,7 +1038,7 @@ export default function Page() {
                         col: e.target.value as ColumnKey,
                       })
                     }
-                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     {COLS.map((c) => (
                       <option key={c.key} value={c.key}>
@@ -1056,7 +1052,7 @@ export default function Page() {
               <div className="p-6 border-t border-gray-100 dark:border-neutral-800 flex justify-end gap-3 bg-gray-50 dark:bg-neutral-900/50 rounded-b-xl">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-800 rounded-lg transition-colors"
                 >
                   Cancelar
                 </button>

@@ -1,23 +1,21 @@
 "use client";
 
 import "../globals.css";
-import logo from './assets/images/logo.svg';
-import logo_mini from './assets/images/logo-mini.svg';
 import logoSidebarFull from './assets/images/logo_completa.png';
 import logoSidebarIcon from './assets/images/logo_icon.png';
-import acLogoMin from './assets/images/AC_logo_min.png';
 import PrivateRoute from "@/components/PrivateRoute";
 import { useRouter, usePathname } from "next/navigation";
 import Image from 'next/image';
-import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight } from "react-icons/md";
-import { FaShoppingCart, FaWrench, FaBox, FaTruck, FaCog, FaChevronRight, FaClipboardCheck } from 'react-icons/fa';
-import { IoPersonSharp } from "react-icons/io5";
+import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight, MdSearch } from "react-icons/md";
+import { HiOutlineShoppingCart, HiOutlineWrench, HiOutlineCube, HiOutlineTruck, HiOutlineClipboardDocumentCheck, HiOutlineUser, HiOutlineCog } from "react-icons/hi2";
 import Link from "next/link";
-import { useState, useEffect, MouseEvent, useContext, useMemo } from "react";
+import { useState, useEffect, MouseEvent, useContext } from "react";
 
 // ⬇️ Permissão (sem alterar visuais)
 import { AbilityContext } from "../components/AbilityProvider";
 import { canOnPathPrefix, normalizePath } from "../lib/ability";
+import SidebarMenuItem from "./components/SidebarMenuItem";
+import ProfileDropdown from "./components/ProfileDropdown";
 
 export default function RootLayout({
   children,
@@ -38,15 +36,10 @@ export default function RootLayout({
     } catch { /* ignore */ }
   }, []);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [popover, setPopover] = useState<{ top: number; left: number; section: string } | null>(null);
-  const [subPopover, setSubPopover] = useState<{ top: number; left: number; items: { label: string; href: string }[] } | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile toggle
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop collapse
+
   const [isNavigating, setIsNavigating] = useState(false);
-  const expandedSidebarWidth = 256;
-  const collapsedSidebarWidth = 72;
-  const sidebarWidth = sidebarCollapsed ? collapsedSidebarWidth : expandedSidebarWidth;
-  const navHeight = 64;
-  const iconSpacingClass = sidebarCollapsed ? 'mr-0' : 'mr-3';
 
   const isPathActive = (target: string) =>
     target === '/'
@@ -61,37 +54,6 @@ export default function RootLayout({
     qualidade: isPathActive('/qualidade'),
     sistema: isPathActive('/usuario'),
   };
-
-  const buttonMotionClasses = "transition-transform duration-200 ease-out hover:scale-105 active:scale-95";
-
-  const summaryClasses = (active: boolean) =>
-    `flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'px-4'} py-2 cursor-pointer rounded transition-all duration-300 ease-in-out ${active && !sidebarCollapsed ? 'bg-blue-100 text-[var(--primary-600)] font-semibold shadow-inner' : 'text-gray-700 hover:bg-blue-50'
-    } ${active && sidebarCollapsed ? 'text-[var(--primary-600)]' : ''}`;
-
-  const iconClasses = (active: boolean) =>
-    `text-xl transform transition-all duration-300 ease-in-out ${active ? 'text-[var(--primary-600)]' : 'text-gray-700'
-    } ${sidebarCollapsed ? 'scale-110 translate-x-0' : 'scale-100 translate-x-1'}`;
-
-  const linkClasses = (href: string, exact = false) => {
-    const active = exact ? pathname === href : isPathActive(href);
-    return `text-gray-600 py-1 px-2 rounded hover:bg-blue-100 ${active ? 'bg-blue-100 text-[var(--primary-600)] font-medium' : ''}`;
-  };
-
-  const textTransitionClass = sidebarCollapsed
-    ? 'opacity-0 -translate-x-2 pointer-events-none'
-    : 'opacity-100 translate-x-0 pointer-events-auto';
-
-  const labelStyle = (order = 0) => ({
-    display: 'inline-block',
-    transition: 'opacity 280ms ease, transform 280ms ease, max-width 280ms ease',
-    transitionDelay: `${order * 40}ms`,
-    maxWidth: sidebarCollapsed ? '0px' : '200px',
-  });
-  const cascadeStyle = (index: number, step = 40) => ({
-    transitionDelay: `${index * step}ms`,
-  });
-  const cascadeItemClass = () =>
-    `transition-all duration-300 ease-out opacity-0 -translate-y-2 group-open:opacity-100 group-open:translate-y-0`;
 
   // ---------- Permissões: helpers ----------
   const canViewPath = (href: string) => {
@@ -160,12 +122,6 @@ export default function RootLayout({
     return userModules.includes(module);
   };
 
-  // Para popover quando sidebar colapsada (já filtrado por canView)
-  const popoverItems = useMemo(() => {
-    if (!popover) return [];
-    return getVisibleSubmenuItems(popover.section);
-  }, [popover, ability, userData]); // ability muda quando user troca
-
   function deslogar() {
     window.localStorage.setItem('auth', 'false');
     window.localStorage.removeItem('userData');
@@ -185,561 +141,176 @@ export default function RootLayout({
     setIsNavigating(true);
     try {
       await router.push(href);
+      setSidebarOpen(false); // Close mobile sidebar on navigation
     } finally {
       setIsNavigating(false);
     }
   };
 
-  // bloqueio por canView (somente navega se puder ver)
-  if (pathname !== "/login" && pathname !== "/" && !canViewPath(pathname)) {
-    router.replace("/403");
-    return;
-  }
+  useEffect(() => {
+    const target = normalizePath(pathname);
+    if (target !== "/login" && target !== "/" && !canViewPath(target)) {
+      router.replace("/403");
+    }
+  }, [pathname, ability]);
 
   return (
     <PrivateRoute>
-      <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
-        <nav
-          role="navigation"
-          className="fixed top-0 flex items-center justify-between bg-gradient-to-r from-[var(--primary-600)] to-[var(--secondary-500)] shadow px-6 z-50 h-16 transition-all duration-300 text-white"
-          style={{ left: sidebarWidth, width: `calc(100% - ${sidebarWidth}px)` }}
+      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
+        {/* Sidebar Start */}
+        <aside
+          className={`fixed left-0 top-0 z-9999 flex h-screen flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-black lg:static lg:translate-x-0 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            } ${sidebarCollapsed ? 'lg:w-[90px] overflow-visible' : 'lg:w-[250px] w-[250px] overflow-y-hidden'}`}
         >
-          <div className="flex items-center gap-2">
-            <span className="text-sm sm:text-base font-medium">
-              Olá, {userData?.usuario?.split(' ')[0] || 'Usuário'}!
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ul className="flex items-center gap-2">
-              <li>
-                <button aria-label="notificações" className={`p-2 rounded hidden lg:block hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${buttonMotionClasses}`}>
-                  <MdOutlineNotificationsNone className="text-xl text-white" />
-                </button>
-              </li>
-              <li className="relative">
-                <button aria-label="notificações" className={`p-2 rounded relative lg:hidden hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${buttonMotionClasses}`}>
-                  <MdOutlineNotificationsNone className="text-xl text-white" />
-                  <span className="absolute top-0 right-0 block w-2 h-2 bg-red-400 rounded-full"></span>
-                </button>
-              </li>
-              <li>
-                <button aria-label="logout" onClick={deslogar} className={`p-2 rounded hidden lg:block hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${buttonMotionClasses}`}>
-                  <MdPowerSettingsNew className="text-xl text-white" />
-                </button>
-              </li>
-            </ul>
-          </div>
-        </nav>
-
-        <div className="flex">
-          <aside
-            className={`fixed top-0 left-0 h-screen bg-white shadow-xl flex flex-col overflow-y-auto overflow-x-visible transition-all duration-300 z-40 ${sidebarCollapsed ? 'no-scrollbar' : ''}`}
-            style={{ width: sidebarWidth }}
-          >
-            <div className="p-4 flex flex-col items-center gap-4 bg-white text-gray-700">
-              <div
-                className="relative flex items-center justify-center w-full mb-4 overflow-visible"
-                style={{ height: 90 }}
-              >
-                <Image
-                  src={logoSidebarFull.src}
-                  alt="Logomarca lateral completa"
-                  width={200}
-                  height={80}
-                  className={`absolute transition-all duration-300 ease-in-out object-contain ${sidebarCollapsed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
-                  priority
-                />
-                <Image
-                  src={logoSidebarIcon.src}
-                  alt="Ícone da logomarca"
-                  width={83}
-                  height={83}
-                  className={`absolute transition-all duration-300 ease-in-out object-contain ${sidebarCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}
-                  priority
-                />
-              </div>
-              <div className="flex items-center justify-between w-full">
-                <span
-                  className={`font-semibold text-gray-700 whitespace-nowrap ${textTransitionClass}`}
-                  style={labelStyle(0)}
-                  aria-hidden={sidebarCollapsed ? true : undefined}
-                >
-                  Menu Principal
+          {/* Sidebar Header */}
+          <div className={`flex items-center justify-center gap-2 pt-4 pb-2`}>
+            <Link href="/" className="block w-full">
+              <div className="relative flex items-center justify-center h-[50px]">
+                <span className={`logo transition-opacity duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`}>
+                  <Image
+                    src={logoSidebarFull}
+                    alt="Logo"
+                    width={150}
+                    height={50}
+                    className="dark:hidden"
+                    priority
+                  />
+                  <Image
+                    src={logoSidebarFull}
+                    alt="Logo"
+                    width={150}
+                    height={50}
+                    className="hidden dark:block"
+                    priority
+                  />
                 </span>
-                <button
-                  aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
-                  onClick={() => setSidebarCollapsed(prev => !prev)}
-                  type="button"
-                  className={`p-2 rounded-lg text-white bg-[var(--primary-600)] hover:bg-[var(--primary-800)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary-600)] ${buttonMotionClasses}`}
-                >
-                  <MdMenu className="text-xl text-inherit" />
-                </button>
+                <Image
+                  src={logoSidebarIcon}
+                  alt="Logo"
+                  width={50}
+                  height={50}
+                  className={`logo-icon transition-all duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
+                  priority
+                />
               </div>
-            </div>
-            <ul className="flex flex-col gap-2 mt-4">
-              {/* COMPRAS */}
-              {hasAccessToModule('Compras') && hasAnyVisibleInSection('Compras') && (
-                <li>
-                  <details className="group">
-                    <summary
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Compras' });
-                        }
-                      }}
-                      className={summaryClasses(sectionActive.compras)}
-                    >
-                      <FaShoppingCart title="Compras" className={`${iconSpacingClass} ${iconClasses(sectionActive.compras)}`} />
-                      <span
-                        className={`font-medium whitespace-nowrap ${textTransitionClass}`}
-                        style={labelStyle(1)}
-                        aria-hidden={sidebarCollapsed ? true : undefined}
-                      >
-                        Compras
-                      </span>
-                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-                    </summary>
-
-                    {!sidebarCollapsed && (
-                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-
-                          {/* Cotação (grupo) */}
-                          {(canViewPath('/compras/cotacao') ||
-                            canViewPath('/compras/cotacao/comparativo') ||
-                            canViewPath('/compras/cotacao/pedido')) && (
-                              <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                                <details className="group">
-                                  <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/cotacao') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
-                                    <span className="font-medium">Cotação</span>
-                                    <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
-                                  </summary>
-                                  <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                                    <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                                      {canViewPath('/compras/cotacao') && (
-                                        <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                                          <Link href="/compras/cotacao" onClick={(e) => handleNavigation('/compras/cotacao', e)} className={linkClasses('/compras/cotacao', true)}>
-                                            Criar Cotação
-                                          </Link>
-                                        </li>
-                                      )}
-                                      {canViewPath('/compras/cotacao/comparativo') && (
-                                        <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                                          <Link href="/compras/cotacao/comparativo" onClick={(e) => handleNavigation('/compras/cotacao/comparativo', e)} className={linkClasses('/compras/cotacao/comparativo')}>
-                                            Comparativo
-                                          </Link>
-                                        </li>
-                                      )}
-                                      {canViewPath('/compras/cotacao/pedido') && (
-                                        <li className={cascadeItemClass()} style={cascadeStyle(2)}>
-                                          <Link href="/compras/cotacao/pedido" onClick={(e) => handleNavigation('/compras/cotacao/pedido', e)} className={linkClasses('/compras/cotacao/pedido')}>
-                                            Pedido
-                                          </Link>
-                                        </li>
-                                      )}
-                                    </ul>
-                                  </div>
-                                </details>
-                              </li>
-                            )}
-
-                          {/* Nota Fiscal */}
-                          {canViewPath('/compras/notaFiscal/notaFiscal') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                              <details className="group">
-                                <summary className={`flex items-center px-4 py-2 cursor-pointer rounded transition ${isPathActive('/compras/notaFiscal') ? 'bg-blue-50 text-[var(--primary-600)] font-medium' : 'text-gray-700 hover:bg-blue-50'}`}>
-                                  <span className="font-medium">Nota Fiscal</span>
-                                  <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />
-                                </summary>
-                                <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                                  <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                                    <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                                      <Link href="/compras/notaFiscal/notaFiscal" onClick={(e) => handleNavigation('/compras/notaFiscal/notaFiscal', e)} className={linkClasses('/compras/notaFiscal/notaFiscal', true)}>
-                                        Lista
-                                      </Link>
-                                    </li>
-                                  </ul>
-                                </div>
-                              </details>
-                            </li>
-                          )}
-
-                          {/* Kanban */}
-                          {canViewPath('/compras/kanban') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(2)}>
-                              <Link href="/compras/kanban" onClick={(e) => handleNavigation('/compras/kanban', e)} className={`${linkClasses('/compras/kanban')} px-4 block`}>
-                                Kanban
-                              </Link>
-                            </li>
-                          )}
-
-                        </ul>
-                      </div>
-                    )}
-                  </details>
-                </li>
-              )}
-
-              {/* OFICINA */}
-              {hasAccessToModule('Oficina') && hasAnyVisibleInSection('Oficina') && (
-                <li>
-                  <details className="group">
-                    <summary
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Oficina' });
-                        }
-                      }}
-                      className={summaryClasses(sectionActive.oficina)}
-                    >
-                      <FaWrench title="Oficina" className={`${iconSpacingClass} ${iconClasses(sectionActive.oficina)}`} />
-                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(2)} aria-hidden={sidebarCollapsed ? true : undefined}>
-                        Oficina
-                      </span>
-                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-                    </summary>
-                    {!sidebarCollapsed && (
-                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          {canViewPath('/oficina/checkList') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <Link href="/oficina/checkList" onClick={(e) => handleNavigation('/oficina/checkList', e)} className={linkClasses('/oficina/checkList')}>
-                                Check List
-                              </Link>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </details>
-                </li>
-              )}
-
-              {/* ESTOQUE */}
-              {hasAccessToModule('Estoque') && hasAnyVisibleInSection('Estoque') && (
-                <li>
-                  <details className="group">
-                    <summary
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Estoque' });
-                        }
-                      }}
-                      className={summaryClasses(sectionActive.estoque)}
-                    >
-                      <FaBox title="Estoque" className={`${iconSpacingClass} ${iconClasses(sectionActive.estoque)}`} />
-                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(3)} aria-hidden={sidebarCollapsed ? true : undefined}>
-                        Estoque
-                      </span>
-                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-                    </summary>
-                    {!sidebarCollapsed && (
-                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          {canViewPath('/estoque/contagem') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <Link href="/estoque/contagem" onClick={(e) => handleNavigation('/estoque/contagem', e)} className={linkClasses('/estoque/contagem')}>
-                                Contagem
-                              </Link>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </details>
-                </li>
-              )}
-
-              {/* EXPEDIÇÃO */}
-              {hasAccessToModule('Expedição') && hasAnyVisibleInSection('Expedicao') && (
-                <li>
-                  <details className="group">
-                    <summary
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Expedicao' });
-                        }
-                      }}
-                      className={summaryClasses(sectionActive.expedicao)}
-                    >
-                      <FaTruck title="Expedição" className={`${iconSpacingClass} ${iconClasses(sectionActive.expedicao)}`} />
-                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(4)} aria-hidden={sidebarCollapsed ? true : undefined}>
-                        Expedição
-                      </span>
-                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-                    </summary>
-                    {!sidebarCollapsed && (
-                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          {canViewPath('/expedicao/dashboard') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <Link href="/expedicao/dashboard" onClick={(e) => handleNavigation('/expedicao/dashboard', e)} className={linkClasses('/expedicao/dashboard')}>
-                                Dashboard
-                              </Link>
-                            </li>
-                          )}
-                          {canViewPath('/expedicao/aplicativo') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <Link href="/expedicao/aplicativo" onClick={(e) => handleNavigation('/expedicao/aplicativo', e)} className={linkClasses('/expedicao/aplicativo')}>
-                                Aplicativo
-                              </Link>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </details>
-                </li>
-              )}
-
-              {/* QUALIDADE */}
-              {hasAccessToModule('Qualidade') && hasAnyVisibleInSection('Qualidade') && (
-                <li>
-                  <details className="group">
-                    <summary
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Qualidade' });
-                        }
-                      }}
-                      className={summaryClasses(sectionActive.qualidade)}
-                    >
-                      <FaClipboardCheck title="Qualidade" className={`${iconSpacingClass} ${iconClasses(sectionActive.qualidade)}`} />
-                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(5)} aria-hidden={sidebarCollapsed ? true : undefined}>
-                        Qualidade
-                      </span>
-                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-                    </summary>
-                    {!sidebarCollapsed && (
-                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          {canViewPath('/qualidade') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <Link href="/qualidade" onClick={(e) => handleNavigation('/qualidade', e)} className={linkClasses('/qualidade', true)}>
-                                Central
-                              </Link>
-                            </li>
-                          )}
-                          {canViewPath('/qualidade/caixa') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(1)}>
-                              <Link href="/qualidade/caixa" onClick={(e) => handleNavigation('/qualidade/caixa', e)} className={linkClasses('/qualidade/caixa')}>
-                                Inbox
-                              </Link>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </details>
-                </li>
-              )}
-
-              {/* SAC */}
-              {hasAccessToModule('Sac') && hasAnyVisibleInSection('Sac') && (
-                <li>
-                  <details className="group">
-                    <summary
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Sac' });
-                        }
-                      }}
-                      className={summaryClasses(sectionActive.expedicao)}
-                    >
-                      <IoPersonSharp title="Sac" className={`${iconSpacingClass} ${iconClasses(sectionActive.expedicao)}`} />
-                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(4)} aria-hidden={sidebarCollapsed ? true : undefined}>
-                        Sac
-                      </span>
-                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-                    </summary>
-                    {!sidebarCollapsed && (
-                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          {canViewPath('/sac/kanban') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <Link href="/sac/kanban" onClick={(e) => handleNavigation('/sac/kanban', e)} className={linkClasses('/sac/kanban')}>
-                                Nova Solicitação
-                              </Link>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </details>
-                </li>
-              )}
-
-              {/* SISTEMA (Admin apenas) */}
-              {userData?.setor === 'Admin' && hasAnyVisibleInSection('Sistema') && (
-                <li>
-                  <details className="group">
-                    <summary
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 8, section: 'Sistema' });
-                        }
-                      }}
-                      className={summaryClasses(sectionActive.sistema)}
-                    >
-                      <FaCog title="Sistema" className={`${iconSpacingClass} ${iconClasses(sectionActive.sistema)}`} />
-                      <span className={`font-medium whitespace-nowrap ${textTransitionClass}`} style={labelStyle(5)} aria-hidden={sidebarCollapsed ? true : undefined}>
-                        Sistema
-                      </span>
-                      {!sidebarCollapsed && <FaChevronRight className="ml-auto transition-transform group-open:rotate-90 w-4 h-4" />}
-                    </summary>
-                    {!sidebarCollapsed && (
-                      <div className="grid grid-rows-[0fr] group-open:grid-rows-[1fr] transition-[grid-template-rows] duration-300 ease-in-out">
-                        <ul className="ml-10 mt-1 flex flex-col gap-1 overflow-hidden">
-                          {canViewPath('/usuario') && (
-                            <li className={cascadeItemClass()} style={cascadeStyle(0)}>
-                              <Link href="/usuario" onClick={(e) => handleNavigation('/usuario', e)} className={linkClasses('/usuario')}>
-                                Usuários
-                              </Link>
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </details>
-                </li>
-              )}
-            </ul>
-          </aside>
-
-          <div
-            className="flex-1 transition-all duration-300"
-            style={{ marginLeft: sidebarWidth, paddingTop: navHeight }}
-          >
-            <main
-              className={`bg-gray-50 ${pathname === '/compras/kanban'
-                  ? 'h-[calc(100vh-64px)] p-0 overflow-hidden'
-                  : 'min-h-screen p-8'
-                }`}
+            </Link>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="block lg:hidden"
             >
-              {children}
-            </main>
+              <MdChevronRight className="rotate-180 text-2xl text-gray-500" />
+            </button>
+          </div>
 
-            {sidebarCollapsed && popover && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => { setSubPopover(null); setPopover(null); }} />
-                <div
-                  className="fixed z-50 bg-white shadow-2xl rounded-lg overflow-hidden min-w-56"
-                  style={{ top: popover.top, left: popover.left }}
-                >
-                  <ul className="py-2">
-                    {(() => {
-                      // itens do popover, já filtrados por canView
-                      const mainItems = popoverItems;
+          <div className={`flex flex-col mt-3 duration-300 ease-linear no-scrollbar ${sidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
+            <nav className="mt-0 py-2 px-4 lg:mt-0 lg:px-6">
+              <div>
+                <h3 className={`mb-4 text-xs uppercase leading-[20px] text-gray-400 font-semibold transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}`}>
+                  MENU
+                </h3>
 
-                      // submenu especial de compras (2 níveis), mantendo apenas itens visíveis
-                      const comprasSubmenu = [
-                        {
-                          label: 'Cotação',
-                          items: [
-                            { label: 'Criar Cotação', href: '/compras/cotacao' },
-                            { label: 'Comparativo', href: '/compras/cotacao/comparativo' },
-                            { label: 'Pedido', href: '/compras/cotacao/pedido' }
-                          ].filter(i => canViewPath(i.href)),
-                        },
-                        ...(canViewPath('/compras/kanban') ? [{ label: 'Kanban', href: '/compras/kanban' } as const] : []),
-                        ...(canViewPath('/compras/notaFiscal/notaFiscal') ? [{ label: 'NF - Lista', href: '/compras/notaFiscal/notaFiscal' } as const] : []),
-                      ];
+                <ul className="flex flex-col gap-4 mb-6">
+                  {/* Menu Items Configuration */}
+                  {[
+                    { id: 'Compras', label: 'Compras', icon: HiOutlineShoppingCart, path: '/compras' },
+                    { id: 'Oficina', label: 'Oficina', icon: HiOutlineWrench, path: '/oficina' },
+                    { id: 'Estoque', label: 'Estoque', icon: HiOutlineCube, path: '/estoque' },
+                    { id: 'Expedição', label: 'Expedição', icon: HiOutlineTruck, path: '/expedicao' }, // Note: id matches hasAccessToModule
+                    { id: 'Qualidade', label: 'Qualidade', icon: HiOutlineClipboardDocumentCheck, path: '/qualidade' },
+                    { id: 'Sac', label: 'Sac', icon: HiOutlineUser, path: '/sac' },
+                    { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/usuario' },
+                  ].map((section) => {
+                    // Special handling for section keys if they differ from ID
+                    const sectionKey = section.id === 'Expedição' ? 'Expedicao' : section.id;
 
-                      const itemsToRender =
-                        popover?.section === 'Compras'
-                          ? comprasSubmenu.filter(item => ('items' in item && item.items?.length) || ('href' in item && item.href))
-                          : mainItems;
+                    if (!hasAccessToModule(section.id) || !hasAnyVisibleInSection(sectionKey)) return null;
 
-                      return itemsToRender.map(item => (
-                        ('items' in item && item.items) ? (
-                          <li key={item.label}>
-                            <button
-                              className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition ${buttonMotionClasses}`}
-                              onMouseEnter={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
-                              }}
-                              onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setSubPopover({ top: rect.top + window.scrollY, left: rect.right + window.scrollX + 6, items: item.items! });
-                              }}
-                            >
-                              <span>{item.label}</span>
-                              <MdChevronRight className="ml-auto text-gray-400" />
-                            </button>
-                          </li>
-                        ) : (
-                          <li key={(item as any).href || item.label}>
-                            <Link
-                              href={(item as any).href!}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition"
-                              onClick={(e) => {
-                                handleNavigation((item as any).href!, e);
-                                setSubPopover(null);
-                                setPopover(null);
-                              }}
-                            >
-                              {item.label}
-                            </Link>
-                          </li>
-                        )
-                      ));
-                    })()}
-                  </ul>
-                </div>
-              </>
-            )}
-
-            {subPopover && (
-              <div
-                className="fixed z-50 bg-white shadow-2xl rounded-lg overflow-hidden min-w-56"
-                style={{ top: subPopover.top, left: subPopover.left }}
-                onMouseLeave={() => setSubPopover(null)}
-                onMouseEnter={() => { }}
-              >
-                <ul className="py-2">
-                  {subPopover.items.map(item => (
-                    <li key={item.href || item.label}>
-                      <Link
-                        href={item.href}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition"
-                        onClick={(e) => {
-                          handleNavigation(item.href, e);
-                          setSubPopover(null);
-                          setPopover(null);
-                        }}
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
+                    return (
+                      <SidebarMenuItem
+                        key={section.id}
+                        label={section.label}
+                        icon={section.icon}
+                        isActive={sectionActive[sectionKey.toLowerCase() as keyof typeof sectionActive]}
+                        isCollapsed={sidebarCollapsed}
+                        submenus={getVisibleSubmenuItems(sectionKey)}
+                        onNavigate={handleNavigation}
+                        isPathActive={isPathActive}
+                        pathname={pathname}
+                      />
+                    );
+                  })}
                 </ul>
               </div>
-            )}
+            </nav>
           </div>
+        </aside>
+        {/* Sidebar End */}
+
+        {/* Content Area Start */}
+        <div className="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
+          {/* Header Start */}
+          <header className="sticky top-0 z-999 flex w-full border-b border-gray-200 bg-white lg:border-b dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex grow flex-col items-center justify-between lg:flex-row lg:px-6">
+              <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4 dark:border-gray-800">
+                {/* Hamburger Toggle BTN */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSidebarOpen(!sidebarOpen);
+                  }}
+                  className="z-99999 block rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-800 dark:bg-black lg:hidden"
+                >
+                  <MdMenu className="text-xl" />
+                </button>
+
+                <button
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="z-99999 hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 lg:flex dark:border-gray-800 dark:text-gray-400"
+                >
+                  <MdMenu className="text-xl" />
+                </button>
+                {/* Hamburger Toggle BTN */}
+
+
+              </div>
+
+              <div className="flex items-center gap-3 2xsm:gap-7">
+                <ul className="flex items-center gap-2 2xsm:gap-4">
+                  {/* Notification Menu Area */}
+                  <li className="relative">
+                    <Link
+                      href="#"
+                      className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 hover:text-primary dark:border-gray-800 dark:bg-black dark:text-gray-400"
+                    >
+                      <MdOutlineNotificationsNone className="text-xl" />
+                      <span className="absolute -top-0.5 right-0 z-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-black"></span>
+                    </Link>
+                  </li>
+                  {/* Notification Menu Area */}
+                </ul>
+
+                {/* User Area */}
+                <ProfileDropdown userData={userData} onLogout={deslogar} />
+                {/* User Area */}
+              </div>
+            </div>
+          </header>
+          {/* Header End */}
+
+          {/* Main Content Start */}
+          <main
+            className={`relative flex-1 ${pathname === '/compras/kanban' || pathname === '/sac/kanban'
+              ? 'h-[calc(100vh-80px)] overflow-hidden'
+              : 'mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 overflow-y-auto'
+              }`}
+          >
+            {children}
+          </main>
+          {/* Main Content End */}
         </div>
+        {/* Content Area End */}
       </div>
+
       {isNavigating && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">

@@ -17,15 +17,15 @@ export const PageHeader = ({ title, subtitle, onBack, children }: Props) => (
         <button
           type="button"
           onClick={onBack}
-          className="h-11 w-11 rounded-2xl border border-slate-200 flex items-center justify-center text-[var(--primary-600)] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+          className="h-11 w-11 rounded-2xl border border-gray-200 dark:border-strokedark flex items-center justify-center text-primary hover:bg-gray-50 dark:hover:bg-meta-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
           aria-label="Voltar"
         >
           <MdArrowBack size={22} />
         </button>
       )}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-500 mt-1 max-w-2xl">{subtitle}</p>}
+        <h1 className="text-2xl font-bold text-black dark:text-white">{title}</h1>
+        {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">{subtitle}</p>}
       </div>
     </div>
     {children && <div className="flex flex-wrap gap-3">{children}</div>}

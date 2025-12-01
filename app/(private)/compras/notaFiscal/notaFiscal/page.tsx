@@ -27,19 +27,8 @@ const API_BASE = `${COMPRAS_BASE}/compras/nota-fiscal/nfe-distribuicao`;
 const DANFE_ENDPOINT = `${COMPRAS_BASE}/compras/nota-fiscal/danfe`;
 
 export default function NotaFiscalList() {
-  const BTN =
-    "h-12 px-4 inline-flex items-center justify-center gap-2 rounded text-white font-semibold " +
-    "bg-gradient-to-r from-blue-500 to-purple-600 " +
-    "hover:from-blue-600 hover:to-purple-700 " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 " +
-    "disabled:opacity-50 disabled:cursor-not-allowed";
+  // Removed custom button constants to use standard classes
 
-  const BTN_SQUARE =
-    "h-10 w-10 md:h-12 md:w-12 inline-flex items-center justify-center rounded text-white font-semibold " +
-    "bg-gradient-to-r from-blue-500 to-purple-600 " +
-    "hover:from-blue-600 hover:to-purple-700 " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 " +
-    "disabled:opacity-50 disabled:cursor-not-allowed";
 
   // Paginação no front
   const [page, setPage] = useState(1);
@@ -96,7 +85,7 @@ export default function NotaFiscalList() {
         try {
           const j = await res.json();
           if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -151,15 +140,21 @@ export default function NotaFiscalList() {
   };
 
   return (
-    <div className="main-panel min-h-screen text-black">
+    <div className="main-panel min-h-screen text-black dark:text-white">
       <div className="content-wrapper p-2">
         {/* Page header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h3 className="text-2xl font-semibold mb-3 md:mb-0">Notas Fiscais Distribuição</h3>
+          <h3 className="text-2xl font-semibold mb-3 md:mb-0 text-black dark:text-white">Notas Fiscais Distribuição</h3>
           <div className="flex items-center gap-2">
             {/* Recarregar */}
-            <button className={BTN_SQUARE} onClick={fetchAll} disabled={loading} title="Recarregar do servidor">
-              <FaSync className={loading ? "animate-spin" : ""} />
+            <button
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all duration-300 ease-in-out active:scale-95 disabled:opacity-50 dark:bg-meta-4 dark:text-white dark:border-strokedark"
+              onClick={fetchAll}
+              disabled={loading}
+              title="Recarregar do servidor"
+            >
+              <FaSync className={loading ? "animate-spin" : ""} size={18} />
+              <span className="text-sm font-medium hidden md:inline">Atualizar</span>
             </button>
           </div>
         </div>
@@ -167,17 +162,17 @@ export default function NotaFiscalList() {
         {/* Listagem */}
         <div id="list">
           <div className="w-full">
-            <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-stroke dark:border-strokedark">
               {/* PageSize dropdown */}
               <div className="flex items-center justify-end mb-4">
                 <div className="relative" ref={pageSizeRef}>
                   <button
-                    className={BTN}
+                    className="h-10 border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white flex items-center gap-2"
                     aria-haspopup="listbox"
                     aria-expanded={pageSizeOpen}
                     onClick={() => setPageSizeOpen((v) => !v)}
                   >
-                    <span className="mr-1">{pageSize}</span>
+                    <span className="mr-1">{pageSize} itens</span>
                     <FaCaretDown />
                   </button>
                   {pageSizeOpen && (
@@ -187,9 +182,8 @@ export default function NotaFiscalList() {
                           key={n}
                           role="option"
                           aria-selected={pageSize === (n as 10 | 20 | 50)}
-                          className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${
-                            pageSize === n ? "bg-gray-50 font-semibold" : ""
-                          }`}
+                          className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${pageSize === n ? "bg-gray-50 font-semibold" : ""
+                            }`}
                           onClick={() => {
                             setPageSize(n as 10 | 20 | 50);
                             setPage(1);
@@ -210,35 +204,69 @@ export default function NotaFiscalList() {
               </div>
 
               {/* Tabela */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
+              <div className="max-w-full overflow-x-auto border border-stroke dark:border-strokedark rounded-lg">
+                <table className="w-full table-auto">
                   <thead>
-                    <tr>
-                      {/* <th className="p-2 text-start">Empresa</th> */}
-                      <th className="p-2 text-start">Chave NFe</th>
-                      <th className="p-2 text-start">CPF/CNPJ Emitente</th>
-                      <th className="p-2 text-start">Nome Emitente</th>
-                      <th className="p-2 text-start">RG/IE Emitente</th>
-                      <th className="p-2 text-start">Data Emissão</th>
-                      {/* <th className="p-2 text-start">Tipo Operação</th> */}
-                      <th className="p-2 text-start">Tipo Operação Desc</th>
-                      <th className="p-2 text-center">PDF</th>
+                    <tr className="bg-gray-50 text-left dark:bg-meta-4">
+                      <th className="min-w-[150px] py-3 px-4 text-sm font-medium text-black dark:text-white xl:pl-11">
+                        Chave NFe
+                      </th>
+                      <th className="min-w-[150px] py-3 px-4 text-sm font-medium text-black dark:text-white">
+                        CPF/CNPJ Emitente
+                      </th>
+                      <th className="min-w-[150px] py-3 px-4 text-sm font-medium text-black dark:text-white">
+                        Nome Emitente
+                      </th>
+                      <th className="min-w-[120px] py-3 px-4 text-sm font-medium text-black dark:text-white">
+                        RG/IE Emitente
+                      </th>
+                      <th className="min-w-[120px] py-3 px-4 text-sm font-medium text-black dark:text-white">
+                        Data Emissão
+                      </th>
+                      <th className="min-w-[120px] py-3 px-4 text-sm font-medium text-black dark:text-white">
+                        Tipo Operação Desc
+                      </th>
+                      <th className="py-3 px-4 text-sm font-medium text-black dark:text-white text-center">
+                        PDF
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {paged.map((row, idx) => (
-                      <tr key={row.CHAVE_NFE ?? idx} className="border-t">
-                        {/* <td className="p-4">{row.EMPRESA}</td> */}
-                        <td className="p-4">{row.CHAVE_NFE}</td>
-                        <td className="p-4">{row.CPF_CNPJ_EMITENTE}</td>
-                        <td className="p-4">{row.NOME_EMITENTE}</td>
-                        <td className="p-4">{row.RG_IE_EMITENTE}</td>
-                        <td className="p-4">{fmtDate(row.DATA_EMISSAO)}</td>
-                        {/* <td className="p-4">{row.TIPO_OPERACAO}</td> */}
-                        <td className="p-4">{row.TIPO_OPERACAO_DESC}</td>
-                        <td className="p-4 text-center">
+                      <tr key={row.CHAVE_NFE ?? idx} className="border-b border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors">
+                        <td className="py-3 px-4 pl-9 xl:pl-11">
+                          <h5 className="text-sm font-medium text-black dark:text-white">
+                            {row.CHAVE_NFE}
+                          </h5>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="text-sm text-black dark:text-white">
+                            {row.CPF_CNPJ_EMITENTE}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="text-sm text-black dark:text-white">
+                            {row.NOME_EMITENTE}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="text-sm text-black dark:text-white">
+                            {row.RG_IE_EMITENTE}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="text-sm text-black dark:text-white">
+                            {fmtDate(row.DATA_EMISSAO)}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="text-sm text-black dark:text-white">
+                            {row.TIPO_OPERACAO_DESC}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4 text-center">
                           <button
-                            className={BTN_SQUARE}
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                             title="Baixar PDF DANFE"
                             onClick={async () => {
                               try {
@@ -261,7 +289,7 @@ export default function NotaFiscalList() {
                               }
                             }}
                           >
-                            <FaFilePdf />
+                            <FaFilePdf className="w-5 h-5" />
                           </button>
                         </td>
                       </tr>
@@ -269,14 +297,14 @@ export default function NotaFiscalList() {
 
                     {!loading && paged.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="p-6 text-center text-gray-500">
+                        <td colSpan={7} className="py-5 px-4 text-center text-gray-500 dark:text-gray-400">
                           Nenhum registro encontrado.
                         </td>
                       </tr>
                     )}
                     {loading && (
                       <tr>
-                        <td colSpan={9} className="p-6 text-center text-gray-500">
+                        <td colSpan={7} className="py-5 px-4 text-center text-gray-500 dark:text-gray-400">
                           Carregando...
                         </td>
                       </tr>
@@ -292,14 +320,14 @@ export default function NotaFiscalList() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    className={BTN}
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page <= 1 || loading}
                   >
                     Anterior
                   </button>
                   <button
-                    className={BTN}
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     onClick={() => setPage((p) => (p < totalPages ? p + 1 : p))}
                     disabled={page >= totalPages || loading}
                   >

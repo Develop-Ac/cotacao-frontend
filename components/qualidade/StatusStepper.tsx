@@ -42,8 +42,17 @@ export const StatusStepper = ({ current, completed, onSelect }: Props) => {
               ? { backgroundColor: SKIPPED_BG, borderColor: SKIPPED_BORDER, color: SKIPPED_TEXT }
               : { backgroundColor: DEFAULT_BG, borderColor: DEFAULT_BORDER, color: DEFAULT_TEXT };
 
+        // Dark mode adjustments for circle style (simplified for now, can be expanded)
+        const circleClass = useCurrentColor || isCompleted
+          ? ""
+          : "dark:bg-meta-4 dark:border-strokedark dark:text-gray-400";
+
         const labelClass =
-          useCurrentColor || isCompleted ? "text-slate-900 font-semibold" : isSkipped ? "text-slate-400" : "text-slate-500";
+          useCurrentColor || isCompleted
+            ? "text-gray-900 dark:text-white font-semibold"
+            : isSkipped
+              ? "text-gray-400 dark:text-gray-500"
+              : "text-gray-500 dark:text-gray-400";
 
         return (
           <div key={status.code} className="flex items-center gap-3">
@@ -53,14 +62,14 @@ export const StatusStepper = ({ current, completed, onSelect }: Props) => {
               className="keep-color flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
             >
               <span
-                className="h-10 w-10 rounded-full border-2 flex items-center justify-center font-bold text-sm"
-                style={circleStyle}
+                className={`h-10 w-10 rounded-full border-2 flex items-center justify-center font-bold text-sm ${circleClass}`}
+                style={useCurrentColor || isCompleted ? circleStyle : {}}
               >
-                <span className="h-2.5 w-2.5 rounded-full bg-current" />
+                <span className={`h-2.5 w-2.5 rounded-full ${useCurrentColor || isCompleted ? "bg-white" : "bg-gray-400 dark:bg-gray-500"}`} />
               </span>
               <span className={`text-left text-xs ${labelClass}`}>{status.label}</span>
             </button>
-            {index < statuses.length - 1 && <div className="w-8 h-[2px] bg-slate-200" />}
+            {index < statuses.length - 1 && <div className="w-8 h-[2px] bg-gray-200 dark:bg-strokedark" />}
           </div>
         );
       })}

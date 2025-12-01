@@ -21,14 +21,14 @@ const widths: Record<NonNullable<Props["width"]>, string> = {
 export const FormModal = ({ open, title, onClose, children, footer, width = "sm" }: Props) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className={`w-full rounded-3xl bg-white shadow-2xl border border-slate-100 py-6 pr-6 pl-8 ${widths[width]}`}>
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className={`w-full rounded-3xl bg-white dark:bg-boxdark shadow-2xl border border-gray-100 dark:border-strokedark py-6 pr-6 pl-8 ${widths[width]}`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-slate-900">{title}</h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="h-10 w-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"
+            className="h-10 w-10 rounded-full border border-gray-200 dark:border-strokedark flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
             aria-label="Fechar"
           >
             <MdClose size={20} />

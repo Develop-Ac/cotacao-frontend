@@ -9,9 +9,9 @@ interface Props {
 }
 
 export const SectionCard = ({ title, trailing, children }: Props) => (
-  <section className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+  <section className="bg-white dark:bg-boxdark rounded-2xl border border-gray-200 dark:border-strokedark p-5 shadow-sm">
     <div className="flex items-center justify-between gap-4 mb-4">
-      <h2 className="text-lg font-bold text-[var(--primary-600)]">{title}</h2>
+      <h2 className="text-lg font-bold text-primary dark:text-white">{title}</h2>
       {trailing}
     </div>
     <div className="space-y-3">{children}</div>

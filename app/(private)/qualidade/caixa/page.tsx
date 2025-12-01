@@ -70,13 +70,13 @@ export default function CaixaDeEntradaPage() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="h-28 rounded-2xl bg-white border border-slate-200 animate-pulse" />
+            <div key={idx} className="h-28 rounded-2xl bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark animate-pulse" />
           ))}
         </div>
       ) : emails.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-          <p className="text-lg font-semibold text-slate-900">Nenhum e-mail por aqui</p>
-          <p className="text-sm text-slate-500 mt-2">Clique em “Sincronizar” para requisitar a leitura da caixa.</p>
+        <div className="rounded-2xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark p-12 text-center">
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">Nenhum e-mail por aqui</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Clique em “Sincronizar” para requisitar a leitura da caixa.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -85,28 +85,27 @@ export default function CaixaDeEntradaPage() {
               key={email.id}
               type="button"
               onClick={() => email.garantiaId && router.push(`/qualidade/${email.garantiaId}`)}
-              className="w-full text-left rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:border-[var(--primary-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 transition"
+              className="w-full text-left rounded-3xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-5 shadow-sm hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 transition"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-base font-semibold text-slate-900">{email.assunto || "(sem assunto)"}</p>
-                  <p className="text-sm text-slate-500">{email.remetente}</p>
+                  <p className="text-base font-semibold text-gray-900 dark:text-white">{email.assunto || "(sem assunto)"}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{email.remetente}</p>
                 </div>
                 <span
-                  className={`text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-full ${
-                    email.garantiaId
-                      ? "bg-lime-100 text-lime-700 border border-lime-200"
-                      : "bg-rose-100 text-rose-700 border border-rose-200"
-                  }`}
+                  className={`text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-full ${email.garantiaId
+                      ? "bg-lime-100 dark:bg-lime-900/20 text-lime-700 dark:text-lime-400 border border-lime-200 dark:border-lime-800"
+                      : "bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
+                    }`}
                 >
                   {email.garantiaId ? `Garantia #${email.garantiaId}` : "Não vinculado"}
                 </span>
               </div>
-              <p className="text-sm text-slate-600 mt-3 line-clamp-3">{stripHtml(email.corpoHtml) || "Sem conteúdo exibível."}</p>
-              <div className="flex items-center justify-between text-xs text-slate-400 mt-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-3 line-clamp-3">{stripHtml(email.corpoHtml) || "Sem conteúdo exibível."}</p>
+              <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 mt-4">
                 <span>{formatDateTime(email.dataRecebimento)}</span>
                 {email.attachments.length > 0 && (
-                  <span className="font-semibold text-[var(--primary-600)]">{email.attachments.length} anexo(s)</span>
+                  <span className="font-semibold text-primary">{email.attachments.length} anexo(s)</span>
                 )}
               </div>
             </button>

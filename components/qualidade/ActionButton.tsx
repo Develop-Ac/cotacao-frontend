@@ -5,9 +5,9 @@ import { ReactNode } from "react";
 const baseClass =
   "inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed";
 
-const solidClass = "bg-[var(--primary-600)] text-white hover:bg-[var(--primary-800)]";
+const solidClass = "bg-primary text-white hover:bg-opacity-90";
 const ghostClass =
-  "border border-[var(--primary-600)] text-[var(--primary-600)] hover:bg-[var(--primary-600)]/10";
+  "border border-primary text-primary hover:bg-primary/10 dark:hover:bg-primary/20";
 
 const shapes: Record<"pill" | "rounded" | "square", string> = {
   pill: "px-5 py-2.5 text-sm",

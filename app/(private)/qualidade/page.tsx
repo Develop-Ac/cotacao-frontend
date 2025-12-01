@@ -89,7 +89,7 @@ export default function QualidadeHome() {
   }, [statusFilter]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="w-full space-y-6">
       <FormModal
         open={novaGarantiaOpen}
         title="Nova Garantia"
@@ -102,7 +102,7 @@ export default function QualidadeHome() {
           onCancel={() => setNovaGarantiaOpen(false)}
         />
       </FormModal>
-      <PageHeader title="Central de Garantias" subtitle="Monitoramento em tempo real dos processos">
+      <PageHeader title="Central de Garantias" subtitle="Monitoramento dos processos">
         <ActionButton
           label="Nova Garantia"
           icon={<MdAddCircleOutline size={18} />}
@@ -119,42 +119,42 @@ export default function QualidadeHome() {
       </PageHeader>
 
       <div
-        className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4"
+        className="bg-white dark:bg-boxdark rounded-xl border border-gray-100 dark:border-strokedark p-5 shadow-sm space-y-4"
         ref={dropdownRef}
       >
         <div className="flex flex-wrap gap-4">
           <label className="flex-1 min-w-[240px] relative">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por fornecedor, NI ou NF"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white"
             />
           </label>
           <div className="relative">
             <button
               type="button"
               onClick={() => setDropdownOpen((prev) => !prev)}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600 hover:border-[var(--primary-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+              className="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-form-strokedark px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 bg-white dark:bg-form-input"
             >
               <MdFilterList size={18} />
               <span>{statusLabel}</span>
             </button>
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-lg max-h-80 overflow-y-auto z-10">
+              <div className="absolute right-0 mt-2 w-72 rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg max-h-80 overflow-y-auto z-10">
                 {STATUS_FLOW.map((status) => (
                   <label
                     key={status.code}
-                    className="flex items-center justify-between px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                    className="flex items-center justify-between px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 cursor-pointer"
                   >
                     <span className="flex-1">{status.label}</span>
                     <input
                       type="checkbox"
                       checked={statusFilter.includes(status.code)}
                       onChange={() => toggleStatus(status.code)}
-                      className="h-4 w-4 accent-[var(--primary-600)]"
+                      className="h-4 w-4 accent-primary rounded border-gray-300"
                     />
                   </label>
                 ))}
@@ -167,7 +167,7 @@ export default function QualidadeHome() {
             variant="ghost"
             onClick={carregar}
             loading={refreshing}
-            className="rounded-xl px-4 py-2.5"
+            className="rounded-lg px-4 py-2.5"
           />
         </div>
         {statusFilter.length > 0 && (
@@ -187,31 +187,33 @@ export default function QualidadeHome() {
             <button
               type="button"
               onClick={() => setStatusFilter([])}
-              className="inline-flex items-center rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+              className="inline-flex items-center rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
             >
               Limpar filtros
             </button>
           </div>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       </div>
 
       <div className="space-y-3">
         {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="h-32 rounded-2xl bg-white border border-slate-200 animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="h-48 rounded-xl bg-white dark:bg-boxdark border border-gray-100 dark:border-strokedark animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-            <p className="text-lg font-semibold text-slate-900">Nenhuma garantia encontrada</p>
-            <p className="text-sm text-slate-500 mt-2">Ajuste os filtros ou tente atualizar a lista.</p>
+          <div className="rounded-xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark p-12 text-center">
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">Nenhuma garantia encontrada</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ajuste os filtros ou tente atualizar a lista.</p>
           </div>
         ) : (
-          filtered.map((garantia) => (
-            <GarantiaCard key={garantia.id} garantia={garantia} onClick={() => router.push(`/qualidade/${garantia.id}`)} />
-          ))
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filtered.map((garantia) => (
+              <GarantiaCard key={garantia.id} garantia={garantia} onClick={() => router.push(`/qualidade/${garantia.id}`)} />
+            ))}
+          </div>
         )}
       </div>
     </div>

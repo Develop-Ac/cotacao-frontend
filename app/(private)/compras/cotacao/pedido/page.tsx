@@ -11,6 +11,7 @@ import {
 } from "react-icons/fa";
 import { useEffect, useMemo, useState } from "react";
 import { serviceUrl } from "@/lib/services";
+import Alert from "@/components/Alert";
 
 const COMPRAS_API = serviceUrl("compras");
 const comprasUrl = (path: string) => `${COMPRAS_API}/compras${path}`;
@@ -51,55 +52,67 @@ const fmtDateTime = (iso: string) => {
 
 function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
   return (
-    <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-gray-100">
-      <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-start">
+    <div className="bg-white dark:bg-boxdark rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-gray-100 dark:border-strokedark">
+      <div className="bg-gray-50 dark:bg-meta-4 p-4 border-b border-gray-100 dark:border-strokedark flex justify-between items-start">
         <div>
-          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
+          <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">
             Pedido de Cotação
           </div>
-          <div className="text-2xl font-bold text-gray-800">
+          <div className="text-2xl font-bold text-gray-800 dark:text-white">
             #{pedido.pedido_cotacao}
           </div>
         </div>
       </div>
 
       <div className="p-4 flex-1 flex flex-col gap-3">
-        <div className="flex items-start gap-2 text-gray-600">
-          <FaUser className="text-gray-400 mt-1 shrink-0" />
-          <span className="font-medium text-sm line-clamp-2" title={pedido.for_nome}>
+        <div className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
+          <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 dark:text-orange-400 shrink-0">
+            <FaUser size={14} />
+          </div>
+          <span className="font-medium text-sm line-clamp-2 mt-1" title={pedido.for_nome}>
             {pedido.for_nome}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-gray-600">
-          <FaCalendar className="text-gray-400" />
+        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 shrink-0">
+            <FaCalendar size={14} />
+          </div>
           <span className="text-sm">{fmtDateTime(pedido.created_at)}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 mt-2">
-          <div className="bg-gray-50 p-2 rounded-lg">
-            <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-              <FaBox /> Itens
+          <div className="bg-gray-50 dark:bg-meta-4 p-2 rounded-lg">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                <FaBox size={10} />
+              </div>
+              Itens
             </div>
-            <div className="font-semibold text-gray-800">{pedido.itens_count}</div>
+            <div className="font-semibold text-gray-800 dark:text-white pl-8">{pedido.itens_count}</div>
           </div>
-          <div className="bg-gray-50 p-2 rounded-lg">
-            <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-              <FaBox /> Qtd. Total
+          <div className="bg-gray-50 dark:bg-meta-4 p-2 rounded-lg">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                <FaBox size={10} />
+              </div>
+              Qtd. Total
             </div>
-            <div className="font-semibold text-gray-800">
+            <div className="font-semibold text-gray-800 dark:text-white pl-8">
               {Number(pedido.total_qtd).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
             </div>
           </div>
         </div>
 
-        <div className="mt-1 pt-2 border-t border-gray-100">
+        <div className="mt-1 pt-2 border-t border-gray-100 dark:border-strokedark">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-gray-600">
-              <FaMoneyBill className="text-gray-400" />
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+              <div className="w-8 h-8 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-500 dark:text-green-400 shrink-0">
+                <FaMoneyBill size={14} />
+              </div>
               <span className="text-xs font-semibold uppercase">Total</span>
             </div>
-            <span className="text-lg font-bold text-green-600">
+            <span className="text-lg font-bold text-green-600 dark:text-green-400">
               {pedido.total_valor_fmt ?? "-"}
             </span>
           </div>
@@ -111,7 +124,7 @@ function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
           href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=true`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-3 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
+          className="flex-1 py-2 px-3 bg-white dark:bg-meta-4 border border-emerald-200 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
           title="Abrir PDF (com marca)"
         >
           <FaFilePdf />
@@ -121,7 +134,7 @@ function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
           href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=false`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 py-2 px-3 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
+          className="flex-1 py-2 px-3 bg-white dark:bg-meta-4 border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
           title="Abrir PDF (sem marca)"
         >
           <FaFilePdf />
@@ -290,18 +303,18 @@ export default function Tela() {
   const pagina = useMemo(() => pedidosFiltrados.slice(0, pageSize), [pedidosFiltrados, pageSize]);
 
   return (
-    <div className="min-h-screen text-gray-900 p-4 md:p-8 space-y-8 bg-gray-50/50">
+    <div className="text-gray-900 dark:text-white space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Listagem de Pedido</h1>
-          <p className="text-gray-500 mt-1">Gerencie e crie novas cotações</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Listagem de Pedido</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie Seus Pedidos</p>
         </div>
 
         <div className="flex gap-3">
           <button
             onClick={carregarPedidos}
             disabled={loadingPedidos}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all duration-200 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-meta-4 text-gray-700 dark:text-white border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-opacity-90 hover:border-gray-300 shadow-sm transition-all duration-200 disabled:opacity-50"
             title="Atualizar Lista"
           >
             <FaSync className={loadingPedidos ? "animate-spin" : ""} size={18} />
@@ -312,11 +325,11 @@ export default function Tela() {
 
       {/* BOX ABERTO */}
       {formularioAberto && (
-        <div className="bg-white rounded-xl shadow-lg p-6 animate-in fade-in slide-in-from-top-4 duration-300 border border-gray-100">
-          <h2 className="text-xl font-semibold mb-4 border-b pb-2">Nova Cotação</h2>
+        <div className="bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 animate-in fade-in slide-in-from-top-4 duration-300 border border-gray-100 dark:border-strokedark">
+          <h2 className="text-xl font-semibold mb-4 border-b dark:border-strokedark pb-2 text-black dark:text-white">Nova Cotação</h2>
           <div className="flex flex-col md:flex-row gap-4 items-end mb-6">
             <div className="flex-1 w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Número do Pedido
               </label>
               <input
@@ -325,7 +338,7 @@ export default function Tela() {
                 placeholder="Ex: 123456"
                 value={pedido}
                 onChange={(e) => setPedido(e.target.value.replace(/[^\d]/g, ""))}
-                className="w-full h-10 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                className="w-full h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-form-input text-black dark:text-white"
               />
             </div>
             <button
@@ -345,18 +358,17 @@ export default function Tela() {
           </div>
 
           {msgCot && (
-            <div
-              className={`p-4 rounded-lg mb-6 ${msgCot.includes("sucesso") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                }`}
-            >
-              {msgCot}
-            </div>
+            <Alert
+              type={msgCot.includes("sucesso") ? "success" : "error"}
+              message={msgCot}
+              className="mb-6"
+            />
           )}
 
           {itensCotacao.length > 0 && (
-            <div className="overflow-x-auto border rounded-lg">
+            <div className="overflow-x-auto border dark:border-strokedark rounded-lg">
               <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 text-gray-600 font-medium border-b">
+                <thead className="bg-gray-50 dark:bg-meta-4 text-gray-600 dark:text-gray-300 font-medium border-b dark:border-strokedark">
                   <tr>
                     <th className="px-4 py-3">Código</th>
                     <th className="px-4 py-3">Descrição</th>
@@ -366,15 +378,15 @@ export default function Tela() {
                     <th className="px-4 py-3 text-right">Qtd.</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-strokedark">
                   {itensCotacao.map((it, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900">{it.PRO_CODIGO}</td>
-                      <td className="px-4 py-3 text-gray-700">{it.PRO_DESCRICAO}</td>
-                      <td className="px-4 py-3 text-gray-500">{it.MAR_DESCRICAO}</td>
-                      <td className="px-4 py-3 text-gray-500">{it.REFERENCIA}</td>
-                      <td className="px-4 py-3 text-gray-500">{it.UNIDADE}</td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900">
+                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{it.PRO_CODIGO}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{it.PRO_DESCRICAO}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{it.MAR_DESCRICAO}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{it.REFERENCIA}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{it.UNIDADE}</td>
+                      <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">
                         {it.QUANTIDADE}
                       </td>
                     </tr>
@@ -388,62 +400,62 @@ export default function Tela() {
 
       {/* LISTAGEM INFERIOR */}
       <div className="space-y-4">
-        <div className="bg-white shadow-md rounded-xl p-4 border border-gray-100">
+        <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
             <div className="col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Fornecedor</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Fornecedor</label>
               <input
                 type="text"
                 placeholder="Filtrar por nome..."
                 value={fFor}
                 onChange={(e) => setFFor(e.target.value)}
-                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="h-9 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
               />
             </div>
             <div className="col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Pedido Cotação</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Pedido Cotação</label>
               <input
                 type="text"
                 placeholder="Filtrar por número..."
                 value={fPed}
                 onChange={(e) => setFPed(e.target.value.replace(/[^\d]/g, ""))}
-                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="h-9 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
               />
             </div>
             <div className="col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">De</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">De</label>
               <input
                 type="date"
                 value={fDe}
                 onChange={(e) => setFDe(e.target.value)}
-                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="h-9 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
               />
             </div>
             <div className="col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Até</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Até</label>
               <input
                 type="date"
                 value={fAte}
                 onChange={(e) => setFAte(e.target.value)}
-                className="h-9 w-full border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="h-9 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
               />
             </div>
             <div className="col-span-1 flex items-end gap-2">
               <button
                 onClick={limparFiltros}
-                className="h-9 px-4 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-sm font-medium w-full transition-colors"
+                className="h-9 px-4 rounded-lg bg-gray-100 dark:bg-meta-4 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-opacity-90 text-sm font-medium w-full transition-colors"
               >
                 Limpar
               </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t pt-3">
-            <div className="text-sm text-gray-500">
+          <div className="flex items-center justify-between border-t border-gray-100 dark:border-strokedark pt-3">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               Mostrando {pagina.length} de {pedidosFiltrados.length} registros
             </div>
             <select
-              className="h-9 border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              className="h-9 border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
               value={pageSize}
               onChange={(e) => setPageSize(Number(e.target.value))}
             >
@@ -457,9 +469,10 @@ export default function Tela() {
         </div>
 
         {msgPedidos && (
-          <div className="p-4 bg-blue-50 text-blue-700 rounded-lg border border-blue-100 shadow-sm">
-            {msgPedidos}
-          </div>
+          <Alert
+            type={msgPedidos.includes("Nenhum") ? "info" : "error"}
+            message={msgPedidos}
+          />
         )}
 
         {loadingPedidos ? (
@@ -467,13 +480,13 @@ export default function Tela() {
             {[...Array(4)].map((_, i) => (
               <div
                 key={i}
-                className="bg-white h-64 rounded-xl shadow-sm border border-gray-100 animate-pulse"
+                className="bg-white dark:bg-boxdark h-64 rounded-xl shadow-sm border border-gray-100 dark:border-strokedark animate-pulse"
               ></div>
             ))}
           </div>
         ) : pagina.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300 shadow-sm">
-            <p className="text-gray-500">Nenhum pedido encontrado.</p>
+          <div className="text-center py-12 bg-white dark:bg-boxdark rounded-xl border border-dashed border-gray-300 dark:border-strokedark shadow-sm">
+            <p className="text-gray-500 dark:text-gray-400">Nenhum pedido encontrado.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

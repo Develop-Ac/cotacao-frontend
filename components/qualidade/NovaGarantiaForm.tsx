@@ -245,7 +245,7 @@ export const NovaGarantiaForm = ({
 
   const containerClass =
     variant === "page"
-      ? "bg-white rounded-3xl border border-slate-200 shadow-sm py-6 pr-6 pl-8 space-y-5"
+      ? "bg-white dark:bg-boxdark rounded-3xl border border-gray-200 dark:border-strokedark shadow-sm py-6 pr-6 pl-8 space-y-5"
       : "space-y-5";
 
   const resetFields = () => {
@@ -390,7 +390,7 @@ export const NovaGarantiaForm = ({
     return () => {
       cancelled = true;
     };
-  // use efetivamente apenas os valores de dependência estáveis
+    // use efetivamente apenas os valores de dependência estáveis
   }, [initialErpFornecedorId, isEditMode, normalizedInitialData.notaInterna]);
 
   const handleFormularioDownload = useCallback(async () => {
@@ -413,16 +413,16 @@ export const NovaGarantiaForm = ({
     }
   }, [formularioDownloadKey, formularioDownloadLoading]);
 
-const buildProdutoEntry = (produto: VendaDetalhes["produtos"][number], index: number): ProdutoFormEntry => ({
-  id: `${produto.codigo ?? index}-${index}`,
-  codigo: produto.codigo?.toString(),
-  descricao: produto.descricao,
-  quantidade: produto.quantidade,
-  selected: true,
-  tipo: "Avaria",
-  nfCompra: "",
-  refFabricante: "",
-});
+  const buildProdutoEntry = (produto: VendaDetalhes["produtos"][number], index: number): ProdutoFormEntry => ({
+    id: `${produto.codigo ?? index}-${index}`,
+    codigo: produto.codigo?.toString(),
+    descricao: produto.descricao,
+    quantidade: produto.quantidade,
+    selected: true,
+    tipo: "Avaria",
+    nfCompra: "",
+    refFabricante: "",
+  });
 
   const setProdutosFromVenda = (produtos: VendaDetalhes["produtos"]) => {
     setVendaProdutos(produtos);
@@ -438,36 +438,36 @@ const buildProdutoEntry = (produto: VendaDetalhes["produtos"][number], index: nu
     setProdutoParaAdicionar("");
   };
 
-const updateProduto = (id: string, patch: Partial<ProdutoFormEntry>) => {
-  setProdutosForm((prev) =>
-    prev.map((produto) => (produto.id === id ? { ...produto, ...patch } : produto)),
-  );
-};
+  const updateProduto = (id: string, patch: Partial<ProdutoFormEntry>) => {
+    setProdutosForm((prev) =>
+      prev.map((produto) => (produto.id === id ? { ...produto, ...patch } : produto)),
+    );
+  };
 
-const handleFormularioFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0];
-  if (!file) {
-    setFormularioFile(null);
-    return;
-  }
-  setFormularioFile(file);
-  event.target.value = "";
-};
-
-
-const removeFormularioFile = () => setFormularioFile(null);
-
-const handleMediaFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(event.target.files ?? []);
-  if (files.length === 0) return;
-  setMediaFiles((prev) => [...prev, ...files]);
-  event.target.value = "";
-};
+  const handleFormularioFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setFormularioFile(null);
+      return;
+    }
+    setFormularioFile(file);
+    event.target.value = "";
+  };
 
 
-const removeMediaFile = (index: number) => {
-  setMediaFiles((prev) => prev.filter((_, idx) => idx !== index));
-};
+  const removeFormularioFile = () => setFormularioFile(null);
+
+  const handleMediaFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    setMediaFiles((prev) => [...prev, ...files]);
+    event.target.value = "";
+  };
+
+
+  const removeMediaFile = (index: number) => {
+    setMediaFiles((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   const findGarantiaIdByNi = useCallback(async (notaInternaBusca: string) => {
     const normalized = notaInternaBusca.trim().toLowerCase();
@@ -661,12 +661,12 @@ const removeMediaFile = (index: number) => {
       : (form.tipoGarantia || "Avaria");
     const nfsCompraPayload = usandoProdutosDetalhados
       ? Array.from(
-          new Set(
-            selecionados
-              .map((produto) => produto.nfCompra.trim())
-              .filter((nf) => nf.length > 0),
-          ),
-        ).join(", ")
+        new Set(
+          selecionados
+            .map((produto) => produto.nfCompra.trim())
+            .filter((nf) => nf.length > 0),
+        ),
+      ).join(", ")
       : form.nfsCompra.trim();
     const copiasEmail = form.copiasEmail.trim();
     const attachments: UploadAttachment[] = [];
@@ -742,27 +742,26 @@ const removeMediaFile = (index: number) => {
       <form onSubmit={handleLookup} className={containerClass}>
         {feedback && (
           <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${
-              feedback.type === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-red-200 bg-red-50 text-red-700"
-            }`}
+            className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === "success"
+                ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400"
+                : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+              }`}
           >
             {feedback.message}
           </div>
         )}
         <div className="space-y-4">
           <div>
-            <p className="text-base font-semibold text-slate-900">Informe o número da venda (NI)</p>
-            <p className="text-sm text-slate-500">Buscaremos os dados automaticamente no sistema.</p>
+            <p className="text-base font-semibold text-gray-900 dark:text-white">Informe o número da venda (NI)</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Buscaremos os dados automaticamente no sistema.</p>
           </div>
           <label className="flex flex-col gap-2 ml-2 md:ml-4">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Número da venda (NI)</span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Número da venda (NI)</span>
             <input
               value={lookupValue}
               onChange={(event) => setLookupValue(event.target.value)}
               placeholder="Ex.: NI12345"
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </label>
           {lookupError && <p className="text-sm text-red-600">{lookupError}</p>}
@@ -777,7 +776,7 @@ const removeMediaFile = (index: number) => {
             <button
               type="button"
               onClick={handleManualContinue}
-              className="keep-color text-sm font-semibold text-slate-500 hover:text-slate-900"
+              className="keep-color text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             >
               Preencher manualmente
             </button>
@@ -785,7 +784,7 @@ const removeMediaFile = (index: number) => {
               <button
                 type="button"
                 onClick={onCancel}
-                className="keep-color text-sm text-slate-400 hover:text-slate-600"
+                className="keep-color text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 Cancelar
               </button>
@@ -799,26 +798,25 @@ const removeMediaFile = (index: number) => {
   return (
     <form onSubmit={handleSubmit} className={containerClass}>
       {lookupMessage && (
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-2xl border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-400">
           {lookupMessage}
         </div>
       )}
       {feedback && (
         <div
-          className={`rounded-2xl border px-4 py-3 text-sm ${
-            feedback.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-red-200 bg-red-50 text-red-700"
-          }`}
+          className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === "success"
+              ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400"
+              : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+            }`}
         >
           {feedback.message}
         </div>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Venda selecionada:{" "}
-            <span className="font-semibold text-slate-900">{form.notaInterna || lookupValue}</span>
+            <span className="font-semibold text-gray-900 dark:text-white">{form.notaInterna || lookupValue}</span>
           </p>
           {!isEditMode && (
             <button
@@ -866,37 +864,37 @@ const removeMediaFile = (index: number) => {
           disabled={skipEmail}
           onChange={(event) => setForm((prev) => ({ ...prev, copiasEmail: event.target.value }))}
         />
-          <label className="flex items-center gap-2 text-sm ml-[3px] opacity-70 cursor-not-allowed">
-            <input type="hidden" name="skipEmail" value="true" />
-            <input
-              type="checkbox"
-              checked
-              readOnly
-              className="h-4 w-4 rounded border-slate-300 accent-[var(--primary-600)]"
-            />
-            <span className="text-xs font-semibold text-slate-600">Não enviar e-mails ao fornecedor</span>
+        <label className="flex items-center gap-2 text-sm ml-[3px] opacity-70 cursor-not-allowed">
+          <input type="hidden" name="skipEmail" value="true" />
+          <input
+            type="checkbox"
+            checked
+            readOnly
+            className="h-4 w-4 rounded border-gray-300 dark:border-strokedark accent-primary"
+          />
+          <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Não enviar e-mails ao fornecedor</span>
+        </label>
+        <>
+          <Field
+            label="NF Compra"
+            value={form.nfsCompra}
+            onChange={(event) => setForm((prev) => ({ ...prev, nfsCompra: event.target.value }))}
+          />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Tipo de Garantia</span>
+            <select
+              value={form.tipoGarantia}
+              onChange={(event) => setForm((prev) => ({ ...prev, tipoGarantia: event.target.value }))}
+              className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {TIPO_GARANTIA_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
-          <>
-            <Field
-              label="NF Compra"
-              value={form.nfsCompra}
-              onChange={(event) => setForm((prev) => ({ ...prev, nfsCompra: event.target.value }))}
-            />
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tipo de Garantia</span>
-              <select
-                value={form.tipoGarantia}
-                onChange={(event) => setForm((prev) => ({ ...prev, tipoGarantia: event.target.value }))}
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {TIPO_GARANTIA_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
+        </>
         {isPortalProcesso && (
           <Field
             label="Protocolo do Fornecedor"
@@ -923,11 +921,11 @@ const removeMediaFile = (index: number) => {
         onChange={(event) => setForm((prev) => ({ ...prev, descricao: event.target.value }))}
       />
       {(configLoading || fornecedorConfig || configError) && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
-          <p className="text-sm font-semibold text-slate-900">Instruções do fornecedor</p>
-          {configLoading && <p className="text-xs text-slate-500">Carregando instruções especiais...</p>}
+        <section className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-4 space-y-2">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">Instruções do fornecedor</p>
+          {configLoading && <p className="text-xs text-gray-500 dark:text-gray-400">Carregando instruções especiais...</p>}
           {!configLoading && fornecedorConfig && (
-            <div className="space-y-2 text-sm text-slate-600">
+            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
               {fornecedorInstrucoes && <p className="whitespace-pre-line">{fornecedorInstrucoes}</p>}
               {isPortalProcesso && (
                 <>
@@ -943,7 +941,7 @@ const removeMediaFile = (index: number) => {
                       Acessar portal do fornecedor
                     </a>
                   )}
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     Informe o número do protocolo emitido pelo portal antes de salvar a garantia.
                   </p>
                 </>
@@ -951,7 +949,7 @@ const removeMediaFile = (index: number) => {
               {isFormularioProcesso && (
                 <>
                   <p>Este fornecedor exige o preenchimento e envio de um formulário específico.</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     Utilize o card &quot;Formulário preenchido&quot; abaixo para baixar, preencher e anexar o documento
                     obrigatório.
                   </p>
@@ -966,31 +964,31 @@ const removeMediaFile = (index: number) => {
         </section>
       )}
       {usingDetailedProdutos && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
+        <section className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-slate-900">Produtos da venda</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Produtos da venda</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {produtosSelecionados.length}/{produtosForm.length} selecionados
               </p>
             </div>
             {tipoGarantiaCalculado && (
-              <span className="text-xs font-semibold text-[var(--primary-600)]">
+              <span className="text-xs font-semibold text-primary">
                 Tipo de garantia: {tipoGarantiaCalculado}
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Marque os itens que farão parte da garantia e informe os detalhes necessários.
           </p>
           {availableProdutosParaAdicionar.length > 0 && (
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Adicionar produto</span>
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Adicionar produto</span>
                 <select
                   value={produtoParaAdicionar}
                   onChange={(event) => setProdutoParaAdicionar(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione</option>
                   {availableProdutosParaAdicionar.map((produto) => {
@@ -1008,7 +1006,7 @@ const removeMediaFile = (index: number) => {
                 type="button"
                 onClick={() => produtoParaAdicionar && adicionarProdutoPorCodigo(produtoParaAdicionar)}
                 disabled={!produtoParaAdicionar}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-[var(--primary-600)] disabled:opacity-40"
+                className="rounded-xl border border-gray-200 dark:border-strokedark px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-primary disabled:opacity-40"
               >
                 Incluir
               </button>
@@ -1016,19 +1014,19 @@ const removeMediaFile = (index: number) => {
           )}
           <div className="space-y-3">
             {produtosForm.map((produto) => (
-              <div key={produto.id} className="rounded-2xl border border-slate-200 p-4 space-y-3">
+              <div key={produto.id} className="rounded-2xl border border-gray-200 dark:border-strokedark p-4 space-y-3">
                 <label className="flex items-start gap-3">
                   <input
                     type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-slate-300 accent-[var(--primary-600)]"
+                    className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-strokedark accent-primary"
                     checked={produto.selected}
                     onChange={(event) => updateProduto(produto.id, { selected: event.target.checked })}
                   />
                   <div>
-                    <p className="font-semibold text-slate-800">
+                    <p className="font-semibold text-gray-800 dark:text-white">
                       {[produto.codigo, produto.descricao].filter(Boolean).join(" - ") || "Produto"}
                     </p>
-                    <p className="text-xs text-slate-500">Quantidade: {produto.quantidade ?? "-"}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Quantidade: {produto.quantidade ?? "-"}</p>
                   </div>
                 </label>
                 {produto.selected && (
@@ -1040,7 +1038,7 @@ const removeMediaFile = (index: number) => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                           Tipo de Ocorrência
                         </span>
                         <select
@@ -1048,7 +1046,7 @@ const removeMediaFile = (index: number) => {
                           onChange={(event) =>
                             updateProduto(produto.id, { tipo: event.target.value as ProdutoTipo })
                           }
-                          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           {PRODUTO_TIPOS.map((tipo) => (
                             <option key={tipo} value={tipo}>
@@ -1058,21 +1056,21 @@ const removeMediaFile = (index: number) => {
                         </select>
                       </label>
                       <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">NF Compra</span>
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">NF Compra</span>
                         <input
                           value={produto.nfCompra}
                           onChange={(event) => updateProduto(produto.id, { nfCompra: event.target.value })}
-                          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                           Referência do Fabricante
                         </span>
                         <input
                           value={produto.refFabricante}
                           onChange={(event) => updateProduto(produto.id, { refFabricante: event.target.value })}
-                          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </label>
                     </div>
@@ -1085,11 +1083,11 @@ const removeMediaFile = (index: number) => {
       )}
 
       {isFormularioProcesso && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+        <section className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-slate-900">Formulário preenchido *</p>
-              <p className="text-xs text-slate-500">Anexe o arquivo exigido pelo fornecedor.</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Formulário preenchido *</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Anexe o arquivo exigido pelo fornecedor.</p>
             </div>
             <div className="flex flex-col items-end gap-1 text-right">
               {formularioDownloadUrl ? (
@@ -1113,9 +1111,9 @@ const removeMediaFile = (index: number) => {
                   {formularioDownloadLoading ? "Gerando link..." : "Baixar formulario"}
                 </button>
               ) : fornecedorConfig ? (
-                <p className="text-xs text-slate-500">Nenhum formulario disponivel.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Nenhum formulario disponivel.</p>
               ) : (
-                <p className="text-xs text-slate-500">Carregando instrucoes do fornecedor...</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Carregando instrucoes do fornecedor...</p>
               )}
               {formularioDownloadError && (
                 <p className="text-xs text-red-600 max-w-xs">{formularioDownloadError}</p>
@@ -1123,16 +1121,16 @@ const removeMediaFile = (index: number) => {
             </div>
           </div>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Selecionar arquivo</span>
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Selecionar arquivo</span>
             <input
               type="file"
               accept=".pdf,.xls,.xlsx,.csv,.doc,.docx,image/*"
               onChange={handleFormularioFileChange}
-              className="rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-2xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </label>
           {formularioFile && (
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-strokedark px-3 py-2 text-sm text-gray-700 dark:text-white">
               <span className="truncate">{formularioFile.name}</span>
               <button
                 type="button"
@@ -1146,29 +1144,29 @@ const removeMediaFile = (index: number) => {
         </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+      <section className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-900">Imagens e vídeos</p>
-            <p className="text-xs text-slate-500">Adicione quantos arquivos forem necessários, incluindo o formulário.</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Imagens e vídeos</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Adicione quantos arquivos forem necessários, incluindo o formulário.</p>
           </div>
         </div>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Adicionar arquivos</span>
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Adicionar arquivos</span>
           <input
             type="file"
             accept="image/*,video/*"
             multiple
             onChange={handleMediaFilesChange}
-            className="rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-2xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
         {mediaFiles.length > 0 && (
-          <ul className="space-y-2 text-sm text-slate-700">
+          <ul className="space-y-2 text-sm text-gray-700 dark:text-white">
             {mediaFiles.map((file, index) => (
               <li
                 key={`${file.name}-${index}`}
-                className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-strokedark px-3 py-2"
               >
                 <span className="truncate">{file.name}</span>
                 <button
@@ -1209,16 +1207,16 @@ interface FieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 const Field = ({ label, textarea = false, rows = 3, ...rest }: FieldProps) => (
   <label className="flex flex-col gap-1 text-sm ml-[3px]">
-    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
+    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</span>
     {textarea ? (
       <textarea
         rows={rows}
-        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
       />
     ) : (
       <input
-        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         {...rest}
       />
     )}
@@ -1227,8 +1225,8 @@ const Field = ({ label, textarea = false, rows = 3, ...rest }: FieldProps) => (
 
 const ReadOnlyInfo = ({ label, value }: { label: string; value?: string }) => (
   <div className="flex flex-col gap-1 text-sm">
-    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</span>
+    <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 px-3 py-2 text-sm text-gray-700 dark:text-white">
       {value && value.length > 0 ? value : "-"}
     </div>
   </div>

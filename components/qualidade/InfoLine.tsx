@@ -7,7 +7,7 @@ interface Props {
 
 export const InfoLine = ({ label, value }: Props) => (
   <div className="flex flex-col">
-    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
-    <span className="text-sm text-slate-800">{value ?? "—"}</span>
+    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</span>
+    <span className="text-sm text-gray-800 dark:text-white">{value ?? "—"}</span>
   </div>
 );

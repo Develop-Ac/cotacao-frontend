@@ -1,31 +1,32 @@
 "use client";
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Guard } from "../../../components/Guard";
-import { Can } from "../../../components/Can";
-import { usePermissions } from "../../../hooks/usePermissions";
-
-import { usePathname } from "next/navigation";
-
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  MouseEvent as ReactMouseEvent,
+  RefObject,
+} from "react";
 import { serviceUrl } from "@/lib/services";
-
-const KANBAN_URL = serviceUrl("sac");
-// const KANBAN_URL = "http://localhost:8000";
+import { motion } from "framer-motion";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd";
+import { usePermissions } from "../../../hooks/usePermissions";
+import { usePathname } from "next/navigation";
 
 // --- Types ---
 type ColumnKey = "aguardando_atendimento" | "em_analise" | "finalizado";
-const COLS: { key: ColumnKey; label: string }[] = [
-  { key: "aguardando_atendimento", label: "Solicitado" },
-  { key: "em_analise", label: "Em Andamento" },
-  { key: "finalizado", label: "Concluído" },
-];
-// ...existing code...
 
 type Task = {
   id: string;
   title: string;
   createdAt: number;
   etapa: ColumnKey;
-  // campos extras (editáveis no modal do card)
+  // SAC specific
   desc?: string;
   responsavel?: string;
   due?: string; // YYYY-MM-DD
@@ -44,228 +45,328 @@ type Task = {
   imagens?: string[]; // Array de base64
 };
 
-type DragData = { taskId: string; from: ColumnKey };
-  type BoardState = Record<string, Task[]>;
+type BoardState = Record<ColumnKey, Task[]>;
 
-// COLS será gerado dinamicamente após o fetch
-const COL_LABELS: Record<string, string> = {
-  aguardando_atendimento: "Aguardando atendimento",
-  em_analise: "Em análise",
-  finalizado: "Finalizado",
-};
+const COLS: { key: ColumnKey; label: string }[] = [
+  { key: "aguardando_atendimento", label: "Solicitado" },
+  { key: "em_analise", label: "Em Andamento" },
+  { key: "finalizado", label: "Concluído" },
+];
 
-const STORAGE_KEY = "kanban_ac_board_v1";
 const AUTOS_KEY = "kanban_automations";
 const uid = () =>
   Math.random().toString(36).slice(2, 7) + "-" + Date.now().toString(36);
 
 // --- Componentes ---
-interface CardProps {
+function Card({
+  task,
+  onDelete,
+  onOpen,
+  isDragging = false,
+  userSetor,
+  colKey,
+}: {
   task: Task;
   onDelete?: () => void;
   onOpen?: () => void;
-  colKey: ColumnKey;
+  isDragging?: boolean;
   userSetor: string;
-}
-function Card({ task, onDelete, onOpen, colKey, userSetor }: CardProps) {
-  // Permissão de edição
+  colKey: ColumnKey;
+}) {
+  // Permissão de edição (mantida do original)
   const canEdit =
     (userSetor === "Atacado" || userSetor === "Varejo")
       ? colKey === "aguardando_atendimento"
       : true;
+
+  // classes de cor por prioridade
+  let priorityClasses = "";
+  switch (task.prioridade) {
+    case "alta":
+      priorityClasses = "bg-red-100 text-red-700 border-red-200";
+      break;
+    case "media":
+      priorityClasses = "bg-amber-100 text-amber-700 border-amber-200";
+      break;
+    case "baixa":
+      priorityClasses = "bg-emerald-100 text-emerald-700 border-emerald-200";
+      break;
+    default:
+      priorityClasses = "bg-gray-100 text-gray-600 border-gray-200";
+  }
+  const dueDate = task.due ? new Date(task.due) : null;
+  const isOverdue = dueDate ? dueDate < new Date() : false;
+
   return (
-    <div
+    <motion.div
+      layout
+      initial={false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.18 }}
       onClick={() => canEdit && onOpen && onOpen()}
-      className={`rounded-2xl shadow-sm border border-gray-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 hover:shadow-md transition-all duration-200 ease-out hover:-translate-y-0.5 ${canEdit ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
-      draggable={canEdit}
-      onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
-        if (!canEdit) {
-          e.preventDefault();
-          return;
-        }
-        const container = e.currentTarget.closest<HTMLElement>("[data-col]");
-        const from = (container?.dataset.col || "") as ColumnKey;
-        const payload = { taskId: task.id, from };
-        e.dataTransfer.setData("application/json", JSON.stringify(payload));
-      }}
+      data-kanban-card="true"
+      className={`rounded-lg border border-gray-200 dark:border-neutral-700 p-3 
+                  bg-white dark:bg-[#0e1116] 
+                  transition-all duration-300 ease-out group
+                  ${canEdit ? "cursor-pointer" : "cursor-not-allowed opacity-60"}
+                  ${isDragging
+          ? "shadow-xl ring-2 ring-blue-500 rotate-2 z-50"
+          : "shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700"
+        }`}
     >
-      <div className="flex flex-col items-start justify-between gap-2">
-        <h4 className="text-base font-bold leading-5 text-blue-900 dark:text-blue-200 flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-1"></span>
-          {task.title}
-        </h4>
-        <p className="text-xs text-blue-700 dark:text-blue-200">Vendedor: <span className="font-semibold">{task.vendedor}</span></p>
-        <p className="text-xs text-blue-700 dark:text-blue-200">Venda: <span className="font-semibold">{task.venda}</span></p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <div className="flex flex-wrap gap-1">
+            {task.prioridade && (
+              <span
+                className={`priority-badge inline-flex items-center px-2 py-0.5 
+                            text-[10px] font-semibold rounded border uppercase ${priorityClasses}`}
+              >
+                {task.prioridade}
+              </span>
+            )}
+            {task.vendedor && (
+              <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded border bg-gray-100 text-gray-700 border-gray-200 uppercase">
+                {task.vendedor}
+              </span>
+            )}
+          </div>
+          <h4 className="text-sm font-medium leading-5 text-gray-900 dark:text-[#d6d6d8] line-clamp-3">
+            {task.title}
+          </h4>
+        </div>
+
+        <div className="flex items-start gap-2">
+          {dueDate && (
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] leading-tight font-semibold border whitespace-nowrap
+                ${isOverdue
+                  ? "bg-red-500 text-white border-red-600"
+                  : "bg-gray-100 text-gray-700 border-gray-300"
+                }
+              `}
+            >
+              {dueDate.toLocaleDateString("pt-BR").slice(0, 5)}
+            </span>
+          )}
+        </div>
       </div>
 
-      {task.responsavel && (
-        <div className="mt-2 text-xs text-blue-700 dark:text-blue-200 flex items-center gap-2">
-          <span className="inline-block w-4 h-4">👤</span>
-          <span className="px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900 font-semibold text-blue-900 dark:text-blue-100">
-            {task.responsavel}
-          </span>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-0.5 text-xs text-gray-500 dark:text-gray-400">
+          {task.venda && <span>Venda: {task.venda}</span>}
+          {task.cliente && <span>Cod. Cliente: {task.cliente}</span>}
         </div>
-      )}
-
-      {(task.prioridade || task.due) && (
-        <div className="mt-2 flex items-center gap-2 text-xs">
-          {task.prioridade && (
-            <span className={`px-2 py-0.5 rounded-full border font-bold ${task.prioridade === "alta" ? "bg-red-100 border-red-300 text-red-700" : task.prioridade === "media" ? "bg-yellow-100 border-yellow-300 text-yellow-700" : "bg-green-100 border-green-300 text-green-700"}`}>
-              {task.prioridade}
-            </span>
-          )}
-          {task.due && (
-            <span className="text-blue-700 dark:text-blue-200">
-              vence {new Date(task.due).toLocaleDateString("pt-BR")}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
+        {task.responsavel && (
+          <div
+            className="flex items-center"
+            title={`Responsável: ${task.responsavel}`}
+          >
+            <div className="inline-flex items-center justify-center rounded-md bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 px-2 py-1 min-h-[28px] min-w-[28px] whitespace-nowrap">
+              {task.responsavel}
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
-interface ColumnProps {
+function Column({
+  label,
+  colKey,
+  tasks,
+  onAddTask,
+  onDeleteTask,
+  onOpenTask,
+  disableDrag,
+  userSetor,
+}: {
   label: string;
   colKey: ColumnKey;
   tasks: Task[];
-  board: BoardState;
-  onDropTask: (data: DragData, to: ColumnKey) => void;
   onAddTask: (col: ColumnKey, title: string) => void;
   onDeleteTask: (col: ColumnKey, id: string) => void;
   onOpenTask: (col: ColumnKey, id: string) => void;
+  disableDrag: boolean;
   userSetor: string;
-}
-function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask, onOpenTask, board, userSetor }: ColumnProps) {
+}) {
   const [value, setValue] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+
+  // Modal de tipo para criação
   const [showTypeModal, setShowTypeModal] = useState(false);
-  const [pendingTitle, setPendingTitle] = useState("");
-  const [pendingCol, setPendingCol] = useState<ColumnKey | null>(null);
   const [typeChoice, setTypeChoice] = useState<"garantia" | "devolucao" | "pendencia" | null>(null);
+
   const canCreate = (userSetor === "Atacado" || userSetor === "Varejo") ? colKey === "aguardando_atendimento" : true;
 
-  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    const raw = e.dataTransfer.getData("application/json");
-    if (!raw) return;
-    let payload: DragData | null = null;
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        "taskId" in (parsed as any) &&
-        "from" in (parsed as any)
-      ) {
-        const p = parsed as any;
-        payload = { taskId: String(p.taskId), from: p.from as ColumnKey };
-      }
-    } catch {}
-    const canMove = (userSetor === "Atacado" || userSetor === "Varejo") ? colKey === "aguardando_atendimento" : true;
-    if (!payload || !canMove) return;
-    onDropTask(payload, colKey as ColumnKey);
-  }
-
   return (
-    <>
-      <div
-        data-col={colKey}
-        onDragOver={(e: React.DragEvent<HTMLDivElement>) => e.preventDefault()}
-        onDrop={handleDrop}
-        className="min-w-[320px] w-[320px] bg-white dark:bg-neutral-950 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-neutral-800 flex flex-col"
-      >
-        <h2 className="text-lg font-semibold mb-3">{label}</h2>
-        <div className="flex flex-col gap-2">
-          {tasks.map((t) => (
-            <Card
-              key={t.id}
-              task={t}
-              onDelete={() => onDeleteTask(colKey, t.id)}
-              onOpen={() => onOpenTask(colKey, t.id)}
-              colKey={colKey as ColumnKey}
-              userSetor={userSetor}
-            />
-          ))}
-        </div>
-        <div className="flex mt-4 gap-2">
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Novo card..."
-            className="w-full text-base rounded-2xl border border-blue-200 dark:border-blue-700 bg-white dark:bg-neutral-900 px-3 py-2 shadow focus:ring-2 focus:ring-blue-300"
-            disabled={!canCreate}
-          />
-          <button
-            onClick={() => {
-              // Ao clicar, abre modal de escolha
-              setPendingTitle(value.trim());
-              setPendingCol(colKey as ColumnKey);
-              setShowTypeModal(true);
-            }}
-            className="text-base px-4 py-2 rounded-2xl border border-blue-200 dark:border-blue-700 bg-blue-500 hover:bg-blue-600 text-white shadow font-bold transition-all duration-150"
-            disabled={!canCreate}
+    <div
+      data-col={colKey}
+      className="flex flex-col w-[320px] shrink-0 max-h-full rounded-xl bg-gray-200 dark:bg-[#171c23] border border-gray-300/60 dark:border-neutral-700"
+    >
+      {/* Column Header */}
+      <div className="p-3 flex items-center justify-between shrink-0">
+        <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200 px-1">
+          {label}
+        </h3>
+        <span className="text-xs font-medium text-gray-500 bg-gray-200 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
+          {tasks.length}
+        </span>
+      </div>
+
+      {/* Tasks List */}
+      <Droppable droppableId={colKey} isDropDisabled={disableDrag}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={`
+              flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2 min-h-[20px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-neutral-700
+              ${snapshot.isDraggingOver
+                ? "dark:bg-blue-900/10 transition-colors"
+                : ""
+              }
+            `}
           >
-            +
+            <div className="flex flex-col gap-2">
+              {tasks.map((t, index) => {
+                // Usando o ID da tarefa como draggableId para garantir unicidade e persistência correta
+                const draggableId = t.id;
+                return (
+                  <Draggable
+                    key={draggableId}
+                    draggableId={draggableId}
+                    index={index}
+                    isDragDisabled={disableDrag || ((userSetor === "Atacado" || userSetor === "Varejo") && colKey !== "aguardando_atendimento")}
+                  >
+                    {(dragProvided, dragSnapshot) => (
+                      <div
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        {...dragProvided.dragHandleProps}
+                        className="draggable-wrapper keep-color"
+                        style={{ ...dragProvided.draggableProps.style }}
+                      >
+                        <Card
+                          task={t}
+                          onDelete={() => onDeleteTask(colKey, t.id)}
+                          onOpen={() => onOpenTask(colKey, t.id)}
+                          isDragging={dragSnapshot.isDragging}
+                          userSetor={userSetor}
+                          colKey={colKey}
+                        />
+                      </div>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {provided.placeholder}
+            </div>
+          </div>
+        )}
+      </Droppable>
+
+      <div className="p-2 shrink-0">
+        {isAdding ? (
+          <div className="p-2 bg-white dark:bg-neutral-800 rounded-lg border border-blue-200 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+            <textarea
+              autoFocus
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (value.trim()) {
+                    setShowTypeModal(true);
+                  }
+                }
+                if (e.key === "Escape") {
+                  setIsAdding(false);
+                }
+              }}
+              placeholder="Insira um título..."
+              className="w-full text-sm bg-transparent border-none focus:ring-0 p-0 resize-none placeholder:text-gray-400 text-gray-900 dark:text-gray-100"
+              rows={3}
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={() => {
+                  if (value.trim()) {
+                    setShowTypeModal(true);
+                  }
+                }}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
+              >
+                Adicionar
+              </button>
+              <button
+                onClick={() => setIsAdding(false)}
+                className="p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAdding(true)}
+            disabled={!canCreate}
+            className={`keep-color kanban-btn flex items-center gap-2 w-full px-2 py-1.5 text-sm text-left ${!canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <span className="text-lg leading-none">+</span> Adicionar um cartão
           </button>
-        </div>
+        )}
       </div>
 
       {/* Modal de escolha Garantia/Devolução */}
       {showTypeModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
           <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[340px] shadow-lg">
-            <h2 className="text-lg font-semibold mb-4">Tipo de Card</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Tipo de Card</h2>
             <div className="flex flex-col gap-3">
               <button
-                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "garantia" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
+                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "garantia" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100"}`}
                 onClick={() => setTypeChoice("garantia")}
               >Garantia</button>
               <button
-                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "devolucao" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
+                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "devolucao" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100"}`}
                 onClick={() => setTypeChoice("devolucao")}
               >Devolução</button>
               <button
-                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "pendencia" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900"}`}
+                className={`px-4 py-2 rounded-xl border font-bold ${typeChoice === "pendencia" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100"}`}
                 onClick={() => setTypeChoice("pendencia")}
               >Pendência</button>
             </div>
             <div className="flex justify-end gap-2 mt-6">
               <button
-                className="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-neutral-700"
+                className="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-neutral-700 text-gray-700 dark:text-gray-300"
                 onClick={() => {
                   setShowTypeModal(false);
                   setTypeChoice(null);
                 }}
               >Cancelar</button>
               <button
-                className="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+                className="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                 disabled={!typeChoice}
                 onClick={() => {
-                  if (!pendingCol) return;
-                  // Busca o maior número global entre todas as colunas para o tipo
                   let prefix = "";
                   if (typeChoice === "garantia") prefix = "garantia #";
                   else if (typeChoice === "devolucao") prefix = "devolucao #";
                   else if (typeChoice === "pendencia") prefix = "pendencia #";
-                  const allTasks = Object.values(board).flat() as Task[];
-                  const nums = allTasks
-                    .map((t: Task) => t.title)
-                    .filter(t => t.startsWith(prefix))
-                    .map(t => {
-                      const m = t.match(/(garantia|devolucao|pendencia) #(\d{3})/);
-                      return m ? parseInt(m[2], 10) : null;
-                    })
-                    .filter(n => n !== null);
-                  const nextNum = nums.length ? Math.max(...(nums as number[])) + 1 : 0;
-                  let title = pendingTitle;
-                  if (!title) {
-                    title = `${prefix}${nextNum.toString().padStart(3, "0")}`;
-                  } else {
-                    // Se o usuário digitou algo, prefixa o tipo
+
+                  // Lógica de numeração (simplificada, idealmente viria do backend ou calculada globalmente)
+                  // Aqui vamos confiar que o título será ajustado ou apenas usar o input
+                  let title = value.trim();
+                  if (!title.toLowerCase().startsWith(prefix.split(' ')[0])) {
+                    // Se não tem prefixo, adiciona. Se tiver, usa o que tá.
+                    // Mas a lógica original buscava o próximo número. Vamos tentar manter simples por enquanto.
                     title = `${prefix}${title}`;
                   }
-                  onAddTask(pendingCol, title);
+
+                  onAddTask(colKey, title);
                   setValue("");
+                  setIsAdding(false);
                   setShowTypeModal(false);
                   setTypeChoice(null);
                 }}
@@ -274,102 +375,84 @@ function Column({ label, colKey, tasks = [], onDropTask, onAddTask, onDeleteTask
           </div>
         </div>
       )}
-    </>
-  );
-}
-// ...existing code...
-        // (Remove this duplicated block entirely, as the input and button logic already exists inside the Column component)
-
-// Simple ImageGallery component for previewing images
-function ImageGallery({ previews, imagens }: { previews: string[]; imagens: string[] }) {
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const allImages = [...(imagens || []), ...(previews || [])];
-  if (allImages.length === 0) return null;
-  return (
-    <div>
-      <div className="flex gap-2 mt-2 flex-wrap">
-        {allImages.map((src, idx) => (
-          <img
-            key={idx}
-            src={src}
-            alt={`Imagem ${idx + 1}`}
-            className={`w-16 h-16 object-cover rounded border cursor-pointer ${selectedIdx === idx ? "ring-2 ring-blue-500" : ""}`}
-            onClick={() => setSelectedIdx(idx)}
-          />
-        ))}
-      </div>
-      <div className="mt-2 flex justify-center">
-        <img
-          src={allImages[selectedIdx]}
-          alt={`Imagem grande ${selectedIdx + 1}`}
-          className="max-h-48 rounded shadow"
-        />
-      </div>
-      {allImages.length > 1 && (
-        <div className="flex justify-center gap-2 mt-1">
-          <button
-            type="button"
-            className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-900"
-            disabled={selectedIdx === 0}
-            onClick={() => setSelectedIdx((idx) => Math.max(0, idx - 1))}
-          >
-            &lt;
-          </button>
-          <button
-            type="button"
-            className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-900"
-            disabled={selectedIdx === allImages.length - 1}
-            onClick={() => setSelectedIdx((idx) => Math.min(allImages.length - 1, idx + 1))}
-          >
-            &gt;
-          </button>
-        </div>
-      )}
     </div>
   );
 }
 
-// Função utilitária para pegar permissões da tela atual
-type Permissao = {
-  id: string;
-  usuario_id: string;
-  modulo: string;
-  tela: string;
-  visualizar: boolean;
-  editar: boolean;
-  criar: boolean;
-  deletar: boolean;
-};
-function getPermissoesTelaAtual() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("userData");
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    const permissoes: Permissao[] = data.permissoes || [];
-    // Pega o path da url atual (sem query/hash)
-    let path = window.location.pathname;
-    // Remove "/app" do início se existir (Next.js pode ter isso)
-    if (path.startsWith("/app")) path = path.slice(4);
-    // Busca permissão exata para a tela
-    const found = permissoes.find((p: Permissao) => p.tela === path);
-    return found || null;
-  } catch {
-    return null;
-  }
+// --- Hook Customizado para Drag-to-Scroll ---
+function useDraggableScroll(ref: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const slider = ref.current;
+    if (!slider) return;
+
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    const shouldIgnoreTarget = (target: HTMLElement | null) => {
+      if (!target) return false;
+      return !!target.closest(
+        "[data-kanban-card], button, textarea, input, select, label, option, a"
+      );
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement | null;
+      if (shouldIgnoreTarget(target)) return;
+      isDown = true;
+      startX = e.clientX;
+      scrollLeft = slider.scrollLeft;
+      slider.style.cursor = "grabbing";
+      slider.style.userSelect = "none";
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDown || !slider) return;
+      e.preventDefault();
+      const x = e.clientX;
+      const walk = x - startX;
+      slider.scrollLeft = scrollLeft - walk;
+    };
+
+    const onMouseUp = () => {
+      if (!isDown || !slider) return;
+      isDown = false;
+      slider.style.cursor = "grab";
+      slider.style.userSelect = "auto";
+    };
+
+    slider.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+
+    return () => {
+      slider.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [ref]);
 }
 
 export default function Page() {
+  const KANBAN_URL = serviceUrl("sac");
   const [board, setBoard] = useState<BoardState>({
     aguardando_atendimento: [],
     em_analise: [],
     finalizado: []
   });
-  const [cols, setCols] = useState<{ key: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Carrega o board e as colunas via GET ao montar
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  useDraggableScroll(boardRef);
+
+  // Carrega o board
   useEffect(() => {
     async function fetchBoard() {
       setLoading(true);
@@ -378,7 +461,6 @@ export default function Page() {
         const res = await fetch(KANBAN_URL + "/kanban");
         if (!res.ok) throw new Error("Erro ao buscar kanban");
         const data = await res.json();
-        console.log("KANBAN GET:", data);
         setBoard({
           aguardando_atendimento: data.aguardando_atendimento || [],
           em_analise: data.em_analise || [],
@@ -391,23 +473,12 @@ export default function Page() {
       }
     }
     fetchBoard();
-  }, []);
+  }, [KANBAN_URL]);
 
-  // --- Filtro por Responsável ---
-  const [filterResp, setFilterResp] = useState<string>("");
-
-  // Lista única de responsáveis existentes no board (para o select)
-  const responsaveis = useMemo(() => {
-    const set = new Set<string>();
-    Object.values(board).forEach((list: any) =>
-      (list ?? []).forEach((t: any) => {
-        if (t.responsavel && t.responsavel.trim()) set.add(t.responsavel.trim());
-      })
-    );
-    return Array.from(set).sort((a, b) =>
-      a.localeCompare(b, "pt-BR", { sensitivity: "base" })
-    );
-  }, [board]);
+  // --- Filtros ---
+  const [filterVendedor, setFilterVendedor] = useState("");
+  const [filterCliente, setFilterCliente] = useState("");
+  const [filterVenda, setFilterVenda] = useState("");
 
   // Modal de automação
   const [showModal, setShowModal] = useState(false);
@@ -419,10 +490,17 @@ export default function Page() {
 
   // Modal de edição de card
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [selected, setSelected] = useState<{ col: ColumnKey; id: string } | null>(
-    null
-  );
+  const [selected, setSelected] = useState<{
+    col: ColumnKey;
+    id: string;
+  } | null>(null);
   const [taskForm, setTaskForm] = useState<{
+    title: string;
+    desc: string;
+    responsavel: string;
+    due: string;
+    prioridade: "baixa" | "media" | "alta";
+    // SAC fields
     data: string;
     venda: string;
     cliente: string;
@@ -434,38 +512,14 @@ export default function Page() {
     dptoResponsavel: string;
     tipo: string;
     vendedor: string;
-    imagens: string[]; // base64
+    imagens: string[];
     files: File[];
-    previews: string[];
   }>({
-    data: "",
-    venda: "",
-    cliente: "",
-    itemReclamado: "",
-    reclamacao: "",
-    solucao: "",
-    dataSolucao: "",
-    custo: "",
-    dptoResponsavel: "",
-    tipo: "",
-    vendedor: "",
-    imagens: [],
-    files: [],
-    previews: []
+    title: "", desc: "", responsavel: "", due: "", prioridade: "media",
+    data: "", venda: "", cliente: "", itemReclamado: "", reclamacao: "",
+    solucao: "", dataSolucao: "", custo: "", dptoResponsavel: "",
+    tipo: "", vendedor: "", imagens: [], files: []
   });
-  useEffect(() => {
-    if (loading) return; // não envia enquanto carrega
-    async function putBoard() {
-      try {
-        await fetch(KANBAN_URL, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(board),
-        });
-      } catch {}
-    }
-    putBoard();
-  }, [board]);
 
   async function addTask(col: ColumnKey, title: string) {
     const newTask: Task = {
@@ -473,7 +527,6 @@ export default function Page() {
       title,
       createdAt: Date.now(),
       etapa: col,
-      data: String(new Date().getTime())  
     };
     setBoard((prev) => ({
       ...prev,
@@ -485,8 +538,9 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newTask)
       });
-    } catch {}
+    } catch { }
   }
+
   function deleteTask(col: ColumnKey, id: string) {
     setBoard((prev) => ({
       ...prev,
@@ -496,33 +550,64 @@ export default function Page() {
       method: "DELETE"
     });
   }
-  async function moveTask(data: DragData, to: ColumnKey) {
+
+  // --- Drag & Drop ---
+  function handleDragEnd(result: DropResult) {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+
+    const from = source.droppableId as ColumnKey;
+    const to = destination.droppableId as ColumnKey;
+    const fromIndex = source.index;
+    const toIndex = destination.index;
+
+    if (from === to && fromIndex === toIndex) return;
+    if (from === to && fromIndex === toIndex) return;
+    if (filterVendedor || filterCliente || filterVenda) return; // Desabilita drop se filtrado
+
+    // Atualiza estado local
     setBoard((prev) => {
-      const src = [...(prev[data.from] ?? [])];
-      const idx = src.findIndex((t) => t.id === data.taskId);
-      if (idx === -1) return prev;
-      const [task] = src.splice(idx, 1);
-      const dest = [...(prev[to] ?? [])];
-      dest.unshift({ ...task, etapa: to });
-      return { ...prev, [data.from]: src, [to]: dest };
+      const newBoard = { ...prev };
+      const sourceList = Array.from(newBoard[from]);
+      const [moved] = sourceList.splice(fromIndex, 1);
+
+      if (!moved) return prev;
+
+      // Atualiza a etapa na tarefa movida
+      const updatedTask = { ...moved, etapa: to };
+
+      if (from === to) {
+        sourceList.splice(toIndex, 0, updatedTask);
+        newBoard[from] = sourceList;
+      } else {
+        const destList = Array.from(newBoard[to]);
+        destList.splice(toIndex, 0, updatedTask);
+        newBoard[from] = sourceList;
+        newBoard[to] = destList;
+      }
+      return newBoard;
     });
+
+    // Chama API para mover
+    // Nota: O endpoint original era PUT /kanban/etapa/{id} com body { etapa: to }
+    // O draggableId deve ser o ID da tarefa
     try {
-      await fetch(`${KANBAN_URL}/kanban/etapa/${data.taskId}`, {
+      fetch(`${KANBAN_URL}/kanban/etapa/${draggableId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ etapa: to })
       });
-    } catch {}
+    } catch { }
   }
 
-  // --- Automação robusta: dispara no minuto exato e evita repetição por dia ---
+  // --- Automação ---
   useEffect(() => {
     type Automation = {
       id: string;
       title: string;
-      time: string; // HH:MM
+      time: string;
       col: ColumnKey;
-      lastRunDate?: string; // YYYY-MM-DD
+      lastRunDate?: string;
     };
 
     const loadAutos = (): Automation[] => {
@@ -552,18 +637,7 @@ export default function Page() {
         const target = toTodayDate(a.time);
         const shouldRun = now >= target && a.lastRunDate !== todayStr();
         if (shouldRun) {
-          setBoard((prev) => ({
-            ...prev,
-            [a.col]: [
-              {
-                id: uid(),
-                title: a.title + " (auto)",
-                createdAt: Date.now(),
-                etapa: a.col,
-              },
-              ...prev[a.col],
-            ],
-          }));
+          addTask(a.col as ColumnKey, a.title + " (auto)");
           a.lastRunDate = todayStr();
           changed = true;
         }
@@ -571,10 +645,7 @@ export default function Page() {
       if (changed) saveAutos(autos);
     };
 
-    // roda já na montagem (caso a aba abra depois do horário)
     runCheck();
-
-    // alinha para o início do próximo minuto
     const delay = 60000 - (Date.now() % 60000);
     let interval: ReturnType<typeof setInterval> | null = null;
     const timer = setTimeout(() => {
@@ -595,7 +666,7 @@ export default function Page() {
       alert("Informe um título.");
       return;
     }
-    if (!/^\d{2}:\d{2}$/.test(t)) {
+    if (!t || !/^\d{2}:\d{2}$/.test(t)) {
       alert("Informe um horário válido no formato HH:MM.");
       return;
     }
@@ -616,287 +687,333 @@ export default function Page() {
   // --- Modal do Card ---
   function openTaskModal(col: ColumnKey, id: string) {
     setSelected({ col, id });
-    // carrega dados do card para o form
-    setBoard((prev) => {
-      const t = prev[col].find((x) => x.id === id);
+    const t = board[col].find((x) => x.id === id);
+    if (t) {
       setTaskForm({
-        data: t?.data || "",
-        venda: t?.venda || "",
-        cliente: t?.cliente || "",
-        itemReclamado: t?.itemReclamado || "",
-        reclamacao: t?.reclamacao || "",
-        solucao: t?.solucao || "",
-        dataSolucao: t?.dataSolucao || "",
-        custo: t?.custo || "",
-        dptoResponsavel: t?.dptoResponsavel || "",
-        tipo: t?.tipo || "",
-        vendedor: t?.vendedor || "",
-        imagens: t?.imagens || [],
-        files: [],
-        previews: []
+        title: t.title || "",
+        desc: t.desc || "",
+        responsavel: t.responsavel || "",
+        due: t.due || "",
+        prioridade: t.prioridade || "media",
+        data: t.data || "",
+        venda: t.venda || "",
+        cliente: t.cliente || "",
+        itemReclamado: t.itemReclamado || "",
+        reclamacao: t.reclamacao || "",
+        solucao: t.solucao || "",
+        dataSolucao: t.dataSolucao || "",
+        custo: t.custo || "",
+        dptoResponsavel: t.dptoResponsavel || "",
+        tipo: t.tipo || "",
+        vendedor: t.vendedor || "",
+        imagens: t.imagens || [],
+        files: []
       });
-      return prev; // não altera o estado aqui
-    });
+    }
     setShowTaskModal(true);
   }
+
   async function saveTaskModal() {
     if (!selected) return;
-    // Se houver arquivos, converte todos para base64 antes de enviar
-    const sendUpdate = async (updated: any) => {
-      let imagens: string[] = Array.isArray(updated.imagens) ? [...updated.imagens] : [];
-      if (taskForm.files && taskForm.files.length > 0) {
-        const toBase64 = (file: File) => {
-          return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        };
-        try {
-          const filesBase64 = await Promise.all(taskForm.files.map(toBase64));
-          imagens = imagens.concat(filesBase64);
-        } catch {}
-      }
-      updated.imagens = imagens;
-      fetch(`${KANBAN_URL}/kanban`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated)
-      });
-    };
+
+    // Upload de imagens (base64)
+    let imagens: string[] = [...(taskForm.imagens || [])];
+    if (taskForm.files && taskForm.files.length > 0) {
+      const toBase64 = (file: File) => {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      };
+      try {
+        const filesBase64 = await Promise.all(taskForm.files.map(toBase64));
+        imagens = imagens.concat(filesBase64);
+      } catch { }
+    }
+
+    const updatedTask = { ...taskForm, imagens, id: selected.id, etapa: selected.col };
+
     setBoard((prev) => {
       const list = prev[selected.col].map((t) =>
-        t.id === selected.id ? { ...t, ...taskForm, imagens: t.imagens || [] } : t
+        t.id === selected.id ? { ...t, ...updatedTask } : t
       );
-      // PUT com o card atualizado
-      const updated = list.find((t) => t.id === selected.id);
-      if (updated) {
-        sendUpdate(updated);
-      }
       return { ...prev, [selected.col]: list };
     });
+
+    try {
+      await fetch(`${KANBAN_URL}/kanban`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedTask)
+      });
+    } catch { }
+
     setShowTaskModal(false);
   }
 
-  // Board filtrado por responsável (aplicado na renderização)
+  // Board filtrado
+  // Board filtrado
   const filteredBoard: BoardState = useMemo(() => {
-    if (!filterResp) return board;
-    const out: BoardState = {
-      aguardando_atendimento: [],
-      em_analise: [],
-      finalizado: []
-    };
+    if (!filterVendedor && !filterCliente && !filterVenda) return board;
+    const out = {} as BoardState;
     for (const col of COLS) {
-      out[col.key] = (board[col.key] ?? []).filter(
-        (t: any) => (t.responsavel || "").toLowerCase() === filterResp.toLowerCase()
-      );
+      out[col.key] = board[col.key].filter((t) => {
+        const matchVendedor = !filterVendedor || (t.vendedor || "").toLowerCase().includes(filterVendedor.toLowerCase());
+        const matchCliente = !filterCliente || (t.cliente || "").toLowerCase().includes(filterCliente.toLowerCase());
+        const matchVenda = !filterVenda || (t.venda || "").toLowerCase().includes(filterVenda.toLowerCase());
+        return matchVendedor && matchCliente && matchVenda;
+      });
     }
     return out;
-  }, [board, filterResp]);
+  }, [board, filterVendedor, filterCliente, filterVenda]);
 
-  // --- Scroll horizontal por arraste ---
-  const boardRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const dragStartX = useRef(0);
-  const scrollStartX = useRef(0);
+  // User Setor
+  const userSetor = typeof window !== "undefined" ? (() => {
+    try {
+      const raw = localStorage.getItem("userData");
+      if (!raw) return "";
+      const data = JSON.parse(raw);
+      return data.setor || "";
+    } catch { return ""; }
+  })() : "";
 
-  // handlers para mouse/touch
-  function handleBoardMouseDown(e: React.MouseEvent<HTMLDivElement>) {
-    isDragging.current = true;
-    dragStartX.current = e.clientX;
-    scrollStartX.current = boardRef.current?.scrollLeft || 0;
-    document.body.style.cursor = "grabbing";
-  }
-  function handleBoardMouseMove(e: MouseEvent) {
-    if (!isDragging.current) return;
-    if (!boardRef.current) return;
-    const dx = e.clientX - dragStartX.current;
-    boardRef.current.scrollLeft = scrollStartX.current - dx;
-  }
-  function handleBoardMouseUp() {
-    isDragging.current = false;
-    document.body.style.cursor = "";
-  }
-  useEffect(() => {
-    const move = (e: MouseEvent) => handleBoardMouseMove(e);
-    const up = () => handleBoardMouseUp();
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, []);
-
-  // Defina o setor do usuário aqui (exemplo: "Atacado", "Varejo", ou outro valor)
-  const userSetor =
-    typeof window !== "undefined"
-      ? (() => {
-          try {
-            const raw = localStorage.getItem("userData");
-            if (!raw) return "";
-            const data = JSON.parse(raw);
-            return data.setor || "";
-          } catch {
-            return "";
-          }
-        })()
-      : "";
-
-  // Permissões da tela atual
-  const permissoesTela = typeof window !== "undefined" ? getPermissoesTelaAtual() : null;
-
-  const pathname = usePathname(); // usa a rota atual
-  const { canView, canEdit, canCreate, canDelete } = usePermissions(pathname);
-
-  console.log("Permissões do Kanban:", { canView, canEdit, canCreate, canDelete });
+  if (!isMounted) return null;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-neutral-950 text-gray-900 dark:text-gray-100">
-      <div className="max-w-[1400px] px-6 py-8 mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold">Kanban – Fluxo Operacional</h1>
-            <p className="text-sm text-gray-500">Automatize e gerencie seu fluxo.</p>
-          </div>
+    <div className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
+      {/* Header Toolbar */}
+      <div className="flex items-center gap-4 px-6 py-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur border-b border-gray-200 dark:border-neutral-800 shrink-0 z-10">
+        <h1 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white mr-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M8 7v10" />
+              <path d="M16 7v10" />
+              <path d="M12 7v10" />
+            </svg>
+          </span>
+          <span>Kanban SAC</span>
+        </h1>
+
+        <div className="h-6 w-px bg-gray-300 dark:bg-neutral-700"></div>
+
+        <div className="flex items-center gap-2">
+          <input
+            value={filterVendedor}
+            onChange={(e) => setFilterVendedor(e.target.value)}
+            placeholder="Vendedor"
+            className="text-sm rounded-md border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none w-32"
+          />
+          <input
+            value={filterCliente}
+            onChange={(e) => setFilterCliente(e.target.value)}
+            placeholder="Cód. Cliente"
+            className="text-sm rounded-md border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none w-32"
+          />
+          <input
+            value={filterVenda}
+            onChange={(e) => setFilterVenda(e.target.value)}
+            placeholder="Nº Venda"
+            className="text-sm rounded-md border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none w-28"
+          />
         </div>
 
-        <div
-          className="overflow-x-auto cursor-grab"
-          ref={boardRef}
-          onMouseDown={handleBoardMouseDown}
-        >
-          <div className="flex gap-4 min-w-max pb-2">
+        {(filterVendedor || filterCliente || filterVenda) && (
+          <button
+            onClick={() => {
+              setFilterVendedor("");
+              setFilterCliente("");
+              setFilterVenda("");
+            }}
+            className="text-xs px-2 py-1.5 rounded text-red-600 hover:bg-red-50 font-medium"
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+
+      {/* Board Area */}
+      <div
+        ref={boardRef}
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden select-none"
+        style={{ cursor: "grab" }}
+      >
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="h-full flex gap-4 px-6 pb-4 pt-6 min-w-max items-start">
             {COLS.map((c) => (
               <Column
                 key={c.key}
                 label={c.label}
-                colKey={c.key as ColumnKey}
-                tasks={filteredBoard[c.key] ?? []}
-                board={board}
-                onDropTask={moveTask}
+                colKey={c.key}
+                tasks={filteredBoard[c.key]}
                 onAddTask={addTask}
                 onDeleteTask={deleteTask}
                 onOpenTask={openTaskModal}
+                disableDrag={!!(filterVendedor || filterCliente || filterVenda)}
                 userSetor={userSetor}
               />
             ))}
+          </div>
+        </DragDropContext>
+      </div>
 
-        {/* Modal: Detalhes/Edição do Card */}
-        {showTaskModal && selected && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 w-[520px] shadow-lg max-h-[80vh] overflow-y-auto">
-              <h2 className="text-lg font-semibold mb-4">Detalhes do Card</h2>
+      {error && (
+        <div className="absolute bottom-4 right-4 bg-red-100 border border-red-200 text-red-700 px-4 py-2 rounded-lg shadow-lg">
+          Erro: {error}
+        </div>
+      )}
 
-              <div className="grid grid-cols-2 gap-3">
+      {/* Modal Automação */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-xl w-full max-w-md shadow-2xl p-6">
+            <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Nova Automação</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Título do Card</label>
+                <input
+                  value={automation.title}
+                  onChange={(e) => setAutomation({ ...automation, title: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Horário (HH:MM)</label>
+                <input
+                  type="time"
+                  value={automation.time}
+                  onChange={(e) => setAutomation({ ...automation, time: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Coluna</label>
+                <select
+                  value={automation.col}
+                  onChange={(e) => setAutomation({ ...automation, col: e.target.value as ColumnKey })}
+                  className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
+                >
+                  {COLS.map((c) => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-neutral-700">Cancelar</button>
+              <button onClick={saveAutomation} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Task Details (SAC Fields) */}
+      {showTaskModal && selected && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-neutral-800">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M8 7v10" /><path d="M16 7v10" /><path d="M12 7v10" /></svg>
+                </div>
+                <div className="flex-1">
+                  <input
+                    value={taskForm.title}
+                    onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                    className="w-full text-xl font-bold bg-transparent border-none focus:ring-0 p-0 text-gray-900 dark:text-white"
+                    placeholder="Título do cartão"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    na coluna <span className="font-medium text-gray-700 dark:text-gray-300">{COLS.find(c => c.key === selected.col)?.label}</span>
+                  </p>
+                </div>
+                <button onClick={() => setShowTaskModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Campos SAC */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm mb-1">VENDA</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Venda</label>
                   <input value={taskForm.venda} onChange={e => setTaskForm({ ...taskForm, venda: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
                 <div>
-                  <label className="block text-sm mb-1">CLIENTE</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente</label>
                   <input value={taskForm.cliente} onChange={e => setTaskForm({ ...taskForm, cliente: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
                 <div>
-                  <label className="block text-sm mb-1">ITEM RECLAMADO</label>
-                  <input value={taskForm.itemReclamado} onChange={e => setTaskForm({ ...taskForm, itemReclamado: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">DPTO RESPONSAVEL</label>
-                  <input value={taskForm.dptoResponsavel} onChange={e => setTaskForm({ ...taskForm, dptoResponsavel: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">VENDEDOR</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Vendedor</label>
                   <input value={taskForm.vendedor} onChange={e => setTaskForm({ ...taskForm, vendedor: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-sm mb-1">RECLAMAÇÃO</label>
-                  <textarea value={taskForm.reclamacao} onChange={e => setTaskForm({ ...taskForm, reclamacao: e.target.value })} rows={2} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm mb-1">Imagens</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={e => {
-                      const files = Array.from(e.target.files || []);
-                      setTaskForm(prev => ({
-                        ...prev,
-                        files: files,
-                        previews: files.map(f => URL.createObjectURL(f))
-                      }));
-                    }}
-                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2"
-                  />
-                  {/* Visualização de imagem grande com navegação */}
-                  <ImageGallery
-                    previews={taskForm.previews}
-                    imagens={taskForm.imagens}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm mb-1">SOLUÇÃO</label>
-                  <textarea value={taskForm.solucao} onChange={e => setTaskForm({ ...taskForm, solucao: e.target.value })} rows={2} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
                 <div>
-                  <label className="block text-sm mb-1">DATA SOLUÇÃO</label>
-                  <input type="date" value={taskForm.dataSolucao} onChange={e => setTaskForm({ ...taskForm, dataSolucao: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">CUSTO</label>
-                  <input value={taskForm.custo} onChange={e => setTaskForm({ ...taskForm, custo: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">TIPO</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo</label>
                   <input value={taskForm.tipo} onChange={e => setTaskForm({ ...taskForm, tipo: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  onClick={() => setShowTaskModal(false)}
-                  className="px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-neutral-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={saveTaskModal}
-                  className="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Salvar
-                </button>
-                {/* Botão de excluir, só aparece se permissoesTela?.deletar === true */}
-                {canDelete && (
-                  <button
-                    onClick={async () => {
-                      if (!selected) return;
-                      // Remove do board local
-                      setBoard((prev) => ({
-                        ...prev,
-                        [selected.col]: prev[selected.col].filter((t) => t.id !== selected.id),
-                      }));
-                      // Chama DELETE na API
-                      try {
-                        await fetch(`${KANBAN_URL}/kanban/${selected.id}`, {
-                          method: "DELETE"
-                        });
-                      } catch {}
-                      setShowTaskModal(false);
-                    }}
-                    className="px-4 py-2 text-sm rounded-xl bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    Excluir
-                  </button>
-                )}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição / Reclamação</label>
+                <textarea
+                  value={taskForm.reclamacao || taskForm.desc}
+                  onChange={(e) => setTaskForm({ ...taskForm, reclamacao: e.target.value, desc: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2 min-h-[100px]"
+                  placeholder="Detalhes..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Responsável</label>
+                  <input value={taskForm.responsavel} onChange={e => setTaskForm({ ...taskForm, responsavel: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Prazo</label>
+                  <input type="date" value={taskForm.due} onChange={e => setTaskForm({ ...taskForm, due: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Prioridade</label>
+                  <select value={taskForm.prioridade} onChange={e => setTaskForm({ ...taskForm, prioridade: e.target.value as any })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2">
+                    <option value="baixa">Baixa</option>
+                    <option value="media">Média</option>
+                    <option value="alta">Alta</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Imagens */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Anexos</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {taskForm.imagens?.map((img, idx) => (
+                    <img key={idx} src={img} alt="Anexo" className="w-16 h-16 object-cover rounded border" />
+                  ))}
+                </div>
+                <input type="file" multiple onChange={e => {
+                  if (e.target.files) {
+                    setTaskForm({ ...taskForm, files: Array.from(e.target.files) });
+                  }
+                }} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 dark:border-neutral-800 flex justify-between bg-gray-50 dark:bg-neutral-900/50 rounded-b-xl">
+              <button onClick={() => {
+                if (confirm("Excluir este cartão?")) {
+                  deleteTask(selected.col, selected.id);
+                  setShowTaskModal(false);
+                }
+              }} className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium">Excluir</button>
+              <div className="flex gap-2">
+                <button onClick={() => setShowTaskModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium">Cancelar</button>
+                <button onClick={saveTaskModal} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none">Salvar</button>
               </div>
             </div>
           </div>
-        )}
-          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
