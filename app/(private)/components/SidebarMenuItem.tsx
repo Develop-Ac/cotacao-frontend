@@ -32,7 +32,10 @@ export default function SidebarMenuItem({
     const [isOpen, setIsOpen] = useState(isActive);
 
     useEffect(() => {
-        if (isActive) setIsOpen(true);
+        if (isActive) {
+            const timer = setTimeout(() => setIsOpen(true), 0);
+            return () => clearTimeout(timer);
+        }
     }, [isActive]);
 
     function handleToggle(e: React.MouseEvent) {
