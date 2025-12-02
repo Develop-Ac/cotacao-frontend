@@ -72,18 +72,19 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000
 
-# Artefatos do build
-COPY --from=builder /app/.next ./.next
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copia public
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
 
-# Configs opcionais do Next (não quebra se estiver vazio)
-COPY --from=builder /opt/runtime/ ./
+# Copia artefatos standalone
+# O standalone já inclui node_modules necessários e o server.js
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# node_modules SOMENTE de produção (resolvidos com legacy-peer-deps)
-COPY --from=prod-deps /app/node_modules ./node_modules
+USER nextjs
 
 EXPOSE 3000
 
-# Usa o bin do Next do node_modules
-CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
+CMD ["node", "server.js"]

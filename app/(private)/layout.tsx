@@ -9,7 +9,7 @@ import Image from 'next/image';
 import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight, MdSearch } from "react-icons/md";
 import { HiOutlineShoppingCart, HiOutlineWrench, HiOutlineCube, HiOutlineTruck, HiOutlineClipboardDocumentCheck, HiOutlineUser, HiOutlineCog } from "react-icons/hi2";
 import Link from "next/link";
-import { useState, useEffect, MouseEvent, useContext } from "react";
+import React, { useState, useEffect, MouseEvent, useContext } from "react";
 
 // ⬇️ Permissão (sem alterar visuais)
 import { AbilityContext } from "../components/AbilityProvider";
@@ -57,10 +57,10 @@ export default function RootLayout({
   };
 
   // ---------- Permissões: helpers ----------
-  const canViewPath = (href: string) => {
+  const canViewPath = React.useCallback((href: string) => {
     const target = normalizePath(href);
     return canOnPathPrefix(ability, "read", target); // read herda por prefixo
-  };
+  }, [ability]);
 
   // Submenus completos para cada seção (sem filtro)
   const getSubmenuItems = (section: string) => {
@@ -158,7 +158,7 @@ export default function RootLayout({
     if (target !== "/login" && target !== "/" && !canViewPath(target)) {
       router.replace("/403");
     }
-  }, [pathname, ability]);
+  }, [pathname, canViewPath, router]);
 
   return (
     <PrivateRoute>

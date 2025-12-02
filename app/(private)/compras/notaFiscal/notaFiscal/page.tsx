@@ -5,7 +5,7 @@ import {
   FaCaretDown,
 } from "react-icons/fa";
 import { FaFilePdf } from "react-icons/fa";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { serviceUrl } from "@/lib/services";
 
 // ===============================
@@ -67,7 +67,7 @@ export default function NotaFiscalList() {
   }, []);
 
   // ---------- CARREGAMENTO ----------
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -108,13 +108,12 @@ export default function NotaFiscalList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // carrega ao montar
   useEffect(() => {
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchAll]);
 
   // paginação no front
   const total = items.length;

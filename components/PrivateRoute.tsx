@@ -13,7 +13,7 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
     if (!autenticado) {
       router.push('/login');
     }
-  }, []);
+  }, [router]);
 
   return <>{children}</>;
 }

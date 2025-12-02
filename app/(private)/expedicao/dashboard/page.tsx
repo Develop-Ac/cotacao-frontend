@@ -60,6 +60,45 @@ const MAPA_ENTREGADORES: { [key: number]: string } = {
     31: "FRANCISCO DOS SANTOS",
 };
 
+const calcularDuracao = (inicio: string, fim: string): number => {
+    if (!inicio || !fim || inicio === '' || fim === '') return 0;
+
+    const dataInicio = new Date(inicio);
+    const dataFim = new Date(fim);
+
+    // Verifica se as datas são válidas
+    if (isNaN(dataInicio.getTime()) || isNaN(dataFim.getTime())) return 0;
+
+    const duracao = (dataFim.getTime() - dataInicio.getTime()) / 1000; // retorna em segundos
+    return duracao > 0 ? duracao : 0; // garante que não retorne valores negativos
+};
+
+const processarEntregas = (data: Entrega[]): EntregaProcessada[] => {
+    return data.map(entrega => {
+        const separacao = calcularDuracao(entrega.criado_em, entrega.aceito_em);
+        const embalagem = calcularDuracao(entrega.aceito_em, entrega.embalado_em);
+        const aguarEntregador = calcularDuracao(entrega.embalado_em, entrega.disponivel_para_entrega_em);
+        const aguarRota = calcularDuracao(entrega.disponivel_para_entrega_em, entrega.saiu_para_entrega_em);
+        const rota = calcularDuracao(entrega.saiu_para_entrega_em, entrega.finalizado_em);
+        const retorno = calcularDuracao(entrega.finalizado_em, entrega.retorno_entregador_em);
+        const ciclo = calcularDuracao(entrega.criado_em, entrega.finalizado_em);
+
+        return {
+            ...entrega,
+            nomeEntregador: MAPA_ENTREGADORES[entrega.id_entregador] || "Desconhecido",
+            separacao,
+            embalagem,
+            aguarEntregador,
+            aguarRota,
+            rota,
+            retorno,
+            ciclo
+        };
+    });
+};
+
+const EXPEDICAO_API = serviceUrl("expedicao");
+
 export default function EntregasPage() {
     const [entregas, setEntregas] = useState<EntregaProcessada[]>([]);
     const [loading, setLoading] = useState(true);
@@ -68,18 +107,7 @@ export default function EntregasPage() {
     const [dataInicio, setDataInicio] = useState<string>('');
     const [dataFim, setDataFim] = useState<string>('');
 
-    const calcularDuracao = (inicio: string, fim: string): number => {
-        if (!inicio || !fim || inicio === '' || fim === '') return 0;
 
-        const dataInicio = new Date(inicio);
-        const dataFim = new Date(fim);
-
-        // Verifica se as datas são válidas
-        if (isNaN(dataInicio.getTime()) || isNaN(dataFim.getTime())) return 0;
-
-        const duracao = (dataFim.getTime() - dataInicio.getTime()) / 1000; // retorna em segundos
-        return duracao > 0 ? duracao : 0; // garante que não retorne valores negativos
-    };
 
     // --- Gráfico de entregas por dia ---
     const entregasPorDia = React.useMemo(() => {
@@ -167,31 +195,7 @@ export default function EntregasPage() {
         return `${minutosInteiros}:${segundosRestantes.toString().padStart(2, '0')}`;
     };
 
-    const processarEntregas = (data: Entrega[]): EntregaProcessada[] => {
-        return data.map(entrega => {
-            const separacao = calcularDuracao(entrega.criado_em, entrega.aceito_em);
-            const embalagem = calcularDuracao(entrega.aceito_em, entrega.embalado_em);
-            const aguarEntregador = calcularDuracao(entrega.embalado_em, entrega.disponivel_para_entrega_em);
-            const aguarRota = calcularDuracao(entrega.disponivel_para_entrega_em, entrega.saiu_para_entrega_em);
-            const rota = calcularDuracao(entrega.saiu_para_entrega_em, entrega.finalizado_em);
-            const retorno = calcularDuracao(entrega.finalizado_em, entrega.retorno_entregador_em);
-            const ciclo = calcularDuracao(entrega.criado_em, entrega.finalizado_em);
 
-            return {
-                ...entrega,
-                nomeEntregador: MAPA_ENTREGADORES[entrega.id_entregador] || "Desconhecido",
-                separacao,
-                embalagem,
-                aguarEntregador,
-                aguarRota,
-                rota,
-                retorno,
-                ciclo
-            };
-        });
-    };
-
-    const EXPEDICAO_API = serviceUrl("expedicao");
 
     useEffect(() => {
         const fetchEntregas = async () => {

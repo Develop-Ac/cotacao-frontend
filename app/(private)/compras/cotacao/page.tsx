@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   FaBox,
   FaBuilding,
@@ -275,7 +275,7 @@ export default function Tela() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  const carregarPedidos = async () => {
+  const carregarPedidos = useCallback(async () => {
     setMsgPedidos(null);
     setLoadingPedidos(true);
     try {
@@ -304,7 +304,7 @@ export default function Tela() {
     } finally {
       setLoadingPedidos(false);
     }
-  };
+  }, [page, pageSize]);
 
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [pedidoParaExcluir, setPedidoParaExcluir] = useState<PedidoResumo | null>(null);
@@ -349,11 +349,11 @@ export default function Tela() {
   useEffect(() => {
     setPage(1); // Reset to page 1 when page size changes
     carregarPedidos();
-  }, [pageSize]);
+  }, [pageSize, carregarPedidos]);
 
   useEffect(() => {
     carregarPedidos();
-  }, [page]);
+  }, [page, carregarPedidos]);
 
   const pedidosFiltrados = pedidos.filter(
     (p) => String(p.pedido_cotacao).includes(filterText) || String(p.empresa).includes(filterText)

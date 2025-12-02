@@ -1,95 +1,99 @@
 "use client";
 
-import { FaPlusSquare, FaTrash, FaEdit, FaFilePdf, FaSync , FaListUl, FaCaretDown, FaFilter } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { FaPlusSquare, FaTrash, FaEdit, FaFilePdf, FaSync, FaListUl, FaCaretDown, FaFilter } from "react-icons/fa";
+import { useEffect, useState, useCallback } from "react";
 import React from "react";
 import { serviceUrl } from "@/lib/services";
 
 export default function Login() {
-    // === MAPA DE PERMISSÕES POR SETOR ===
-    const PERMISSOES_SETORES: Record<string, Array<{ modulo: string; telas: string[] }>> = {
-      Estoque: [
-        { modulo: "Estoque", telas: ["/estoque/contagem"] },
-      ],
-      Oficina: [
-        { modulo: "Oficina", telas: ["/oficina/checkList"] },
-      ],
-      Compras: [
-        { modulo: "Compras", telas: [
+  // === MAPA DE PERMISSÕES POR SETOR ===
+  const PERMISSOES_SETORES: Record<string, Array<{ modulo: string; telas: string[] }>> = {
+    Estoque: [
+      { modulo: "Estoque", telas: ["/estoque/contagem"] },
+    ],
+    Oficina: [
+      { modulo: "Oficina", telas: ["/oficina/checkList"] },
+    ],
+    Compras: [
+      {
+        modulo: "Compras", telas: [
           "/compras/cotacao",
           "/compras/cotacao/comparativo",
           "/compras/cotacao/pedido",
           "/compras/notaFiscal/notaFiscal",
           "/compras/kanban",
-        ] },
-      ],
-      Admin: [
-        { modulo: "Estoque", telas: ["/estoque/contagem"] },
-        { modulo: "Oficina", telas: ["/oficina/checkList"] },
-        { modulo: "Compras", telas: [
+        ]
+      },
+    ],
+    Admin: [
+      { modulo: "Estoque", telas: ["/estoque/contagem"] },
+      { modulo: "Oficina", telas: ["/oficina/checkList"] },
+      {
+        modulo: "Compras", telas: [
           "/compras/cotacao",
           "/compras/cotacao/comparativo",
           "/compras/cotacao/pedido",
           "/compras/notaFiscal/notaFiscal",
           "/compras/kanban",
-        ] },
-        { modulo: "Sac", telas: ["/sac/kanban"] },
-        { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
-        { modulo: "Atacado", telas: [] },
-        { modulo: "Varejo", telas: [] },
-        { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
-      ],
-      Sac: [
-        { modulo: "Sac", telas: ["/sac/kanban"] },
-        { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
-      ],
-      Qualidade: [
-        { modulo: "Sac", telas: ["/sac/kanban"] },
-        { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
-        { modulo: "Compras", telas: [ "/compras/kanban" ] },
-      ],
-      Atacado: [
-        { modulo: "Sac", telas: ["/sac/kanban"] },
-      ],
-      Varejo: [
-        { modulo: "Sac", telas: ["/sac/kanban"] },
-      ],
-      "Expedição": [
-        { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
-      ],
-    };
+        ]
+      },
+      { modulo: "Sac", telas: ["/sac/kanban"] },
+      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      { modulo: "Atacado", telas: [] },
+      { modulo: "Varejo", telas: [] },
+      { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
+    ],
+    Sac: [
+      { modulo: "Sac", telas: ["/sac/kanban"] },
+      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+    ],
+    Qualidade: [
+      { modulo: "Sac", telas: ["/sac/kanban"] },
+      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      { modulo: "Compras", telas: ["/compras/kanban"] },
+    ],
+    Atacado: [
+      { modulo: "Sac", telas: ["/sac/kanban"] },
+    ],
+    Varejo: [
+      { modulo: "Sac", telas: ["/sac/kanban"] },
+    ],
+    "Expedição": [
+      { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
+    ],
+  };
 
-    // Estado do modal de permissões
-    const [modalPermissoesAberto, setModalPermissoesAberto] = useState(false);
-    const [permissoes, setPermissoes] = useState<Record<string, Record<string, boolean>>>({});
-    const [modulosTelas, setModulosTelas] = useState<Array<{ modulo: string; telas: string[] }>>([]);
+  // Estado do modal de permissões
+  const [modalPermissoesAberto, setModalPermissoesAberto] = useState(false);
+  const [permissoes, setPermissoes] = useState<Record<string, Record<string, boolean>>>({});
+  const [modulosTelas, setModulosTelas] = useState<Array<{ modulo: string; telas: string[] }>>([]);
 
-    // Abre o modal ao selecionar setor
-    const handleSetorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const novoSetor = e.target.value;
-      setSetor(novoSetor);
-      if (novoSetor && PERMISSOES_SETORES[novoSetor]) {
-        setModulosTelas(PERMISSOES_SETORES[novoSetor]);
-        setModalPermissoesAberto(true);
-      } else {
-        setModulosTelas([]);
-        setModalPermissoesAberto(false);
-      }
-    };
+  // Abre o modal ao selecionar setor
+  const handleSetorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const novoSetor = e.target.value;
+    setSetor(novoSetor);
+    if (novoSetor && PERMISSOES_SETORES[novoSetor]) {
+      setModulosTelas(PERMISSOES_SETORES[novoSetor]);
+      setModalPermissoesAberto(true);
+    } else {
+      setModulosTelas([]);
+      setModalPermissoesAberto(false);
+    }
+  };
 
-    // Permissões possíveis
-    const TIPOS_PERMISSAO = ["visualizar", "editar", "criar", "excluir"];
+  // Permissões possíveis
+  const TIPOS_PERMISSAO = ["visualizar", "editar", "criar", "excluir"];
 
-    // Atualiza permissão
-    const handlePermissaoChange = (tela: string, tipo: string) => {
-      setPermissoes(prev => ({
-        ...prev,
-        [tela]: {
-          ...prev[tela],
-          [tipo]: !prev[tela]?.[tipo],
-        },
-      }));
-    };
+  // Atualiza permissão
+  const handlePermissaoChange = (tela: string, tipo: string) => {
+    setPermissoes(prev => ({
+      ...prev,
+      [tela]: {
+        ...prev[tela],
+        [tipo]: !prev[tela]?.[tipo],
+      },
+    }));
+  };
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [nome, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
@@ -122,7 +126,7 @@ export default function Login() {
   // Função para carregar usuários
   const SISTEMA_API = serviceUrl("sistema");
 
-  const carregarUsuarios = async () => {
+  const carregarUsuarios = useCallback(async () => {
     try {
       const response = await fetch(`${SISTEMA_API}/usuarios`, {
         method: "GET",
@@ -142,12 +146,12 @@ export default function Login() {
       console.error("Erro ao carregar usuários:", msg);
       alert("Erro ao carregar usuários: " + msg);
     }
-  };
+  }, [SISTEMA_API]);
 
   // Carregar usuários ao montar o componente
   useEffect(() => {
     carregarUsuarios();
-  }, []);
+  }, [carregarUsuarios]);
 
   const handleSubmit = async () => {
     try {
@@ -162,7 +166,7 @@ export default function Login() {
         try {
           const errJson = await response.json();
           if (errJson?.message) msg = errJson.message;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -230,7 +234,7 @@ export default function Login() {
         try {
           const errJson = await response.json();
           if (errJson?.message) msg = errJson.message;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
 
@@ -327,53 +331,53 @@ export default function Login() {
                       <option value="Expedição">Expedição</option>
                     </select>
                   </div>
-                        {/* Modal de Permissões - fora do select para overlay funcionar corretamente */}
-                        {modalPermissoesAberto && (
-                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl relative">
-                              <h4 className="text-lg font-bold mb-4">Permissões de Telas do Setor</h4>
-                              <div className="max-h-96 overflow-y-auto">
-                                {modulosTelas.map(({ modulo, telas }) => (
-                                  <div key={modulo} className="mb-4">
-                                    <div className="font-semibold text-blue-700 mb-2">Módulo: {modulo}</div>
-                                    <table className="w-full border mb-2">
-                                      <thead>
-                                        <tr>
-                                          <th className="p-2 text-left">Tela</th>
-                                          {TIPOS_PERMISSAO.map(tipo => (
-                                            <th key={tipo} className="p-2 text-center capitalize">{tipo}</th>
-                                          ))}
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {telas.map(tela => (
-                                          <tr key={tela}>
-                                            <td className="p-2 text-sm">{tela}</td>
-                                            {TIPOS_PERMISSAO.map(tipo => (
-                                              <td key={tipo} className="p-2 text-center">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={!!permissoes[tela]?.[tipo]}
-                                                  onChange={() => handlePermissaoChange(tela, tipo)}
-                                                />
-                                              </td>
-                                            ))}
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="flex justify-end gap-2 mt-4">
-                                <button
-                                  className="px-4 py-2 rounded bg-gray-200 text-gray-700"
-                                  onClick={() => setModalPermissoesAberto(false)}
-                                >Fechar</button>
-                              </div>
+                  {/* Modal de Permissões - fora do select para overlay funcionar corretamente */}
+                  {modalPermissoesAberto && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl relative">
+                        <h4 className="text-lg font-bold mb-4">Permissões de Telas do Setor</h4>
+                        <div className="max-h-96 overflow-y-auto">
+                          {modulosTelas.map(({ modulo, telas }) => (
+                            <div key={modulo} className="mb-4">
+                              <div className="font-semibold text-blue-700 mb-2">Módulo: {modulo}</div>
+                              <table className="w-full border mb-2">
+                                <thead>
+                                  <tr>
+                                    <th className="p-2 text-left">Tela</th>
+                                    {TIPOS_PERMISSAO.map(tipo => (
+                                      <th key={tipo} className="p-2 text-center capitalize">{tipo}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {telas.map(tela => (
+                                    <tr key={tela}>
+                                      <td className="p-2 text-sm">{tela}</td>
+                                      {TIPOS_PERMISSAO.map(tipo => (
+                                        <td key={tipo} className="p-2 text-center">
+                                          <input
+                                            type="checkbox"
+                                            checked={!!permissoes[tela]?.[tipo]}
+                                            onChange={() => handlePermissaoChange(tela, tipo)}
+                                          />
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
-                          </div>
-                        )}
+                          ))}
+                        </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                          <button
+                            className="px-4 py-2 rounded bg-gray-200 text-gray-700"
+                            onClick={() => setModalPermissoesAberto(false)}
+                          >Fechar</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="password" className="block font-medium">Senha</label>
                     <input
@@ -468,14 +472,14 @@ export default function Login() {
                           <td className="p-4">{usuario.setor}</td>
                           <td className="p-4 text-center">
                             <button className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded" title="Editar">
-                              <FaEdit style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px"}}/>
+                              <FaEdit style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px" }} />
                             </button>
                             <button
                               className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded"
                               title="Lixeira"
                               onClick={() => deletarUsuario(usuario.id)}
                             >
-                              <FaTrash style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px"}}/>
+                              <FaTrash style={{ color: "rgb(0, 152, 196)", minHeight: "24px", minWidth: "24px" }} />
                             </button>
                           </td>
                         </tr>

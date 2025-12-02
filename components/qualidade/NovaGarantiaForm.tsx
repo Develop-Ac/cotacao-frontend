@@ -302,6 +302,22 @@ export const NovaGarantiaForm = ({
     }
   };
 
+  const buildProdutoEntry = (produto: VendaDetalhes["produtos"][number], index: number): ProdutoFormEntry => ({
+    id: `${produto.codigo ?? index}-${index}`,
+    codigo: produto.codigo?.toString(),
+    descricao: produto.descricao,
+    quantidade: produto.quantidade,
+    selected: true,
+    tipo: "Avaria",
+    nfCompra: "",
+    refFabricante: "",
+  });
+
+  const setProdutosFromVenda = useCallback((produtos: VendaDetalhes["produtos"]) => {
+    setVendaProdutos(produtos);
+    setProdutosForm(produtos.map((produto, index) => buildProdutoEntry(produto, index)));
+  }, []);
+
   useEffect(() => {
     setFormularioDownloadError(null);
     setFormularioDownloadLoading(false);
@@ -391,7 +407,7 @@ export const NovaGarantiaForm = ({
       cancelled = true;
     };
     // use efetivamente apenas os valores de dependência estáveis
-  }, [initialErpFornecedorId, isEditMode, normalizedInitialData.notaInterna]);
+  }, [initialErpFornecedorId, isEditMode, normalizedInitialData.notaInterna, setProdutosFromVenda]);
 
   const handleFormularioDownload = useCallback(async () => {
     if (formularioDownloadLoading) return;
@@ -413,21 +429,9 @@ export const NovaGarantiaForm = ({
     }
   }, [formularioDownloadKey, formularioDownloadLoading]);
 
-  const buildProdutoEntry = (produto: VendaDetalhes["produtos"][number], index: number): ProdutoFormEntry => ({
-    id: `${produto.codigo ?? index}-${index}`,
-    codigo: produto.codigo?.toString(),
-    descricao: produto.descricao,
-    quantidade: produto.quantidade,
-    selected: true,
-    tipo: "Avaria",
-    nfCompra: "",
-    refFabricante: "",
-  });
 
-  const setProdutosFromVenda = (produtos: VendaDetalhes["produtos"]) => {
-    setVendaProdutos(produtos);
-    setProdutosForm(produtos.map((produto, index) => buildProdutoEntry(produto, index)));
-  };
+
+
 
   const adicionarProdutoPorCodigo = (codigo: string) => {
     const target = vendaProdutos.find(
@@ -743,8 +747,8 @@ export const NovaGarantiaForm = ({
         {feedback && (
           <div
             className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === "success"
-                ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400"
-                : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+              ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400"
+              : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
               }`}
           >
             {feedback.message}
@@ -805,8 +809,8 @@ export const NovaGarantiaForm = ({
       {feedback && (
         <div
           className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === "success"
-              ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400"
-              : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+            ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400"
+            : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
             }`}
         >
           {feedback.message}

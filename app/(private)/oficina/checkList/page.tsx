@@ -16,7 +16,7 @@ import {
   FaGasPump,
   FaEye,
 } from "react-icons/fa";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { serviceUrl } from "@/lib/services";
 
 // ===============================
@@ -214,6 +214,14 @@ export default function ChecklistsList() {
     }
   }, []);
 
+  const prevImage = useCallback(() => {
+    setGalleryIndex((i) => (i <= 0 ? Math.max(0, galleryItems.length - 1) : i - 1));
+  }, [galleryItems.length]);
+
+  const nextImage = useCallback(() => {
+    setGalleryIndex((i) => (i >= galleryItems.length - 1 ? 0 : i + 1));
+  }, [galleryItems.length]);
+
   // Fecha o dropdown ao clicar fora / Esc
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -239,7 +247,7 @@ export default function ChecklistsList() {
       document.removeEventListener("mousedown", onDocClick);
       document.removeEventListener("keydown", onKey);
     };
-  }, [galleryOpen, galleryIndex, galleryItems.length, editModalOpen, viewModalOpen]);
+  }, [galleryOpen, galleryIndex, galleryItems.length, editModalOpen, viewModalOpen, prevImage, nextImage]);
 
   // Helpers
   const fmtDateTime = (iso?: string | null) => {
@@ -354,7 +362,6 @@ export default function ChecklistsList() {
   // carrega ao montar
   useEffect(() => {
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------- FILTRAGEM NO FRONT ----------
@@ -699,12 +706,7 @@ export default function ChecklistsList() {
     setGalleryError(null);
   }
 
-  function prevImage() {
-    setGalleryIndex((i) => (i <= 0 ? Math.max(0, galleryItems.length - 1) : i - 1));
-  }
-  function nextImage() {
-    setGalleryIndex((i) => (i >= galleryItems.length - 1 ? 0 : i + 1));
-  }
+
 
   async function downloadCurrentImage() {
     const cur = galleryItems[galleryIndex];
@@ -1023,11 +1025,14 @@ export default function ChecklistsList() {
 
                       {/* imagem */}
                       {galleryItems[galleryIndex]?.imageUrl ? (
-                        <img
-                          src={galleryItems[galleryIndex].imageUrl}
-                          alt="Avaria"
-                          className="max-h-full max-w-full object-contain"
-                        />
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={galleryItems[galleryIndex].imageUrl}
+                            alt="Avaria"
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </>
                       ) : (
                         <div className="text-gray-500">Carregando imagem...</div>
                       )}

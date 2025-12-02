@@ -1150,6 +1150,7 @@ export default function Page() {
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Anexos</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {taskForm.imagens?.map((img, idx) => (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img key={idx} src={img} alt="Anexo" className="w-16 h-16 object-cover rounded border" />
                   ))}
                 </div>

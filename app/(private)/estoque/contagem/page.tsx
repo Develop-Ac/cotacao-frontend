@@ -13,7 +13,7 @@ import {
     FaUser,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { genId } from "../../../utils/genId";
 import { serviceUrl } from "@/lib/services";
 import Link from "next/link";
@@ -444,7 +444,7 @@ export default function Tela() {
     const [logsDetalhes, setLogsDetalhes] = useState<any[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
 
-    const carregarContagensLista = async () => {
+    const carregarContagensLista = useCallback(async () => {
         setMsgContagensLista(null);
         setLoadingContagensLista(true);
         try {
@@ -477,16 +477,16 @@ export default function Tela() {
         } finally {
             setLoadingContagensLista(false);
         }
-    };
+    }, [page, pageSize]);
 
     useEffect(() => {
         setPage(1);
         carregarContagensLista();
-    }, [pageSize]);
+    }, [pageSize, carregarContagensLista]);
 
     useEffect(() => {
         carregarContagensLista();
-    }, [page]);
+    }, [page, carregarContagensLista]);
 
     // ===== Função para abrir modal de logs =====
     const abrirModalLogs = async (contagem: ContagemListaItem) => {

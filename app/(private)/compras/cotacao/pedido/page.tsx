@@ -9,7 +9,7 @@ import {
   FaSync,
   FaUser,
 } from "react-icons/fa";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { serviceUrl } from "@/lib/services";
 import Alert from "@/components/Alert";
 
@@ -234,7 +234,7 @@ export default function Tela() {
   const [msgPedidos, setMsgPedidos] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<number>(10);
 
-  const carregarPedidos = async () => {
+  const carregarPedidos = useCallback(async () => {
     setMsgPedidos(null);
     setLoadingPedidos(true);
     try {
@@ -258,11 +258,11 @@ export default function Tela() {
     } finally {
       setLoadingPedidos(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     carregarPedidos();
-  }, [pageSize]);
+  }, [pageSize, carregarPedidos]);
 
   // ===== Filtros (Fornecedor, Pedido de Cotação, Criado em [de/até]) =====
   const [fFor, setFFor] = useState<string>("");       // for_codigo (string)

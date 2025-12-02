@@ -465,7 +465,7 @@ export default function GarantiaDetalhePage() {
   const currentAnexoEhImagem = currentAnexo ? isImageAttachment(currentAnexo) : false;
   const downloadingCurrentAnexo = currentAnexo ? downloadingAnexoId === currentAnexo.id : false;
 
-  const abrirAprovacao = () => {
+  const abrirAprovacao = useCallback(() => {
     if (!garantia) return;
     const isAnomalia = (garantia.tipoGarantia ?? "").toLowerCase().includes("anomalia");
     if (isAnomalia) {
@@ -478,7 +478,7 @@ export default function GarantiaDetalhePage() {
     setAprovarCfop("");
     setFreteCortesiaSelecionado(false);
     setAprovarModalVisible(true);
-  };
+  }, [garantia]);
 
   const submitAnomalia = async () => {
     if (!anomaliaCfop.trim()) {
@@ -515,11 +515,11 @@ export default function GarantiaDetalhePage() {
     setNotaAnexos([]);
   };
 
-  const handleNota = () => {
+  const handleNota = useCallback(() => {
     setNotaNumero("");
     setNotaAnexos([]);
     setNotaVisible(true);
-  };
+  }, []);
 
   const submitNota = async () => {
     if (!garantia) return;
@@ -607,14 +607,14 @@ export default function GarantiaDetalhePage() {
     setNotaAnexos((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleNfeReprovada = async () => {
+  const handleNfeReprovada = useCallback(async () => {
     await updateStatus(STATUS_CODES.emissaoNotaFiscal);
     setAprovarPrecisaNF(true);
     setAprovarCfop("");
     setAprovarModalVisible(true);
-  };
+  }, [updateStatus]);
 
-  const handleNfeAprovada = () => {
+  const handleNfeAprovada = useCallback(() => {
     if (freteCortesiaSelecionado) {
       void updateStatus(STATUS_CODES.aguardandoFreteCortesia, { frete_por_conta_de: "cortesia" });
       return;
@@ -636,7 +636,7 @@ export default function GarantiaDetalhePage() {
       obs: "",
     }));
     setEnvioVisible(true);
-  };
+  }, [freteCortesiaSelecionado, updateStatus]);
 
   const submitEnvio = async () => {
     if (!garantia) return;
@@ -700,10 +700,10 @@ export default function GarantiaDetalhePage() {
     setMensagemAnexos((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleDescarte = () => {
+  const handleDescarte = useCallback(() => {
     setDescarteAnexos([]);
     setDescarteVisible(true);
-  };
+  }, []);
 
   const submitDescarte = async () => {
     if (!garantia) return;
@@ -718,10 +718,10 @@ export default function GarantiaDetalhePage() {
     setDescarteVisible(false);
   };
 
-  const handleEnvio = () => {
+  const handleEnvio = useCallback(() => {
     setDataEnvioInput("");
     setDataEnvioVisible(true);
-  };
+  }, []);
 
   const submitDataEnvio = async () => {
     const date = parseBrDate(dataEnvioInput);
@@ -733,10 +733,10 @@ export default function GarantiaDetalhePage() {
     setDataEnvioVisible(false);
   };
 
-  const handleValorCredito = () => {
+  const handleValorCredito = useCallback(() => {
     setValorCreditoInput("");
     setValorCreditoVisible(true);
-  };
+  }, []);
 
   const submitValorCredito = async () => {
     const valor = parseCurrencyInput(valorCreditoInput);
@@ -848,12 +848,12 @@ export default function GarantiaDetalhePage() {
     }
   };
 
-  const handleLiberarCredito = () => {
+  const handleLiberarCredito = useCallback(() => {
     setLiberarStatus(STATUS_CODES.produtoProximaCompra);
     setLiberarValor("");
     setLiberarNf("");
     setLiberarVisible(true);
-  };
+  }, []);
 
   const submitLiberarCredito = async () => {
     if (!garantia) return;
@@ -1002,7 +1002,19 @@ export default function GarantiaDetalhePage() {
       return <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Processo finalizado.</p>;
     }
     return <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma ação disponível para este status.</p>;
-  }, [garantia, updateStatus]);
+  }, [
+    garantia,
+    updateStatus,
+    abrirAprovacao,
+    handleNfeReprovada,
+    handleNfeAprovada,
+    handleNota,
+    handleDescarte,
+    handleEnvio,
+    handleValorCredito,
+    handleLiberarCredito,
+    handleConcluirProcesso,
+  ]);
 
   return (
     <div className="w-full space-y-6">
@@ -1262,11 +1274,14 @@ export default function GarantiaDetalhePage() {
                       {anexoViewerLoading && !currentAnexoUrl ? (
                         <p className="text-sm text-gray-500 dark:text-gray-400">Carregando arquivo...</p>
                       ) : currentAnexoEhImagem && currentAnexoUrl ? (
-                        <img
-                          src={currentAnexoUrl}
-                          alt={currentAnexo.nome ?? "Anexo"}
-                          className="max-h-full max-w-full object-contain"
-                        />
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={currentAnexoUrl}
+                            alt={currentAnexo.nome ?? "Anexo"}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </>
                       ) : currentAnexoEhImagem ? (
                         <p className="text-sm text-gray-500 dark:text-gray-400">Gerando link para visualização...</p>
                       ) : (
