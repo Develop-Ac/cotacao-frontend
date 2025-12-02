@@ -12,7 +12,7 @@ ENV CI=true \
 COPY package.json package-lock.json* ./
 
 # Evita conflitos de peer deps; mantém logs limpos
-RUN npm ci --legacy-peer-deps --loglevel=error
+RUN --mount=type=cache,target=/root/.npm npm ci --legacy-peer-deps --loglevel=error
 
 
 # -------------------------------------------------
@@ -53,7 +53,8 @@ ENV PATH="/app/node_modules/.bin:${PATH}"
 # (Opcional) libs extras; em Debian geralmente não precisa para Next
 # RUN apt-get update && apt-get install -y --no-install-recommends libvips && rm -rf /var/lib/apt/lists/*
 
-RUN npm run build
+# Mount the cache directory to preserve .next/cache between builds
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # Junta configs do Next (se existirem) para copiar de forma opcional no runtime
 RUN mkdir -p /opt/runtime && \
