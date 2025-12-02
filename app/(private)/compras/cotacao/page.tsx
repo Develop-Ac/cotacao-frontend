@@ -13,10 +13,12 @@ import {
   FaSearch,
   FaSync,
   FaTimes,
+  FaTrash,
 } from "react-icons/fa";
 import { serviceUrl } from "@/lib/services";
 import Breadcrumb from "../../components/Breadcrumb";
 import Link from "next/link";
+import { usePermissions } from "@/app/hooks/usePermissions";
 
 type CotacaoItem = {
   PEDIDO_COTACAO: number;
@@ -64,13 +66,16 @@ function PedidoCard({
   pedido,
   onOpenModal,
   onOpenProdutos,
+  onDelete,
 }: {
   pedido: PedidoResumo;
   onOpenModal: (id: number) => void;
   onOpenProdutos: (id: number, empresa: number) => void;
+  onDelete: (pedido: PedidoResumo) => void;
 }) {
   const [fornecedores, setFornecedores] = useState<FornecedorSalvo[]>([]);
   const [loading, setLoading] = useState(true);
+  const { canDelete } = usePermissions("/compras/cotacao");
 
   useEffect(() => {
     let mounted = true;
@@ -105,6 +110,15 @@ function PedidoCard({
           <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Cotação de Compra</div>
           <div className="text-2xl font-bold text-gray-800 dark:text-white">#{pedido.pedido_cotacao}</div>
         </div>
+        {canDelete && (
+          <button
+            onClick={() => onDelete(pedido)}
+            className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+            title="Excluir Cotação"
+          >
+            <FaTrash size={16} />
+          </button>
+        )}
       </div>
 
       <div className="p-4 flex-1 flex flex-col gap-4">
@@ -224,7 +238,7 @@ export default function Tela() {
       };
 
       const res = await fetch(comprasPath("/pedidos-cotacao"), {
-      // const res = await fetch("http://localhost:8000/compras/pedidos-cotacao", {
+        // const res = await fetch("http://localhost:8000/compras/pedidos-cotacao", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -290,6 +304,46 @@ export default function Tela() {
     } finally {
       setLoadingPedidos(false);
     }
+  };
+
+  const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
+  const [pedidoParaExcluir, setPedidoParaExcluir] = useState<PedidoResumo | null>(null);
+
+  const solicitarExclusao = (p: PedidoResumo) => {
+    setPedidoParaExcluir(p);
+    setModalDeleteOpen(true);
+  };
+
+  const confirmarExclusao = async () => {
+    if (!pedidoParaExcluir) return;
+
+    try {
+      // 1. Send DELETE to RabbitMQ service via Proxy
+      const proxyUrl = `/api/proxy/rabbitmq/${pedidoParaExcluir.pedido_cotacao}`;
+      await fetch(proxyUrl, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(pedidoParaExcluir),
+      }).catch((err) => console.error("Erro ao enviar para fila RabbitMQ", err));
+
+      // 2. Optimistically remove from UI
+      setPedidos((prev) => prev.filter((item) => item.pedido_cotacao !== pedidoParaExcluir.pedido_cotacao));
+      setMsgPedidos(`Solicitação de exclusão enviada para a cotação #${pedidoParaExcluir.pedido_cotacao}.`);
+      setTimeout(() => setMsgPedidos(null), 3000);
+
+    } catch (e: any) {
+      console.error("Erro ao excluir cotação", e);
+      alert("Erro ao solicitar exclusão.");
+    } finally {
+      setModalDeleteOpen(false);
+      setPedidoParaExcluir(null);
+    }
+  };
+
+  const excluirCotacao = async (p: PedidoResumo) => {
+    solicitarExclusao(p);
   };
 
   useEffect(() => {
@@ -473,10 +527,10 @@ export default function Tela() {
       </div>
 
       <div
-        className={`grid transition-all duration-300 ease-in-out ${formularioAberto ? "grid-rows-[1fr] opacity-100 mb-10" : "grid-rows-[0fr] opacity-0 mb-0"
+        className={`grid transition-all duration-300 ease-in-out overflow-hidden ${formularioAberto ? "grid-rows-[1fr] opacity-100 mb-10 p-2" : "grid-rows-[0fr] opacity-0 mb-0 p-0"
           }`}
       >
-        <div className="overflow-hidden">
+        <div className="min-h-0">
           <div className="bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-gray-100 dark:border-strokedark">
             <h2 className="text-xl font-semibold mb-4 border-b dark:border-strokedark pb-2 text-black dark:text-white">Nova Cotação</h2>
             <div className="flex flex-col md:flex-row gap-4 items-end mb-6">
@@ -597,6 +651,7 @@ export default function Tela() {
                 pedido={p}
                 onOpenModal={abrirModalFornecedor}
                 onOpenProdutos={abrirModalProdutos}
+                onDelete={excluirCotacao}
               />
             ))}
           </div>
@@ -795,8 +850,6 @@ export default function Tela() {
                   <div className="flex justify-center py-12">
                     <FaSync className="animate-spin text-blue-600 text-3xl" />
                   </div>
-                ) : itensVisualizacao.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">Nenhum produto encontrado.</div>
                 ) : (
                   <div className="border border-stroke dark:border-strokedark rounded-lg overflow-hidden">
                     <table className="w-full text-sm text-left">
@@ -805,7 +858,7 @@ export default function Tela() {
                           <th className="px-4 py-3">Código</th>
                           <th className="px-4 py-3">Descrição</th>
                           <th className="px-4 py-3">Marca</th>
-                          <th className="px-4 py-3">Unidade</th>
+                          <th className="px-4 py-3">Ref.</th>
                           <th className="px-4 py-3 text-right">Qtd.</th>
                         </tr>
                       </thead>
@@ -814,9 +867,9 @@ export default function Tela() {
                           <tr key={idx} className="hover:bg-gray-2 dark:hover:bg-meta-4 transition-colors">
                             <td className="px-4 py-3 font-medium text-gray-700 dark:text-white">{it.PRO_CODIGO}</td>
                             <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{it.PRO_DESCRICAO}</td>
-                            <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{it.MAR_DESCRICAO}</td>
-                            <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{it.UNIDADE}</td>
-                            <td className="px-4 py-3 text-right font-medium text-gray-700 dark:text-white">{it.QUANTIDADE}</td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{it.MAR_DESCRICAO}</td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{it.REFERENCIA}</td>
+                            <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{it.QUANTIDADE}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -832,6 +885,41 @@ export default function Tela() {
                 >
                   Fechar
                 </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Modal de Confirmação de Exclusão */}
+      {
+        modalDeleteOpen && pedidoParaExcluir && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-stroke dark:border-strokedark">
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FaTrash size={24} />
+                </div>
+                <h3 className="text-xl font-bold text-black dark:text-white mb-2">Confirmar Exclusão</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-6">
+                  Tem certeza que deseja excluir a cotação <span className="font-bold text-black dark:text-white">#{pedidoParaExcluir.pedido_cotacao}</span>?
+                  <br />
+                  <span className="text-xs mt-2 block">Esta ação enviará uma solicitação de exclusão.</span>
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => setModalDeleteOpen(false)}
+                    className="px-6 py-2.5 bg-white border border-stroke text-gray-700 hover:bg-gray-50 dark:bg-meta-4 dark:text-white dark:border-strokedark rounded-lg font-medium transition-all duration-200 ease-in-out active:scale-95"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmarExclusao}
+                    className="px-6 py-2.5 bg-red-500 text-white hover:bg-red-600 shadow-md hover:shadow-lg rounded-lg font-medium transition-all duration-200 ease-in-out active:scale-95"
+                  >
+                    Sim, Excluir
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -122,11 +122,16 @@ export default function RootLayout({
     return userModules.includes(module);
   };
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   function deslogar() {
-    window.localStorage.setItem('auth', 'false');
-    window.localStorage.removeItem('userData');
-    setUserData(null);
-    router.replace('/login');
+    setIsLoggingOut(true);
+    setTimeout(() => {
+      window.localStorage.setItem('auth', 'false');
+      window.localStorage.removeItem('userData');
+      setUserData(null);
+      router.replace('/login');
+    }, 1000);
   }
 
   const handleNavigation = async (href: string, event?: MouseEvent<HTMLElement>) => {
@@ -159,7 +164,7 @@ export default function RootLayout({
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
         {/* Sidebar Start */}
         <aside
-          className={`fixed left-0 top-0 z-9999 flex h-screen flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-black lg:static lg:translate-x-0 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          className={`fixed left-0 top-0 z-9999 flex h-screen flex-col bg-gray-800 lg:static lg:translate-x-0 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
             } ${sidebarCollapsed ? 'lg:w-[90px] overflow-visible' : 'lg:w-[250px] w-[250px] overflow-y-hidden'}`}
         >
           {/* Sidebar Header */}
@@ -172,15 +177,7 @@ export default function RootLayout({
                     alt="Logo"
                     width={150}
                     height={50}
-                    className="dark:hidden"
-                    priority
-                  />
-                  <Image
-                    src={logoSidebarFull}
-                    alt="Logo"
-                    width={150}
-                    height={50}
-                    className="hidden dark:block"
+                    className="block"
                     priority
                   />
                 </span>
@@ -249,23 +246,24 @@ export default function RootLayout({
         {/* Content Area Start */}
         <div className="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
           {/* Header Start */}
-          <header className="sticky top-0 z-999 flex w-full border-b border-gray-200 bg-white lg:border-b dark:border-gray-800 dark:bg-gray-900">
+          {/* Header Start */}
+          <header className="sticky top-0 z-999 flex w-full border-b border-gray-700 bg-gray-800">
             <div className="flex grow flex-col items-center justify-between lg:flex-row lg:px-6">
-              <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4 dark:border-gray-800">
+              <div className="flex w-full items-center justify-between gap-2 border-b border-gray-700 px-3 py-3 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
                 {/* Hamburger Toggle BTN */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setSidebarOpen(!sidebarOpen);
                   }}
-                  className="z-99999 block rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm dark:border-gray-800 dark:bg-black lg:hidden"
+                  className="z-99999 block rounded-lg border border-gray-700 bg-black p-1.5 shadow-sm lg:hidden"
                 >
-                  <MdMenu className="text-xl" />
+                  <MdMenu className="text-xl text-white" />
                 </button>
 
                 <button
                   onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                  className="z-99999 hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 lg:flex dark:border-gray-800 dark:text-gray-400"
+                  className="z-99999 hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-700 text-white lg:flex"
                 >
                   <MdMenu className="text-xl" />
                 </button>
@@ -280,10 +278,10 @@ export default function RootLayout({
                   <li className="relative">
                     <Link
                       href="#"
-                      className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 hover:text-primary dark:border-gray-800 dark:bg-black dark:text-gray-400"
+                      className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-700 bg-black text-gray-400 hover:text-primary"
                     >
                       <MdOutlineNotificationsNone className="text-xl" />
-                      <span className="absolute -top-0.5 right-0 z-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-black"></span>
+                      <span className="absolute -top-0.5 right-0 z-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-black"></span>
                     </Link>
                   </li>
                   {/* Notification Menu Area */}
@@ -298,14 +296,16 @@ export default function RootLayout({
           {/* Header End */}
 
           {/* Main Content Start */}
-          <main
-            className={`relative flex-1 ${pathname === '/compras/kanban' || pathname === '/sac/kanban'
-              ? 'h-[calc(100vh-80px)] overflow-hidden'
-              : 'mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 overflow-y-auto'
-              }`}
-          >
-            {children}
-          </main>
+          <div className="flex-1 w-full border-l border-gray-700 flex flex-col">
+            <main
+              className={`relative flex-1 ${pathname === '/compras/kanban' || pathname === '/sac/kanban'
+                ? 'h-[calc(100vh-80px)] overflow-hidden'
+                : 'mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 overflow-y-auto'
+                }`}
+            >
+              {children}
+            </main>
+          </div>
           {/* Main Content End */}
         </div>
         {/* Content Area End */}
@@ -319,6 +319,14 @@ export default function RootLayout({
           </div>
         </div>
       )}
-    </PrivateRoute>
+
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-12 w-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-white text-lg font-medium">Saindo...</span>
+          </div>
+        </div>
+      )}    </PrivateRoute>
   );
 }

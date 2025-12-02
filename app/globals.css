@@ -229,19 +229,19 @@
 }
 
 @utility menu-item-active {
-  @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+  @apply bg-brand-500/[0.12] text-brand-400;
 }
 
 @utility menu-item-inactive {
-  @apply text-gray-700 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-300;
+  @apply text-gray-300 hover:bg-white/5 hover:text-gray-300;
 }
 
 @utility menu-item-icon-active {
-  @apply fill-brand-500 dark:fill-brand-400;
+  @apply fill-brand-400;
 }
 
 @utility menu-item-icon-inactive {
-  @apply fill-gray-500 group-hover:fill-gray-700 dark:fill-gray-400 dark:group-hover:fill-gray-300;
+  @apply fill-gray-400 group-hover:fill-gray-300;
 }
 
 @utility menu-item-arrow {
@@ -249,11 +249,11 @@
 }
 
 @utility menu-item-arrow-active {
-  @apply rotate-180 stroke-brand-500 dark:stroke-brand-400;
+  @apply rotate-180 stroke-brand-400;
 }
 
 @utility menu-item-arrow-inactive {
-  @apply stroke-gray-500 group-hover:stroke-gray-700 dark:stroke-gray-400 dark:group-hover:stroke-gray-300;
+  @apply stroke-gray-400 group-hover:stroke-gray-300;
 }
 
 @utility menu-dropdown-item {
@@ -261,11 +261,11 @@
 }
 
 @utility menu-dropdown-item-active {
-  @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+  @apply bg-brand-500/[0.12] text-brand-400;
 }
 
 @utility menu-dropdown-item-inactive {
-  @apply text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5;
+  @apply text-gray-300 hover:bg-white/5;
 }
 
 @utility menu-dropdown-badge {
@@ -273,11 +273,11 @@
 }
 
 @utility menu-dropdown-badge-active {
-  @apply bg-brand-100 dark:bg-brand-500/20;
+  @apply bg-brand-500/20;
 }
 
 @utility menu-dropdown-badge-inactive {
-  @apply bg-brand-50 group-hover:bg-brand-100 dark:bg-brand-500/15 dark:group-hover:bg-brand-500/20;
+  @apply bg-brand-500/15 group-hover:bg-brand-500/20;
 }
 
 @utility no-scrollbar {

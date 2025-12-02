@@ -1,10 +1,22 @@
-"use client"
+"use client";
 
-import { FaPlusSquare, FaSync } from "react-icons/fa";
+import {
+    FaBox,
+    FaCalendar,
+    FaCheck,
+    FaClipboardList,
+    FaFileExcel,
+    FaPlusSquare,
+    FaSearch,
+    FaSync,
+    FaTimes,
+    FaUser,
+} from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useEffect, useState } from "react";
 import { genId } from "../../../utils/genId";
 import { serviceUrl } from "@/lib/services";
+import Link from "next/link";
 
 type CotacaoItem = {
     PEDIDO_COTACAO: number;
@@ -15,12 +27,6 @@ type CotacaoItem = {
     REFERENCIA: string;
     UNIDADE: string;
     QUANTIDADE: number;
-};
-
-type PedidoResumo = {
-    empresa: number;
-    pedido_cotacao: number;
-    total_itens: number;
 };
 
 type ContagemListaItem = {
@@ -43,28 +49,11 @@ type ContagemListaItem = {
         estoque: number;
         contado: number;
         created_at: string;
+        item?: {
+            cod_produto: number;
+            desc_produto: string;
+        };
     }>;
-};
-
-type FornecedorResp = {
-    FOR_CODIGO: number;
-    FOR_NOME: string;
-    CPF_CNPJ: string | null;
-    RG_IE: string | null;
-    ENDERECO: string | null;
-    BAIRRO: string | null;
-    NUMERO: string | null;
-    CIDADE: string | null;
-    UF: string | null;
-    EMAIL: string | null;
-    FONE: string | null;
-    CONTATO: string | null;
-};
-
-type FornecedorSalvo = {
-    for_codigo: number;
-    for_nome: string | null;
-    cpf_cnpj: string | null;
 };
 
 type ContagemItem = {
@@ -88,13 +77,105 @@ type Usuario = {
 };
 
 const ESTOQUE_BASE = serviceUrl("estoque");
-const estoqueUrl = (path: string) => `${ESTOQUE_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+const estoqueUrl = (path: string) =>
+    `${ESTOQUE_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+
+function ContagemCard({
+    contagem,
+    onOpenLogs,
+}: {
+    contagem: ContagemListaItem;
+    onOpenLogs: (c: ContagemListaItem) => void;
+}) {
+    const getStatus = () => {
+        if (contagem.liberado_contagem) {
+            return { label: "Em Andamento", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" };
+        }
+
+        const logs = contagem.logs || [];
+        const hasCounts = logs.length > 0 && logs.some(l => l.contado !== null && l.contado !== undefined);
+        const allCounted = logs.length > 0 && logs.every(l => l.contado !== null && l.contado !== undefined);
+
+        if (allCounted) {
+            return { label: "Concluído", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" };
+        }
+
+        // Se não está liberado e não tem contagens (ou nem todos contados, caindo no caso de "não iniciado" se vazio, ou talvez um estado intermediário se parcialmente contado mas fechado?)
+        // O usuário disse: "se estiver liberado não e não tiver nenhuma contagem colocar como não iniciado".
+        // Vou assumir que se tiver logs mas nenhum contado, ou sem logs, é não iniciado.
+        if (!hasCounts) {
+            return { label: "Não Iniciado", color: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300" };
+        }
+
+        // Fallback para caso tenha contagens parciais mas não esteja liberado (tecnicamente "Concluído" incompleto ou "Parcial")
+        // Pela regra do usuário "todos preenchidos -> concluído", se sobrar algo, tecnicamente não é concluído.
+        // Mas se não é "não iniciado" (tem alguma contagem), o que seria?
+        // Vou tratar como "Concluído" (talvez parcial) ou manter a lógica de "Não Iniciado" apenas se ZERO contagens.
+        // O usuário foi específico: "liberado não e todos preenchidos -> concluído", "liberado não e nenhuma contagem -> não iniciado".
+        // O caso "liberado não e parcialmente preenchido" não foi especificado. Vou usar "Concluído" com uma cor diferente ou apenas "Concluído" assumindo que fecharam a contagem assim mesmo.
+        // Mas para ser seguro, vou usar "Concluído" se tiver pelo menos 1, mas a regra diz "todos".
+        // Vou seguir estritamente:
+        // Se !liberado e todos contados -> Concluído
+        // Se !liberado e nenhum contado -> Não Iniciado
+        // Se !liberado e parcial -> Vou colocar "Incompleto" (Red?) para alertar, ou "Concluído" (Green) se for o comportamento padrão.
+        // Dado o contexto de "estoque", contagem fechada parcial é comum. Vou deixar "Concluído" mas talvez com um warning visual se possível, mas vou simplificar para "Concluído" se tiver itens, ou "Não Iniciado" se vazio.
+        // Re-lendo: "se tiver como liberado não e todos os produtos estiverem preenchidos então o status é concluído"
+        // "e se estiver liberado não e não tiver nenhuma contagem colocar como não iniciado"
+
+        return { label: "Concluído", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" };
+    };
+
+    const status = getStatus();
+
+    return (
+        <div className="bg-white dark:bg-boxdark rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-gray-100 dark:border-strokedark">
+            <div className="bg-gray-50 dark:bg-meta-4 p-4 border-b border-gray-100 dark:border-strokedark flex justify-between items-start">
+                <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">
+                        Contagem #{contagem.contagem}
+                    </div>
+                    <div className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <FaUser className="text-gray-400" size={14} />
+                        {contagem.usuario?.nome || contagem.colaborador || "N/A"}
+                    </div>
+                </div>
+                <div
+                    className={`px-2 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap ${status.color}`}
+                >
+                    {status.label}
+                </div>
+            </div>
+
+            <div className="p-4 flex-1 flex flex-col gap-4">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 dark:text-blue-400 shrink-0">
+                        <FaCalendar size={14} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Data Criação</span>
+                        <span className="font-medium text-sm">
+                            {new Date(contagem.created_at).toLocaleDateString("pt-BR")}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-4 pt-0 mt-auto">
+                <button
+                    onClick={() => onOpenLogs(contagem)}
+                    className="w-full bg-white dark:bg-meta-4 border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-sm py-2 px-4"
+                >
+                    <FaClipboardList />
+                    Listar Produtos
+                </button>
+            </div>
+        </div>
+    );
+}
 
 export default function Tela() {
     const BTN =
-        "h-10 px-3 inline-flex items-center justify-center gap-2 rounded text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400";
-    const BTN_SQUARE =
-        "h-12 w-12 inline-flex items-center justify-center rounded text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400";
+        "h-10 px-4 inline-flex items-center justify-center gap-2 rounded-lg text-white font-semibold bg-primary hover:bg-opacity-90 transition-all duration-300 ease-in-out active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed";
 
     // ===== Box superior (criar cotação) =====
     const [formularioAberto, setFormularioAberto] = useState(false);
@@ -114,7 +195,9 @@ export default function Tela() {
     const [msgContagem, setMsgContagem] = useState<string | null>(null);
 
     // ===== Novos estados =====
-    const [itensSelecionados, setItensSelecionados] = useState<Set<number>>(new Set());
+    const [itensSelecionados, setItensSelecionados] = useState<Set<number>>(
+        new Set()
+    );
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [contagem1, setContagem1] = useState("");
     const [contagem2, setContagem2] = useState("");
@@ -128,7 +211,9 @@ export default function Tela() {
         if (!p) return setMsgCot("Informe o pedido de cotação.");
         setLoadingCot(true);
         try {
-            const url = `${estoqueUrl(`/compras/openquery/pedido/${encodeURIComponent(p)}`)}?empresa=3`;
+            const url = `${estoqueUrl(
+                `/compras/openquery/pedido/${encodeURIComponent(p)}`
+            )}?empresa=3`;
             const res = await fetch(url, { headers: { Accept: "application/json" } });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -146,23 +231,30 @@ export default function Tela() {
         setMsgContagem(null);
         setItensContagem([]);
         setItensSelecionados(new Set());
-        
+
         if (!dataInicial || !dataFinal) {
             return setMsgContagem("Informe as datas inicial e final.");
         }
-        
+
         setLoadingContagem(true);
         try {
-            const url = `${estoqueUrl(`/estoque/contagem`)}?data_inicial=${encodeURIComponent(dataInicial)}&data_final=${encodeURIComponent(dataFinal)}&empresa=3`;
-            
+            const url = `${estoqueUrl(
+                `/estoque/contagem`
+            )}?data_inicial=${encodeURIComponent(
+                dataInicial
+            )}&data_final=${encodeURIComponent(dataFinal)}&empresa=3`;
+
             const res = await fetch(url, { headers: { Accept: "application/json" } });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const arr = Array.isArray(data) ? data : [];
             setItensContagem(arr);
-            if (!arr.length) setMsgContagem("Nenhum item encontrado no período informado.");
+            if (!arr.length)
+                setMsgContagem("Nenhum item encontrado no período informado.");
         } catch (e: any) {
-            setMsgContagem(`Erro ao buscar contagem: ${e?.message || "desconhecido"}`);
+            setMsgContagem(
+                `Erro ao buscar contagem: ${e?.message || "desconhecido"}`
+            );
         } finally {
             setLoadingContagem(false);
         }
@@ -171,13 +263,16 @@ export default function Tela() {
     const carregarUsuarios = async () => {
         setLoadingUsuarios(true);
         try {
-            const res = await fetch("http://sistema-service.acacessorios.local/usuarios", {
-                headers: { Accept: "application/json" }
-            });
+            const res = await fetch(
+                "http://sistema-service.acacessorios.local/usuarios",
+                {
+                    headers: { Accept: "application/json" },
+                }
+            );
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const arr = Array.isArray(data) ? data : [];
-            const usuariosEstoque = arr.filter(user => user.setor === "Estoque");
+            const usuariosEstoque = arr.filter((user) => user.setor === "Estoque");
             setUsuarios(usuariosEstoque);
         } catch (e: any) {
             console.error("Erro ao carregar usuários:", e);
@@ -205,84 +300,90 @@ export default function Tela() {
         if (itensSelecionados.size === itensFiltrados.length) {
             setItensSelecionados(new Set());
         } else {
-            const todosIndices = new Set(Array.from({ length: itensFiltrados.length }, (_, i) => i));
+            const todosIndices = new Set(
+                Array.from({ length: itensFiltrados.length }, (_, i) => i)
+            );
             setItensSelecionados(todosIndices);
         }
     };
 
     const salvarContagem = async () => {
-        const produtosSelecionados = Array.from(itensSelecionados).map(index => itensFiltrados[index]);
+        const produtosSelecionados = Array.from(itensSelecionados).map(
+            (index) => itensFiltrados[index]
+        );
 
         const contagem_cuid = genId();
-        
+
         try {
             if (contagem1) {
-                const usuario1 = usuarios.find(u => u.id === contagem1);
+                const usuario1 = usuarios.find((u) => u.id === contagem1);
                 const payload1 = {
                     contagem: 1,
                     colaborador: usuario1?.nome,
                     contagem_cuid: contagem_cuid,
-                    produtos: produtosSelecionados
+                    produtos: produtosSelecionados,
                 };
-                
+
                 await fetch(estoqueUrl("/estoque/contagem"), {
-                    method: 'POST',
+                    method: "POST",
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
                     },
-                    body: JSON.stringify(payload1)
+                    body: JSON.stringify(payload1),
                 });
             }
 
             if (contagem2) {
-                const usuario2 = usuarios.find(u => u.id === contagem2);
+                const usuario2 = usuarios.find((u) => u.id === contagem2);
                 const payload2 = {
                     contagem: 2,
                     colaborador: usuario2?.nome,
                     contagem_cuid: contagem_cuid,
-                    produtos: produtosSelecionados
+                    produtos: produtosSelecionados,
                 };
-                
+
                 await fetch(estoqueUrl("/estoque/contagem"), {
-                    method: 'POST',
+                    method: "POST",
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
                     },
-                    body: JSON.stringify(payload2)
+                    body: JSON.stringify(payload2),
                 });
             }
 
             if (contagem3) {
-                const usuario3 = usuarios.find(u => u.id === contagem3);
+                const usuario3 = usuarios.find((u) => u.id === contagem3);
                 const payload3 = {
                     contagem: 3,
                     colaborador: usuario3?.nome,
                     contagem_cuid: contagem_cuid,
-                    produtos: produtosSelecionados
+                    produtos: produtosSelecionados,
                 };
-                
+
                 await fetch(estoqueUrl("/estoque/contagem"), {
-                    method: 'POST',
+                    method: "POST",
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
                     },
-                    body: JSON.stringify(payload3)
+                    body: JSON.stringify(payload3),
                 });
             }
 
-            console.log('Contagens salvas com sucesso!');
+            console.log("Contagens salvas com sucesso!");
+            setFormularioAberto(false);
+            carregarContagensLista();
         } catch (error) {
-            console.error('Erro ao salvar contagens:', error);
+            console.error("Erro ao salvar contagens:", error);
         }
     };
 
     // Filtrar itens baseado na localização e prateleira selecionadas
-    const itensFiltrados = itensContagem.filter(item => {
+    const itensFiltrados = itensContagem.filter((item) => {
         const localizacao = item.LOCALIZACAO?.toUpperCase() || "";
-        
+
         let passaLocalizacao = true;
         let passaPrateleira = true;
 
@@ -302,7 +403,8 @@ export default function Tela() {
                     passaLocalizacao = localizacao.startsWith("BOX");
                     break;
                 case "VITRINE":
-                    passaLocalizacao = localizacao === "VITRINE" || /^V\d/.test(localizacao);
+                    passaLocalizacao =
+                        localizacao === "VITRINE" || /^V\d/.test(localizacao);
                     break;
                 case "VENDA CASADA":
                     passaLocalizacao = localizacao === "VENDA CASADA";
@@ -316,71 +418,28 @@ export default function Tela() {
         if (prateleira) {
             // Extrai prateleira da localização (exemplo: A1302A01 -> prateleira 13)
             const prateleiraMatch = localizacao.match(/^[A-Z](\d{2})/);
-            const prateleiraItem = prateleiraMatch ? parseInt(prateleiraMatch[1], 10) : null;
+            const prateleiraItem = prateleiraMatch
+                ? parseInt(prateleiraMatch[1], 10)
+                : null;
             passaPrateleira = prateleiraItem === parseInt(prateleira, 10);
         }
 
         return passaLocalizacao && passaPrateleira;
     });
 
-    const criarCotacao = async () => {
-        setMsgCot(null);
-        const p = pedido.trim();
-        if (!p) return setMsgCot("Informe o pedido de cotação.");
-        if (!itensCotacao.length) return setMsgCot("Busque o pedido antes de criar a cotação.");
-        setPostingCot(true);
-        try {
-            const payload = {
-                empresa: 3,
-                pedido_cotacao: Number(p),
-                itens: itensCotacao.map((it) => ({
-                    PEDIDO_COTACAO: Number(it.PEDIDO_COTACAO),
-                    EMISSAO: it.EMISSAO ?? null,
-                    PRO_CODIGO: Number(it.PRO_CODIGO),
-                    PRO_DESCRICAO: it.PRO_DESCRICAO,
-                    MAR_DESCRICAO: it.MAR_DESCRICAO ?? null,
-                    REFERENCIA: it.REFERENCIA ?? null,
-                    UNIDADE: it.UNIDADE ?? null,
-                    QUANTIDADE: Number(it.QUANTIDADE),
-                })),
-            };
-
-            const res = await fetch(estoqueUrl("/compras/pedidos-cotacao"), {
-                method: "POST",
-                headers: { Accept: "application/json", "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            if (!res.ok) {
-                let msg = `HTTP ${res.status}`;
-                try {
-                    const err = await res.json();
-                    if (err?.message) msg = err.message;
-                } catch {}
-                throw new Error(msg);
-            }
-
-            const out = await res.json().catch(() => ({}));
-            setMsgCot(`Cotação criada com sucesso. Total de itens: ${out?.total_itens ?? itensCotacao.length}.`);
-            setItensCotacao([]);
-            setPedido("");
-            await carregarContagensLista();
-        } catch (e: any) {
-            setMsgCot(`Erro ao criar cotação: ${e?.message || "desconhecido"}`);
-        } finally {
-            setPostingCot(false);
-        }
-    };
-
     // ===== Tabela inferior (GET all) =====
     const [contagensLista, setContagensLista] = useState<ContagemListaItem[]>([]);
     const [loadingContagensLista, setLoadingContagensLista] = useState(false);
-    const [msgContagensLista, setMsgContagensLista] = useState<string | null>(null);
-    const [pageSize, setPageSize] = useState<number>(10);
+    const [msgContagensLista, setMsgContagensLista] = useState<string | null>(
+        null
+    );
+    const [pageSize, setPageSize] = useState<number>(20);
     const page = 1;
 
     // ===== Estados do modal de logs =====
     const [modalLogsAberto, setModalLogsAberto] = useState(false);
-    const [contagemSelecionada, setContagemSelecionada] = useState<ContagemListaItem | null>(null);
+    const [contagemSelecionada, setContagemSelecionada] =
+        useState<ContagemListaItem | null>(null);
     const [logsDetalhes, setLogsDetalhes] = useState<any[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -389,13 +448,19 @@ export default function Tela() {
         setLoadingContagensLista(true);
         try {
             const res = await fetch(
-                `${estoqueUrl("/estoque/contagem/lista")}?page=${page}&pageSize=${pageSize}`,
+                `${estoqueUrl(
+                    "/estoque/contagem/lista"
+                )}?page=${page}&pageSize=${pageSize}`,
                 { headers: { Accept: "application/json" } }
             );
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            const arr: ContagemListaItem[] = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+            const arr: ContagemListaItem[] = Array.isArray(data?.data)
+                ? data.data
+                : Array.isArray(data)
+                    ? data
+                    : [];
             setContagensLista(arr);
             if (!arr.length) setMsgContagensLista("Nenhuma contagem encontrada.");
         } catch (e: any) {
@@ -415,7 +480,7 @@ export default function Tela() {
         setContagemSelecionada(contagem);
         setModalLogsAberto(true);
         setLoadingLogs(true);
-        
+
         try {
             // Se os logs já estão na contagem (conforme o exemplo que você mostrou)
             if ((contagem as any).logs) {
@@ -444,15 +509,14 @@ export default function Tela() {
         setLogsDetalhes([]);
     };
 
-
     // Função para gerar Excel dos logs
     const gerarExcelLogs = () => {
         if (!logsDetalhes.length) return;
-        const data = logsDetalhes.map(log => ({
-            "Código": log.item?.cod_produto ?? "-",
-            "Descrição": log.item?.desc_produto ?? "-",
-            "Estoque": log.estoque ?? "-",
-            "Contado": log.contado ?? "-"
+        const data = logsDetalhes.map((log) => ({
+            Código: log.item?.cod_produto ?? "-",
+            Descrição: log.item?.desc_produto ?? "-",
+            Estoque: log.estoque ?? "-",
+            Contado: log.contado ?? "-",
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
@@ -460,399 +524,472 @@ export default function Tela() {
         XLSX.writeFile(wb, `logs-contagem-${contagemSelecionada?.contagem}.xlsx`);
     };
 
-    const formatarData = (dataISO: string) => {
-        return new Date(dataISO).toLocaleDateString('pt-BR');
-    };
+
+
 
     return (
-        <div className="main-panel min-h-screen text-black">
-            <div className="content-wrapper p-2">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                    <h3 className="text-2xl font-semibold mb-3 md:mb-0">Contagem de Estoque</h3>
-
-                    <div className="flex gap-6">
-                        <div className="flex flex-col items-center mr-2">
-                            <button
-                                id="form_new_menu"
-                                className={BTN_SQUARE}
-                                title="Abrir filtros"
-                                onClick={() => setFormularioAberto((v) => !v)}
-                            >
-                                <FaPlusSquare className="text-white text-xl" />
-                            </button>
-                            <span className="text-xs text-gray-700 mt-1">NOVO</span>
-                        </div>
-
-                        <div className="flex flex-col items-center mr-2">
-                            <button
-                                id="refresh_pedidos_header"
-                                className={BTN_SQUARE}
-                                title="Atualizar lista"
-                                onClick={carregarContagensLista}
-                                disabled={loadingContagensLista}
-                            >
-                                <FaSync className="text-white text-xl" />
-                            </button>
-                            <span className="text-xs text-gray-700 mt-1">ATUALIZAR</span>
-                        </div>
-                    </div>
+        <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 className="text-3xl font-bold text-black dark:text-white">
+                        <Link href="/" className="hover:text-primary transition-colors">
+                            Intranet
+                        </Link>{" "}
+                        / Contagem de Estoque
+                    </h2>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                        Gerencie contagens e inventários
+                    </p>
                 </div>
 
-                {/* BOX ABERTO - Filtros de Data */}
-                {formularioAberto && (
-                    <div id="screen" className="mb-10">
-                        <div className="w-full">
-                            <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
-                                <h4 className="text-lg font-semibold">Filtrar por período</h4>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
-                                        <input
-                                            type="date"
-                                            value={dataInicial}
-                                            onChange={(e) => setDataInicial(e.target.value)}
-                                            className="h-11 w-full border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                    
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
-                                        <input
-                                            type="date"
-                                            value={dataFinal}
-                                            onChange={(e) => setDataFinal(e.target.value)}
-                                            className="h-11 w-full border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                    
-                                    <div className="flex items-end">
-                                        <button 
-                                            onClick={buscarContagem} 
-                                            disabled={loadingContagem} 
-                                            className={BTN}
-                                        >
-                                            {loadingContagem ? "Buscando..." : "Buscar"}
-                                        </button>
-                                    </div>
-                                </div>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setFormularioAberto((v) => !v)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-sm transition-all duration-300 ease-in-out active:scale-95 ${formularioAberto
+                            ? "bg-gray-800 text-white hover:bg-gray-900"
+                            : "bg-primary text-white hover:bg-opacity-90"
+                            }`}
+                        title={formularioAberto ? "Fechar Formulário" : "Nova Contagem"}
+                    >
+                        {formularioAberto ? (
+                            <FaTimes size={18} />
+                        ) : (
+                            <FaPlusSquare size={18} />
+                        )}
+                        <span className="text-sm font-medium">
+                            {formularioAberto ? "Fechar" : "Nova Contagem"}
+                        </span>
+                    </button>
 
-                                {msgContagem && <p className="text-sm text-gray-600">{msgContagem}</p>}
+                    <button
+                        onClick={carregarContagensLista}
+                        disabled={loadingContagensLista}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all duration-300 ease-in-out active:scale-95 disabled:opacity-50 dark:bg-meta-4 dark:text-white dark:border-strokedark"
+                        title="Atualizar Lista"
+                    >
+                        <FaSync
+                            className={loadingContagensLista ? "animate-spin" : ""}
+                            size={18}
+                        />
+                        <span className="text-sm font-medium">Atualizar</span>
+                    </button>
+                </div>
+            </div>
 
-                                {/* Filtros de localização e prateleira após busca */}
-                                {itensContagem.length > 0 && (
-                                    <div>
-                                        <div className="border-t pt-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            {/* BOX ABERTO - Filtros de Data */}
+            <div
+                className={`grid transition-all duration-300 ease-in-out overflow-hidden ${formularioAberto
+                    ? "grid-rows-[1fr] opacity-100 mb-10 p-2"
+                    : "grid-rows-[0fr] opacity-0 mb-0 p-0"
+                    }`}
+            >
+                <div className="min-h-0">
+                    <div className="bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-gray-100 dark:border-strokedark">
+                        <h4 className="text-lg font-semibold mb-4 text-black dark:text-white">
+                            Nova Contagem
+                        </h4>
+
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Data Inicial
+                                </label>
+                                <input
+                                    type="date"
+                                    value={dataInicial}
+                                    onChange={(e) => setDataInicial(e.target.value)}
+                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Data Final
+                                </label>
+                                <input
+                                    type="date"
+                                    value={dataFinal}
+                                    onChange={(e) => setDataFinal(e.target.value)}
+                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                />
+                            </div>
+
+                            <div className="flex items-end">
+                                <button
+                                    onClick={buscarContagem}
+                                    disabled={loadingContagem}
+                                    className={BTN}
+                                >
+                                    <FaSearch />
+                                    {loadingContagem ? "Buscando..." : "Buscar"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {msgContagem && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                {msgContagem}
+                            </p>
+                        )}
+
+                        {/* Filtros de localização e prateleira após busca */}
+                        {itensContagem.length > 0 && (
+                            <div>
+                                <div className="border-t border-gray-200 dark:border-strokedark pt-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Filtrar por localização:
+                                            </label>
+                                            <select
+                                                value={localizacaoFiltro}
+                                                onChange={(e) => setLocalizacaoFiltro(e.target.value)}
+                                                className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                            >
+                                                <option value="">Todas as localizações</option>
+                                                <option value="PISO_A">PISO A</option>
+                                                <option value="PISO_B">PISO B</option>
+                                                <option value="PISO_C">PISO C</option>
+                                                <option value="VITRINE">VITRINE</option>
+                                                <option value="BOX">BOX</option>
+                                                <option value="VENDA CASADA">VENDA CASADA</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Filtrar por prateleira:
+                                            </label>
+                                            <input
+                                                type="number"
+                                                placeholder="Ex: 13"
+                                                value={prateleira}
+                                                onChange={(e) => setPrateleira(e.target.value)}
+                                                className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            {(localizacaoFiltro || prateleira) && (
+                                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                    Exibindo {itensFiltrados.length} de{" "}
+                                                    {itensContagem.length} itens
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Selects de usuários para contagem */}
+                                    <div className="border-t border-gray-200 dark:border-strokedark pt-4 mt-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por localização:</label>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Contagem 1:
+                                                </label>
                                                 <select
-                                                    value={localizacaoFiltro}
-                                                    onChange={(e) => setLocalizacaoFiltro(e.target.value)}
-                                                    className="h-10 w-full border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
+                                                    value={contagem1}
+                                                    onChange={(e) => setContagem1(e.target.value)}
+                                                    className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                                    disabled={loadingUsuarios}
                                                 >
-                                                    <option value="">Todas as localizações</option>
-                                                    <option value="PISO_A">PISO A</option>
-                                                    <option value="PISO_B">PISO B</option>
-                                                    <option value="PISO_C">PISO C</option>
-                                                    <option value="VITRINE">VITRINE</option>
-                                                    <option value="BOX">BOX</option>
-                                                    <option value="VENDA CASADA">VENDA CASADA</option>
+                                                    <option value="">Selecionar usuário</option>
+                                                    {usuarios.map((usuario) => (
+                                                        <option key={usuario.id} value={usuario.id}>
+                                                            {usuario.nome}
+                                                        </option>
+                                                    ))}
                                                 </select>
                                             </div>
-                                            
+
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por prateleira:</label>
-                                                <input
-                                                    type="number"
-                                                    placeholder="Ex: 13"
-                                                    value={prateleira}
-                                                    onChange={(e) => setPrateleira(e.target.value)}
-                                                    className="h-10 w-full border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                                                />
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Contagem 2:
+                                                </label>
+                                                <select
+                                                    value={contagem2}
+                                                    onChange={(e) => setContagem2(e.target.value)}
+                                                    className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                                    disabled={loadingUsuarios}
+                                                >
+                                                    <option value="">Selecionar usuário</option>
+                                                    {usuarios.map((usuario) => (
+                                                        <option key={usuario.id} value={usuario.id}>
+                                                            {usuario.nome}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
 
                                             <div>
-                                                {(localizacaoFiltro || prateleira) && (
-                                                    <span className="text-sm text-gray-600">
-                                                        Exibindo {itensFiltrados.length} de {itensContagem.length} itens
-                                                    </span>
-                                                )}
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                    Auditoria:
+                                                </label>
+                                                <select
+                                                    value={contagem3}
+                                                    onChange={(e) => setContagem3(e.target.value)}
+                                                    className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                                    disabled={loadingUsuarios}
+                                                >
+                                                    <option value="">Selecionar usuário</option>
+                                                    {usuarios.map((usuario) => (
+                                                        <option key={usuario.id} value={usuario.id}>
+                                                            {usuario.nome}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
 
-                                        {/* Selects de usuários para contagem */}
-                                        <div className="border-t pt-4 mt-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contagem 1:</label>
-                                                    <select
-                                                        value={contagem1}
-                                                        onChange={(e) => setContagem1(e.target.value)}
-                                                        className="h-10 w-full border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                                                        disabled={loadingUsuarios}
-                                                    >
-                                                        <option value="">Selecionar usuário</option>
-                                                        {usuarios.map((usuario) => (
-                                                            <option key={usuario.id} value={usuario.id}>
-                                                                {usuario.nome}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contagem 2:</label>
-                                                    <select
-                                                        value={contagem2}
-                                                        onChange={(e) => setContagem2(e.target.value)}
-                                                        className="h-10 w-full border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                                                        disabled={loadingUsuarios}
-                                                    >
-                                                        <option value="">Selecionar usuário</option>
-                                                        {usuarios.map((usuario) => (
-                                                            <option key={usuario.id} value={usuario.id}>
-                                                                {usuario.nome}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Auditoria:</label>
-                                                    <select
-                                                        value={contagem3}
-                                                        onChange={(e) => setContagem3(e.target.value)}
-                                                        className="h-10 w-full border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                                                        disabled={loadingUsuarios}
-                                                    >
-                                                        <option value="">Selecionar usuário</option>
-                                                        {usuarios.map((usuario) => (
-                                                            <option key={usuario.id} value={usuario.id}>
-                                                                {usuario.nome}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Botão de salvar */}
-                                            <div className="flex justify-end mt-4">
-                                                <button 
-                                                    onClick={salvarContagem}
-                                                    disabled={itensSelecionados.size === 0 || (!contagem1 && !contagem2 && !contagem3)}
-                                                    className={`${BTN} disabled:opacity-50 disabled:cursor-not-allowed`}
-                                                >
-                                                    Salvar Contagem ({itensSelecionados.size} itens)
-                                                </button>
-                                            </div>
+                                        {/* Botão de salvar */}
+                                        <div className="flex justify-end mt-4">
+                                            <button
+                                                onClick={salvarContagem}
+                                                disabled={
+                                                    itensSelecionados.size === 0 ||
+                                                    (!contagem1 && !contagem2 && !contagem3)
+                                                }
+                                                className={BTN}
+                                            >
+                                                <FaCheck />
+                                                Salvar Contagem ({itensSelecionados.size} itens)
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                )}
 
-                                {/* Tabela de Contagem */}
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full">
-                                        <thead className="bg-gray-50 border-b">
+                                {/* Tabela de Contagem (Preview) */}
+                                <div className="overflow-x-auto mt-6 border border-gray-200 dark:border-strokedark rounded-lg">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-gray-50 dark:bg-meta-4 border-b border-gray-200 dark:border-strokedark">
                                             <tr>
-                                                <th className="p-2 text-center w-12">
+                                                <th className="p-3 text-center w-12">
                                                     <input
                                                         type="checkbox"
-                                                        checked={itensFiltrados.length > 0 && itensSelecionados.size === itensFiltrados.length}
+                                                        checked={
+                                                            itensFiltrados.length > 0 &&
+                                                            itensSelecionados.size === itensFiltrados.length
+                                                        }
                                                         onChange={toggleTodosItens}
-                                                        className="rounded"
+                                                        className="rounded border-gray-300 text-primary focus:ring-primary"
                                                     />
                                                 </th>
-                                                <th className="p-2 text-start">Data</th>
-                                                <th className="p-2 text-start">Código</th>
-                                                <th className="p-2 text-start">Produto</th>
-                                                <th className="p-2 text-start">Marca</th>
-                                                <th className="p-2 text-start">Ref. Fabricante</th>
-                                                <th className="p-2 text-start">Ref. Fornecedor</th>
-                                                <th className="p-2 text-start">Localização</th>
-                                                <th className="p-2 text-start">Unidade</th>
-                                                <th className="p-2 text-end">Qtde Saída</th>
-                                                <th className="p-2 text-end">Estoque</th>
-                                                <th className="p-2 text-end">Reserva</th>
+                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
+                                                    Data
+                                                </th>
+                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
+                                                    Código
+                                                </th>
+                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
+                                                    Produto
+                                                </th>
+                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
+                                                    Marca
+                                                </th>
+                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
+                                                    Localização
+                                                </th>
+                                                <th className="p-3 text-end text-gray-700 dark:text-gray-300">
+                                                    Estoque
+                                                </th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-strokedark">
                                             {itensFiltrados.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={12} className="p-4 text-gray-500 text-center">
-                                                        {loadingContagem ? "Carregando..." : "Nenhum item encontrado"}
+                                                    <td
+                                                        colSpan={7}
+                                                        className="p-4 text-gray-500 text-center dark:text-gray-400"
+                                                    >
+                                                        {loadingContagem
+                                                            ? "Carregando..."
+                                                            : "Nenhum item encontrado"}
                                                     </td>
                                                 </tr>
                                             )}
                                             {itensFiltrados.map((item, idx) => (
-                                                <tr key={idx} className="border-t hover:bg-gray-50">
-                                                    <td className="p-2 text-center">
+                                                <tr
+                                                    key={idx}
+                                                    className="hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
+                                                >
+                                                    <td className="p-3 text-center">
                                                         <input
                                                             type="checkbox"
                                                             checked={itensSelecionados.has(idx)}
                                                             onChange={() => toggleItemSelecionado(idx)}
-                                                            className="rounded"
+                                                            className="rounded border-gray-300 text-primary focus:ring-primary"
                                                         />
                                                     </td>
-                                                    <td className="p-2">{formatarData(item.DATA)}</td>
-                                                    <td className="p-2">{item.COD_PRODUTO}</td>
-                                                    <td className="p-2">{item.DESC_PRODUTO}</td>
-                                                    <td className="p-2">{item.MAR_DESCRICAO}</td>
-                                                    <td className="p-2">{item.REF_FABRICANTE}</td>
-                                                    <td className="p-2">{item.REF_FORNECEDOR}</td>
-                                                    <td className="p-2">{item.LOCALIZACAO || "-"}</td>
-                                                    <td className="p-2">{item.UNIDADE}</td>
-                                                    <td className="p-2 text-end">{item.QTDE_SAIDA}</td>
-                                                    <td className="p-2 text-end">{item.ESTOQUE}</td>
-                                                    <td className="p-2 text-end">{item.RESERVA}</td>
+                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
+                                                        {new Date(item.DATA).toLocaleDateString("pt-BR")}
+                                                    </td>
+                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
+                                                        {item.COD_PRODUTO}
+                                                    </td>
+                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
+                                                        {item.DESC_PRODUTO}
+                                                    </td>
+                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
+                                                        {item.MAR_DESCRICAO}
+                                                    </td>
+                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
+                                                        {item.LOCALIZACAO || "-"}
+                                                    </td>
+                                                    <td className="p-3 text-end text-gray-700 dark:text-gray-300">
+                                                        {item.ESTOQUE}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                )}
-                {/* LISTAGEM INFERIOR */}
-                <div id="list">
-                    <div className="w-full">
-                        <div className="bg-white rounded-xl shadow-lg p-6">
-                            <div className="flex items-center justify-end gap-2 mb-4">
-                                <label htmlFor="pageSize" className="text-sm text-gray-700">Tamanho da listagem</label>
-                                <select
-                                    id="pageSize"
-                                    className="h-10 border border-gray-300 rounded px-2"
-                                    value={pageSize}
-                                    onChange={(e) => setPageSize(Number(e.target.value))}
-                                >
-                                    <option value={5}>5</option>
-                                    <option value={10}>10</option>
-                                    <option value={20}>20</option>
-                                    <option value={50}>50</option>
-                                    <option value={100}>100</option>
-                                </select>
-                            </div>
-
-                            {msgContagensLista && <p className="text-sm text-gray-600 mb-2">{msgContagensLista}</p>}
-
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full">
-                                    <thead className="bg-gray-50 border-b">
-                                        <tr>
-                                            <th className="p-2 text-start">Contagem</th>
-                                            <th className="p-2 text-start">Usuário</th>
-                                            <th className="p-2 text-start">Data</th>
-                                            <th className="p-2 text-start">Liberado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {contagensLista.length === 0 && (
-                                            <tr>
-                                                <td colSpan={3} className="p-4 text-gray-500 text-center">
-                                                    {loadingContagensLista ? "Carregando..." : "Nenhuma contagem encontrada"}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {contagensLista.map((item, idx) => (
-                                            <tr key={idx} className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => abrirModalLogs(item)}>
-                                                <td className="p-3">{item.contagem}</td>
-                                                <td className="p-3">{item.usuario.nome}</td>
-                                                <td className="p-3">{formatarData(item.created_at)}</td>
-                                                <td className="p-3">{item.liberado_contagem ? "Sim" : "Não"}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        {/* fim tabela contagens */}
+                        )}
                     </div>
                 </div>
             </div>
 
+            {/* LISTAGEM INFERIOR (Cards) */}
+            <div className="space-y-4">
+                <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                        Listagem de Contagens
+                    </div>
+
+                    <select
+                        className="h-10 border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white w-full sm:w-auto"
+                        value={pageSize}
+                        onChange={(e) => setPageSize(Number(e.target.value))}
+                    >
+                        <option value={10}>10 itens</option>
+                        <option value={20}>20 itens</option>
+                        <option value={50}>50 itens</option>
+                        <option value={100}>100 itens</option>
+                    </select>
+                </div>
+
+                {msgContagensLista && (
+                    <div className="p-4 bg-blue-50 text-blue-700 rounded-lg border border-blue-100 shadow-sm dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30">
+                        {msgContagensLista}
+                    </div>
+                )}
+
+                {loadingContagensLista ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {[...Array(4)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="bg-white dark:bg-boxdark h-48 rounded-xl shadow-sm border border-gray-100 dark:border-strokedark animate-pulse"
+                            ></div>
+                        ))}
+                    </div>
+                ) : contagensLista.length === 0 ? (
+                    <div className="text-center py-12 bg-white dark:bg-boxdark rounded-xl border border-dashed border-gray-300 dark:border-strokedark shadow-sm">
+                        <p className="text-gray-500 dark:text-gray-400">
+                            Nenhuma contagem encontrada.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {contagensLista.map((item, idx) => (
+                            <ContagemCard
+                                key={idx}
+                                contagem={item}
+                                onOpenLogs={abrirModalLogs}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
             {/* MODAL DE LOGS */}
             {modalLogsAberto && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold">
-                                Logs da Contagem {contagemSelecionada?.contagem} - {contagemSelecionada?.usuario.nome}
-                            </h3>
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] border border-stroke dark:border-strokedark">
+                        <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-black dark:text-white">
+                                    Logs da Contagem #{contagemSelecionada?.contagem}
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Colaborador: {contagemSelecionada?.usuario.nome}
+                                </p>
+                            </div>
                             <button
                                 onClick={fecharModalLogs}
-                                className="text-gray-500 hover:text-gray-700 text-2xl"
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-meta-4 transition-colors"
                             >
-                                ×
+                                <FaTimes size={20} />
                             </button>
                         </div>
 
-                        {/* Botão para gerar Excel dos logs */}
-                        <div className="flex justify-end mb-4">
-                            <button
-                                onClick={gerarExcelLogs}
-                                className={`${BTN} mr-2`}
-                                disabled={logsDetalhes.length === 0}
-                            >
-                                Gerar Excel
-                            </button>
-                        </div>
+                        <div className="p-6 overflow-y-auto">
+                            {/* Botão para gerar Excel dos logs */}
+                            <div className="flex justify-end mb-4">
+                                <button
+                                    onClick={gerarExcelLogs}
+                                    className={`${BTN} bg-green-600 hover:bg-green-700`}
+                                    disabled={logsDetalhes.length === 0}
+                                >
+                                    <FaFileExcel />
+                                    Gerar Excel
+                                </button>
+                            </div>
 
-                        {loadingLogs ? (
-                            <div className="text-center py-8">Carregando logs...</div>
-                        ) : logsDetalhes.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">Nenhum log encontrado</div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-50">
-                                            <th className="border border-gray-300 p-2 text-sm">Código</th>
-                                            <th className="border border-gray-300 p-2 text-sm">Descrição</th>
-                                            <th className="border border-gray-300 p-2 text-sm">Estoque</th>
-                                            <th className="border border-gray-300 p-2 text-sm">Contado</th>
+                            <div className="border border-stroke dark:border-strokedark rounded-lg overflow-hidden">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-2 dark:bg-meta-4 text-black dark:text-white font-medium border-b border-stroke dark:border-strokedark">
+                                        <tr>
+                                            <th className="px-4 py-3">Código</th>
+                                            <th className="px-4 py-3">Descrição</th>
+                                            <th className="px-4 py-3 text-right">Estoque</th>
+                                            <th className="px-4 py-3 text-right">Contado</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {logsDetalhes.map((log, idx) => {
-                                            const iguais = log.estoque === log.contado;
-                                            return (
-                                                <tr key={idx} className={iguais ? "bg-green-100" : "bg-red-100"}>
-                                                    <td className="border border-gray-300 p-2 text-center font-semibold">
-                                                        {log.item?.cod_produto ?? "-"}
-                                                    </td>
-                                                    <td className="border border-gray-300 p-2 text-left font-semibold">
-                                                        {log.item?.desc_produto ?? "-"}
-                                                    </td>
-                                                    <td className="border border-gray-300 p-2 text-center font-semibold">
-                                                        {log.estoque ?? "-"}
-                                                    </td>
-                                                    <td className="border border-gray-300 p-2 text-center font-semibold">
-                                                        {log.contado ?? "-"}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
+                                    <tbody className="divide-y divide-stroke dark:divide-strokedark">
+                                        {logsDetalhes.length === 0 ? (
+                                            <tr>
+                                                <td
+                                                    colSpan={4}
+                                                    className="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
+                                                >
+                                                    Nenhum log encontrado para esta contagem.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            logsDetalhes.map((log, idx) => {
+                                                const isDiff = log.estoque !== log.contado;
+                                                const rowClass = isDiff
+                                                    ? "bg-red-50/50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 border-l-4 border-red-500"
+                                                    : "bg-green-50/50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 border-l-4 border-green-500";
+
+                                                return (
+                                                    <tr
+                                                        key={idx}
+                                                        className={`${rowClass} transition-colors`}
+                                                    >
+                                                        <td className="px-4 py-3 font-medium">
+                                                            {log.item?.cod_produto || "-"}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {log.item?.desc_produto || "-"}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            {log.estoque}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-bold">
+                                                            {log.contado}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
-                        )}
-
-                        <div className="flex justify-end mt-4">
-                            <button
-                                onClick={fecharModalLogs}
-                                className={BTN}
-                            >
-                                Fechar
-                            </button>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* MODAL Fornecedor - Removido pois não é necessário para contagem de estoque */}
         </div>
     );
 }

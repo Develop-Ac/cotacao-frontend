@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MdChevronRight } from "react-icons/md";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 
 interface SubmenuItem {
     label: string;
@@ -40,7 +40,7 @@ export default function SidebarMenuItem({
         setIsOpen(!isOpen);
     }
 
-    const containerVariants = {
+    const containerVariants: Variants = {
         hidden: {
             height: 0,
             opacity: 0,
@@ -60,7 +60,7 @@ export default function SidebarMenuItem({
         }
     };
 
-    const itemVariants = {
+    const itemVariants: Variants = {
         hidden: { x: -10, opacity: 0 },
         visible: { x: 0, opacity: 1 }
     };
@@ -118,8 +118,8 @@ export default function SidebarMenuItem({
 
             {/* Floating Menu for Collapsed State */}
             {isCollapsed && (
-                <div className="absolute left-full top-0 ml-3 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-2 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-300 z-50 translate-x-[-10px] group-hover:translate-x-0">
-                    <div className="font-bold px-3 py-2 border-b border-gray-100 dark:border-gray-700 mb-1 text-gray-700 dark:text-gray-200">
+                <div className="absolute left-full top-0 ml-3 w-48 bg-gray-800 border border-gray-700 rounded-md shadow-lg p-2 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-300 z-50 translate-x-[-10px] group-hover:translate-x-0">
+                    <div className="font-bold px-3 py-2 border-b border-gray-700 mb-1 text-gray-200">
                         {label}
                     </div>
                     <ul className="flex flex-col gap-1">
@@ -138,8 +138,8 @@ export default function SidebarMenuItem({
                                         href={item.href}
                                         onClick={(e) => onNavigate(item.href, e)}
                                         className={`block px-3 py-2 rounded-md text-sm ${isActiveItem
-                                            ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400'
-                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                            ? 'bg-brand-500/[0.12] text-brand-400'
+                                            : 'text-gray-400 hover:bg-gray-700'
                                             }`}
                                     >
                                         {item.label}

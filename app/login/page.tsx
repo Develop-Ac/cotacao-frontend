@@ -83,7 +83,7 @@ export default function Login() {
         <div className="absolute inset-0 bg-black/30" />
       </div>
 
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md relative z-10">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
         <div className="flex flex-col items-center mb-8">
           <div className="mb-6">
             <Image src={logo.src} alt="Logo" width={180} height={90} />
