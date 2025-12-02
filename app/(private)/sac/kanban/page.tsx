@@ -269,15 +269,17 @@ function Column({
         )}
       </Droppable>
 
-      <div className="p-2 shrink-0">
-        <button
-          onClick={() => setShowTypeModal(true)}
-          disabled={!canCreate}
-          className={`keep-color kanban-btn flex items-center gap-2 w-full px-2 py-1.5 text-sm text-left ${!canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          <span className="text-lg leading-none">+</span> Adicionar um cartão
-        </button>
-      </div>
+      {colKey === "aguardando_atendimento" && (
+        <div className="p-2 shrink-0">
+          <button
+            onClick={() => setShowTypeModal(true)}
+            disabled={!canCreate}
+            className={`keep-color kanban-btn flex items-center gap-2 w-full px-2 py-1.5 text-sm text-left ${!canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <span className="text-lg leading-none">+</span> Adicionar um cartão
+          </button>
+        </div>
+      )}
 
       {/* Modal de escolha Garantia/Devolução */}
       {showTypeModal && (
