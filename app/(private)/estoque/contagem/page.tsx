@@ -434,7 +434,8 @@ export default function Tela() {
         null
     );
     const [pageSize, setPageSize] = useState<number>(20);
-    const page = 1;
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
     // ===== Estados do modal de logs =====
     const [modalLogsAberto, setModalLogsAberto] = useState(false);
@@ -462,6 +463,13 @@ export default function Tela() {
                     ? data
                     : [];
             setContagensLista(arr);
+
+            if (data?.total) {
+                setTotalPages(Math.ceil(data.total / pageSize));
+            } else if (data?.last_page) {
+                setTotalPages(data.last_page);
+            }
+
             if (!arr.length) setMsgContagensLista("Nenhuma contagem encontrada.");
         } catch (e: any) {
             setMsgContagensLista(`Erro ao carregar: ${e?.message || "desconhecido"}`);
@@ -472,8 +480,13 @@ export default function Tela() {
     };
 
     useEffect(() => {
+        setPage(1);
         carregarContagensLista();
     }, [pageSize]);
+
+    useEffect(() => {
+        carregarContagensLista();
+    }, [page]);
 
     // ===== Função para abrir modal de logs =====
     const abrirModalLogs = async (contagem: ContagemListaItem) => {
@@ -860,10 +873,10 @@ export default function Tela() {
                         value={pageSize}
                         onChange={(e) => setPageSize(Number(e.target.value))}
                     >
-                        <option value={10}>10 itens</option>
-                        <option value={20}>20 itens</option>
-                        <option value={50}>50 itens</option>
-                        <option value={100}>100 itens</option>
+                        <option value={10}>10 contagens</option>
+                        <option value={20}>20 contagens</option>
+                        <option value={50}>50 contagens</option>
+                        <option value={100}>100 contagens</option>
                     </select>
                 </div>
 
@@ -897,6 +910,62 @@ export default function Tela() {
                                 onOpenLogs={abrirModalLogs}
                             />
                         ))}
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {contagensLista.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-strokedark">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Mostrando página <span className="font-semibold text-black dark:text-white">{page}</span> de <span className="font-semibold text-black dark:text-white">{totalPages}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page === 1 || loadingContagensLista}
+                                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                            >
+                                Anterior
+                            </button>
+
+                            <div className="flex items-center gap-1">
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pNum = page;
+                                    if (totalPages <= 5) {
+                                        pNum = i + 1;
+                                    } else if (page <= 3) {
+                                        pNum = i + 1;
+                                    } else if (page >= totalPages - 2) {
+                                        pNum = totalPages - 4 + i;
+                                    } else {
+                                        pNum = page - 2 + i;
+                                    }
+
+                                    return (
+                                        <button
+                                            key={pNum}
+                                            onClick={() => setPage(pNum)}
+                                            disabled={loadingContagensLista}
+                                            className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${page === pNum
+                                                ? "bg-primary text-white"
+                                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                                                }`}
+                                        >
+                                            {pNum}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page === totalPages || loadingContagensLista}
+                                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                            >
+                                Próximo
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

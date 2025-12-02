@@ -300,7 +300,17 @@ export default function Tela() {
     });
   }, [pedidos, fFor, fPed, fDe, fAte]);
 
-  const pagina = useMemo(() => pedidosFiltrados.slice(0, pageSize), [pedidosFiltrados, pageSize]);
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(pedidosFiltrados.length / pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [fFor, fPed, fDe, fAte, pageSize]);
+
+  const pagina = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return pedidosFiltrados.slice(start, start + pageSize);
+  }, [pedidosFiltrados, page, pageSize]);
 
   return (
     <div className="text-gray-900 dark:text-white space-y-8">
@@ -495,6 +505,64 @@ export default function Tela() {
             ))}
           </div>
         )}
+
+
+        {/* Pagination Controls */}
+        {
+          pedidosFiltrados.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-strokedark">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Mostrando página <span className="font-semibold text-black dark:text-white">{page}</span> de <span className="font-semibold text-black dark:text-white">{totalPages}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  Anterior
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pNum = page;
+                    if (totalPages <= 5) {
+                      pNum = i + 1;
+                    } else if (page <= 3) {
+                      pNum = i + 1;
+                    } else if (page >= totalPages - 2) {
+                      pNum = totalPages - 4 + i;
+                    } else {
+                      pNum = page - 2 + i;
+                    }
+
+                    return (
+                      <button
+                        key={pNum}
+                        onClick={() => setPage(pNum)}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${page === pNum
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                          }`}
+                      >
+                        {pNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  Próximo
+                </button>
+              </div>
+            </div>
+          )
+        }
       </div>
     </div>
   );
