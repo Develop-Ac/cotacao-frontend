@@ -546,7 +546,7 @@ export default function Page() {
     setShowTaskModal(false);
   }
 
-  async function addTask(col: ColumnKey, title: string) {
+  const addTask = React.useCallback(async (col: ColumnKey, title: string) => {
     const newTask: Task = {
       id: uid(),
       title,
@@ -564,7 +564,7 @@ export default function Page() {
         body: JSON.stringify(newTask)
       });
     } catch { }
-  }
+  }, [KANBAN_URL]);
 
   function deleteTask(col: ColumnKey, id: string) {
     setBoard((prev) => ({
@@ -694,7 +694,7 @@ export default function Page() {
       clearTimeout(timer);
       if (interval) clearInterval(interval);
     };
-  }, []);
+  }, [addTask]);
 
   function saveAutomation() {
     const t = automation.time?.trim();
@@ -1025,7 +1025,7 @@ export default function Page() {
           <div className="bg-white dark:bg-neutral-900 rounded-xl w-full max-w-md shadow-2xl p-6">
             <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Reabrir Solicitação?</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Ao mover este cartão para fora de "Concluído", a solução aplicada será apagada e o cartão voltará a ficar pendente. Deseja continuar?
+              Ao mover este cartão para fora de &quot;Concluído&quot;, a solução aplicada será apagada e o cartão voltará a ficar pendente. Deseja continuar?
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowReopenModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-neutral-700">Cancelar</button>
