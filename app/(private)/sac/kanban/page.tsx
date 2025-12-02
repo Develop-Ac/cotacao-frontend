@@ -181,6 +181,7 @@ function Column({
   onOpenTask,
   disableDrag,
   userSetor,
+  onCreateTask,
 }: {
   label: string;
   colKey: ColumnKey;
@@ -188,6 +189,7 @@ function Column({
   onAddTask: (col: ColumnKey, title: string) => void;
   onDeleteTask: (col: ColumnKey, id: string) => void;
   onOpenTask: (col: ColumnKey, id: string) => void;
+  onCreateTask: (col: ColumnKey, initialTitle: string, type: string) => void;
   disableDrag: boolean;
   userSetor: string;
 }) {
@@ -268,55 +270,13 @@ function Column({
       </Droppable>
 
       <div className="p-2 shrink-0">
-        {isAdding ? (
-          <div className="p-2 bg-white dark:bg-neutral-800 rounded-lg border border-blue-200 shadow-sm animate-in fade-in zoom-in-95 duration-300">
-            <textarea
-              autoFocus
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (value.trim()) {
-                    setShowTypeModal(true);
-                  }
-                }
-                if (e.key === "Escape") {
-                  setIsAdding(false);
-                }
-              }}
-              placeholder="Insira um título..."
-              className="w-full text-sm bg-transparent border-none focus:ring-0 p-0 resize-none placeholder:text-gray-400 text-gray-900 dark:text-gray-100"
-              rows={3}
-            />
-            <div className="flex items-center gap-2 mt-2">
-              <button
-                onClick={() => {
-                  if (value.trim()) {
-                    setShowTypeModal(true);
-                  }
-                }}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
-              >
-                Adicionar
-              </button>
-              <button
-                onClick={() => setIsAdding(false)}
-                className="p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsAdding(true)}
-            disabled={!canCreate}
-            className={`keep-color kanban-btn flex items-center gap-2 w-full px-2 py-1.5 text-sm text-left ${!canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <span className="text-lg leading-none">+</span> Adicionar um cartão
-          </button>
-        )}
+        <button
+          onClick={() => setShowTypeModal(true)}
+          disabled={!canCreate}
+          className={`keep-color kanban-btn flex items-center gap-2 w-full px-2 py-1.5 text-sm text-left ${!canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <span className="text-lg leading-none">+</span> Adicionar um cartão
+        </button>
       </div>
 
       {/* Modal de escolha Garantia/Devolução */}
@@ -355,20 +315,11 @@ function Column({
                   else if (typeChoice === "devolucao") prefix = "devolucao #";
                   else if (typeChoice === "pendencia") prefix = "pendencia #";
 
-                  // Lógica de numeração (simplificada, idealmente viria do backend ou calculada globalmente)
-                  // Aqui vamos confiar que o título será ajustado ou apenas usar o input
-                  let title = value.trim();
-                  if (!title.toLowerCase().startsWith(prefix.split(' ')[0])) {
-                    // Se não tem prefixo, adiciona. Se tiver, usa o que tá.
-                    // Mas a lógica original buscava o próximo número. Vamos tentar manter simples por enquanto.
-                    title = `${prefix}${title}`;
+                  if (typeChoice) {
+                    onCreateTask(colKey, prefix, typeChoice);
+                    setShowTypeModal(false);
+                    setTypeChoice(null);
                   }
-
-                  onAddTask(colKey, title);
-                  setValue("");
-                  setIsAdding(false);
-                  setShowTypeModal(false);
-                  setTypeChoice(null);
                 }}
               >Criar</button>
             </div>
@@ -713,6 +664,31 @@ export default function Page() {
     setShowTaskModal(true);
   }
 
+  function openCreateTaskModal(col: ColumnKey, initialTitle: string, type: string) {
+    setSelected({ col, id: "new" }); // "new" indicates creation
+    setTaskForm({
+      title: initialTitle,
+      desc: "",
+      responsavel: "",
+      due: "",
+      prioridade: "media",
+      data: "",
+      venda: "",
+      cliente: "",
+      itemReclamado: "",
+      reclamacao: "",
+      solucao: "",
+      dataSolucao: "",
+      custo: "",
+      dptoResponsavel: "",
+      tipo: type,
+      vendedor: "",
+      imagens: [],
+      files: []
+    });
+    setShowTaskModal(true);
+  }
+
   async function saveTaskModal() {
     if (!selected) return;
 
@@ -733,22 +709,50 @@ export default function Page() {
       } catch { }
     }
 
-    const updatedTask = { ...taskForm, imagens, id: selected.id, etapa: selected.col };
+    if (selected.id === "new") {
+      // Criação
+      const newTask: Task = {
+        id: uid(),
+        createdAt: Date.now(),
+        etapa: selected.col,
+        ...taskForm,
+        imagens
+      };
+      // Remove files do objeto final se existir na tipagem (Task não tem files)
+      // @ts-ignore
+      delete newTask.files;
 
-    setBoard((prev) => {
-      const list = prev[selected.col].map((t) =>
-        t.id === selected.id ? { ...t, ...updatedTask } : t
-      );
-      return { ...prev, [selected.col]: list };
-    });
+      setBoard((prev) => ({
+        ...prev,
+        [selected.col]: [newTask, ...(prev[selected.col] ?? [])],
+      }));
 
-    try {
-      await fetch(`${KANBAN_URL}/kanban`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedTask)
+      try {
+        await fetch(`${KANBAN_URL}/kanban`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newTask)
+        });
+      } catch { }
+    } else {
+      // Edição
+      const updatedTask = { ...taskForm, imagens, id: selected.id, etapa: selected.col };
+
+      setBoard((prev) => {
+        const list = prev[selected.col].map((t) =>
+          t.id === selected.id ? { ...t, ...updatedTask } : t
+        );
+        return { ...prev, [selected.col]: list };
       });
-    } catch { }
+
+      try {
+        await fetch(`${KANBAN_URL}/kanban`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedTask)
+        });
+      } catch { }
+    }
 
     setShowTaskModal(false);
   }
@@ -851,6 +855,7 @@ export default function Page() {
                 onAddTask={addTask}
                 onDeleteTask={deleteTask}
                 onOpenTask={openTaskModal}
+                onCreateTask={openCreateTaskModal}
                 disableDrag={!!(filterVendedor || filterCliente || filterVenda)}
                 userSetor={userSetor}
               />

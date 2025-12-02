@@ -476,7 +476,7 @@ a[class*="button"] svg {
 }
 
 .kanban-btn {
-  background-color: #F2F3F5 !important;
+  background-color: transparent !important;
   color: #374151 !important;
   border: none !important;
   font-weight: 500;
@@ -484,11 +484,11 @@ a[class*="button"] svg {
 }
 
 .kanban-btn:hover {
-  background-color: #E0E3E8 !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
 }
 
 .dark .kanban-btn {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: transparent !important;
   color: #e5e7eb !important;
 }
 

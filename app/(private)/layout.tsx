@@ -52,6 +52,7 @@ export default function RootLayout({
     estoque: isPathActive('/estoque'),
     expedicao: isPathActive('/expedicao'),
     qualidade: isPathActive('/qualidade'),
+    sac: isPathActive('/sac'),
     sistema: isPathActive('/usuario'),
   };
 
@@ -296,10 +297,10 @@ export default function RootLayout({
           {/* Header End */}
 
           {/* Main Content Start */}
-          <div className="flex-1 w-full border-l border-gray-700 flex flex-col">
+          <div className="flex-1 w-full border-l border-gray-700 flex flex-col min-h-0">
             <main
-              className={`relative flex-1 ${pathname === '/compras/kanban' || pathname === '/sac/kanban'
-                ? 'h-[calc(100vh-80px)] overflow-hidden'
+              className={`relative flex-1 ${pathname?.startsWith('/compras/kanban') || pathname?.startsWith('/sac/kanban')
+                ? 'flex flex-col h-full min-h-0 overflow-hidden'
                 : 'mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 overflow-y-auto'
                 }`}
             >
