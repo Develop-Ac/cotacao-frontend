@@ -28,9 +28,7 @@ type Task = {
   etapa: ColumnKey;
   // SAC specific
   desc?: string;
-  responsavel?: string;
   due?: string; // YYYY-MM-DD
-  prioridade?: "baixa" | "media" | "alta";
   data?: string;
   venda?: string;
   cliente?: string;
@@ -62,6 +60,7 @@ function Card({
   task,
   onDelete,
   onOpen,
+  onConcluir,
   isDragging = false,
   userSetor,
   colKey,
@@ -69,6 +68,7 @@ function Card({
   task: Task;
   onDelete?: () => void;
   onOpen?: () => void;
+  onConcluir?: () => void;
   isDragging?: boolean;
   userSetor: string;
   colKey: ColumnKey;
@@ -79,21 +79,6 @@ function Card({
       ? colKey === "aguardando_atendimento"
       : true;
 
-  // classes de cor por prioridade
-  let priorityClasses = "";
-  switch (task.prioridade) {
-    case "alta":
-      priorityClasses = "bg-red-100 text-red-700 border-red-200";
-      break;
-    case "media":
-      priorityClasses = "bg-amber-100 text-amber-700 border-amber-200";
-      break;
-    case "baixa":
-      priorityClasses = "bg-emerald-100 text-emerald-700 border-emerald-200";
-      break;
-    default:
-      priorityClasses = "bg-gray-100 text-gray-600 border-gray-200";
-  }
   const dueDate = task.due ? new Date(task.due) : null;
   const isOverdue = dueDate ? dueDate < new Date() : false;
 
@@ -107,7 +92,7 @@ function Card({
       data-kanban-card="true"
       className={`rounded-lg border border-gray-200 dark:border-neutral-700 p-3 
                   bg-white dark:bg-[#0e1116] 
-                  transition-all duration-300 ease-out group
+                  transition-all duration-300 ease-out group relative
                   ${canEdit ? "cursor-pointer" : "cursor-not-allowed opacity-60"}
                   ${isDragging
           ? "shadow-xl ring-2 ring-blue-500 rotate-2 z-50"
@@ -117,14 +102,6 @@ function Card({
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-1 flex-1 min-w-0">
           <div className="flex flex-wrap gap-1">
-            {task.prioridade && (
-              <span
-                className={`priority-badge inline-flex items-center px-2 py-0.5 
-                            text-[10px] font-semibold rounded border uppercase ${priorityClasses}`}
-              >
-                {task.prioridade}
-              </span>
-            )}
             {task.vendedor && (
               <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded border bg-gray-100 text-gray-700 border-gray-200 uppercase">
                 {task.vendedor}
@@ -134,6 +111,11 @@ function Card({
           <h4 className="text-sm font-medium leading-5 text-gray-900 dark:text-[#d6d6d8] line-clamp-3">
             {task.title}
           </h4>
+          {task.itemReclamado && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span className="font-semibold">Item:</span> {task.itemReclamado}
+            </p>
+          )}
         </div>
 
         <div className="flex items-start gap-2">
@@ -157,17 +139,16 @@ function Card({
           {task.venda && <span>Venda: {task.venda}</span>}
           {task.cliente && <span>Cod. Cliente: {task.cliente}</span>}
         </div>
-        {task.responsavel && (
-          <div
-            className="flex items-center"
-            title={`Responsável: ${task.responsavel}`}
-          >
-            <div className="inline-flex items-center justify-center rounded-md bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 px-2 py-1 min-h-[28px] min-w-[28px] whitespace-nowrap">
-              {task.responsavel}
-            </div>
-          </div>
-        )}
       </div>
+
+      {task.solucao && (
+        <div className="mt-3 pt-2 border-t border-gray-100 dark:border-neutral-800">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="font-bold text-green-600 dark:text-green-500">Solução:</span> {task.solucao}
+          </p>
+        </div>
+      )}
+
     </motion.div>
   );
 }
@@ -179,6 +160,7 @@ function Column({
   onAddTask,
   onDeleteTask,
   onOpenTask,
+  onConcluirTask,
   disableDrag,
   userSetor,
   onCreateTask,
@@ -189,6 +171,7 @@ function Column({
   onAddTask: (col: ColumnKey, title: string) => void;
   onDeleteTask: (col: ColumnKey, id: string) => void;
   onOpenTask: (col: ColumnKey, id: string) => void;
+  onConcluirTask: (col: ColumnKey, id: string) => void;
   onCreateTask: (col: ColumnKey, initialTitle: string, type: string) => void;
   disableDrag: boolean;
   userSetor: string;
@@ -254,6 +237,7 @@ function Column({
                           task={t}
                           onDelete={() => onDeleteTask(colKey, t.id)}
                           onOpen={() => onOpenTask(colKey, t.id)}
+                          onConcluir={() => onConcluirTask(colKey, t.id)}
                           isDragging={dragSnapshot.isDragging}
                           userSetor={userSetor}
                           colKey={colKey}
@@ -450,9 +434,7 @@ export default function Page() {
   const [taskForm, setTaskForm] = useState<{
     title: string;
     desc: string;
-    responsavel: string;
     due: string;
-    prioridade: "baixa" | "media" | "alta";
     // SAC fields
     data: string;
     venda: string;
@@ -468,11 +450,101 @@ export default function Page() {
     imagens: string[];
     files: File[];
   }>({
-    title: "", desc: "", responsavel: "", due: "", prioridade: "media",
+    title: "", desc: "", due: "",
     data: "", venda: "", cliente: "", itemReclamado: "", reclamacao: "",
     solucao: "", dataSolucao: "", custo: "", dptoResponsavel: "",
     tipo: "", vendedor: "", imagens: [], files: []
   });
+
+  // Modal de Conclusão
+  const [showConcluirModal, setShowConcluirModal] = useState(false);
+  const [concluirSolution, setConcluirSolution] = useState("");
+  const [taskToConclude, setTaskToConclude] = useState<{ col: ColumnKey; id: string } | null>(null);
+
+  function openConcluirModal(col: ColumnKey, id: string) {
+    setShowTaskModal(false); // Fecha o modal da tarefa antes
+    setTaskToConclude({ col, id });
+    setConcluirSolution("");
+    setShowConcluirModal(true);
+  }
+
+  // Modal de Reabertura
+  const [showReopenModal, setShowReopenModal] = useState(false);
+  const [taskToReopen, setTaskToReopen] = useState<{ id: string; from: ColumnKey; to: ColumnKey } | null>(null);
+
+  function openReopenModal(id: string, from: ColumnKey, to: ColumnKey) {
+    setTaskToReopen({ id, from, to });
+    setShowReopenModal(true);
+  }
+
+  async function confirmReopen() {
+    if (!taskToReopen) return;
+    const { id, from, to } = taskToReopen;
+    const task = board[from].find(t => t.id === id);
+    if (!task) return;
+
+    const updatedTask = {
+      ...task,
+      etapa: to,
+      solucao: "",
+      dataSolucao: ""
+    };
+
+    setBoard(prev => {
+      const sourceList = prev[from].filter(t => t.id !== id);
+      const destList = [updatedTask, ...prev[to]]; // Move to top of destination
+      return { ...prev, [from]: sourceList, [to]: destList };
+    });
+
+    try {
+      await fetch(`${KANBAN_URL}/kanban`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedTask)
+      });
+    } catch { }
+
+    setShowReopenModal(false);
+    setTaskToReopen(null);
+  }
+
+  async function saveConclusao() {
+    if (!taskToConclude || !concluirSolution.trim()) return;
+
+    const { col, id } = taskToConclude;
+    const task = board[col].find(t => t.id === id);
+    if (!task) return;
+
+    const updatedTask = {
+      ...task,
+      etapa: "finalizado" as ColumnKey,
+      solucao: concluirSolution,
+      dataSolucao: new Date().toISOString().slice(0, 10)
+    };
+
+    // Atualiza estado local: remove da origem e adiciona em finalizado
+    setBoard(prev => {
+      const sourceList = prev[col].filter(t => t.id !== id);
+      const destList = [updatedTask, ...prev.finalizado];
+      return {
+        ...prev,
+        [col]: sourceList,
+        finalizado: destList
+      };
+    });
+
+    try {
+      await fetch(`${KANBAN_URL}/kanban`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedTask)
+      });
+    } catch { }
+
+    setShowConcluirModal(false);
+    setTaskToConclude(null);
+    setShowTaskModal(false);
+  }
 
   async function addTask(col: ColumnKey, title: string) {
     const newTask: Task = {
@@ -517,6 +589,18 @@ export default function Page() {
     if (from === to && fromIndex === toIndex) return;
     if (from === to && fromIndex === toIndex) return;
     if (filterVendedor || filterCliente || filterVenda) return; // Desabilita drop se filtrado
+
+    // Intercepta movimento para finalizado
+    if (to === "finalizado" && from !== "finalizado") {
+      openConcluirModal(from, draggableId);
+      return;
+    }
+
+    // Intercepta movimento saindo de finalizado (Reabertura)
+    if (from === "finalizado" && to !== "finalizado") {
+      openReopenModal(draggableId, from, to);
+      return;
+    }
 
     // Atualiza estado local
     setBoard((prev) => {
@@ -645,9 +729,7 @@ export default function Page() {
       setTaskForm({
         title: t.title || "",
         desc: t.desc || "",
-        responsavel: t.responsavel || "",
         due: t.due || "",
-        prioridade: t.prioridade || "media",
         data: t.data || "",
         venda: t.venda || "",
         cliente: t.cliente || "",
@@ -671,9 +753,7 @@ export default function Page() {
     setTaskForm({
       title: initialTitle,
       desc: "",
-      responsavel: "",
       due: "",
-      prioridade: "media",
       data: "",
       venda: "",
       cliente: "",
@@ -857,6 +937,7 @@ export default function Page() {
                 onAddTask={addTask}
                 onDeleteTask={deleteTask}
                 onOpenTask={openTaskModal}
+                onConcluirTask={openConcluirModal}
                 onCreateTask={openCreateTaskModal}
                 disableDrag={!!(filterVendedor || filterCliente || filterVenda)}
                 userSetor={userSetor}
@@ -916,6 +997,44 @@ export default function Page() {
         </div>
       )}
 
+      {/* Modal Conclusão */}
+      {showConcluirModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-xl w-full max-w-md shadow-2xl p-6">
+            <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Concluir Solicitação</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Solução Aplicada</label>
+              <textarea
+                value={concluirSolution}
+                onChange={(e) => setConcluirSolution(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2 min-h-[100px]"
+                placeholder="Descreva a solução..."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowConcluirModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-neutral-700">Cancelar</button>
+              <button onClick={saveConclusao} className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 font-bold">Confirmar Conclusão</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Reabertura */}
+      {showReopenModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-xl w-full max-w-md shadow-2xl p-6">
+            <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Reabrir Solicitação?</h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Ao mover este cartão para fora de "Concluído", a solução aplicada será apagada e o cartão voltará a ficar pendente. Deseja continuar?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowReopenModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-neutral-700">Cancelar</button>
+              <button onClick={confirmReopen} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold">Sim, Reabrir</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Task Details (SAC Fields) */}
       {showTaskModal && selected && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
@@ -945,19 +1064,48 @@ export default function Page() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Venda</label>
-                  <input value={taskForm.venda} onChange={e => setTaskForm({ ...taskForm, venda: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                  <input
+                    value={taskForm.venda}
+                    onChange={e => setTaskForm({ ...taskForm, venda: e.target.value })}
+                    disabled={selected.id !== "new"}
+                    className={`w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 ${selected.id !== "new" ? "bg-gray-200 dark:bg-neutral-800 text-gray-500 cursor-not-allowed" : "bg-transparent"}`}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente</label>
-                  <input value={taskForm.cliente} onChange={e => setTaskForm({ ...taskForm, cliente: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                  <input
+                    value={taskForm.cliente}
+                    onChange={e => setTaskForm({ ...taskForm, cliente: e.target.value })}
+                    disabled={selected.id !== "new"}
+                    className={`w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 ${selected.id !== "new" ? "bg-gray-200 dark:bg-neutral-800 text-gray-500 cursor-not-allowed" : "bg-transparent"}`}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Vendedor</label>
-                  <input value={taskForm.vendedor} onChange={e => setTaskForm({ ...taskForm, vendedor: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                  <input
+                    value={taskForm.vendedor}
+                    onChange={e => setTaskForm({ ...taskForm, vendedor: e.target.value })}
+                    disabled={selected.id !== "new"}
+                    className={`w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 ${selected.id !== "new" ? "bg-gray-200 dark:bg-neutral-800 text-gray-500 cursor-not-allowed" : "bg-transparent"}`}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo</label>
-                  <input value={taskForm.tipo} onChange={e => setTaskForm({ ...taskForm, tipo: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
+                  <input
+                    value={taskForm.tipo}
+                    onChange={e => setTaskForm({ ...taskForm, tipo: e.target.value })}
+                    disabled={selected.id !== "new"}
+                    className={`w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 ${selected.id !== "new" ? "bg-gray-200 dark:bg-neutral-800 text-gray-500 cursor-not-allowed" : "bg-transparent"}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Item Reclamado</label>
+                  <input
+                    value={taskForm.itemReclamado}
+                    onChange={e => setTaskForm({ ...taskForm, itemReclamado: e.target.value })}
+                    disabled={selected.id !== "new"}
+                    className={`w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 ${selected.id !== "new" ? "bg-gray-200 dark:bg-neutral-800 text-gray-500 cursor-not-allowed" : "bg-transparent"}`}
+                  />
                 </div>
               </div>
 
@@ -966,27 +1114,34 @@ export default function Page() {
                 <textarea
                   value={taskForm.reclamacao || taskForm.desc}
                   onChange={(e) => setTaskForm({ ...taskForm, reclamacao: e.target.value, desc: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2 min-h-[100px]"
+                  disabled={selected.id !== "new"}
+                  className={`w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 min-h-[100px] ${selected.id !== "new" ? "bg-gray-200 dark:bg-neutral-800 text-gray-500 cursor-not-allowed" : "bg-transparent"}`}
                   placeholder="Detalhes..."
                 />
               </div>
 
+              {selected.col === "finalizado" && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Solução Aplicada</label>
+                  <textarea
+                    value={taskForm.solucao}
+                    readOnly
+                    className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-3 py-2 min-h-[80px] opacity-80 cursor-not-allowed"
+                    placeholder="Solução..."
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Responsável</label>
-                  <input value={taskForm.responsavel} onChange={e => setTaskForm({ ...taskForm, responsavel: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Prazo</label>
-                  <input type="date" value={taskForm.due} onChange={e => setTaskForm({ ...taskForm, due: e.target.value })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Prioridade</label>
-                  <select value={taskForm.prioridade} onChange={e => setTaskForm({ ...taskForm, prioridade: e.target.value as any })} className="w-full rounded-lg border border-gray-300 dark:border-neutral-700 bg-transparent px-3 py-2">
-                    <option value="baixa">Baixa</option>
-                    <option value="media">Média</option>
-                    <option value="alta">Alta</option>
-                  </select>
+                  <input
+                    type="date"
+                    value={taskForm.due}
+                    onChange={e => setTaskForm({ ...taskForm, due: e.target.value })}
+                    disabled={selected.col === "finalizado"}
+                    className={`w-full rounded-lg border border-gray-300 dark:border-neutral-700 px-3 py-2 ${selected.col === "finalizado" ? "bg-gray-200 dark:bg-neutral-800 text-gray-500 cursor-not-allowed" : "bg-transparent"}`}
+                  />
                 </div>
               </div>
 
@@ -998,11 +1153,17 @@ export default function Page() {
                     <img key={idx} src={img} alt="Anexo" className="w-16 h-16 object-cover rounded border" />
                   ))}
                 </div>
-                <input type="file" multiple onChange={e => {
-                  if (e.target.files) {
-                    setTaskForm({ ...taskForm, files: Array.from(e.target.files) });
-                  }
-                }} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                <input
+                  type="file"
+                  multiple
+                  disabled={selected.col === "finalizado"}
+                  onChange={e => {
+                    if (e.target.files) {
+                      setTaskForm({ ...taskForm, files: Array.from(e.target.files) });
+                    }
+                  }}
+                  className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 ${selected.col === "finalizado" ? "bg-gray-200 dark:bg-neutral-800 cursor-not-allowed opacity-60" : ""}`}
+                />
               </div>
             </div>
 
@@ -1015,7 +1176,17 @@ export default function Page() {
               }} className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium">Excluir</button>
               <div className="flex gap-2">
                 <button onClick={() => setShowTaskModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium">Cancelar</button>
-                <button onClick={saveTaskModal} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none">Salvar</button>
+                {selected.col !== "finalizado" && selected.id !== "new" && (
+                  <button
+                    onClick={() => openConcluirModal(selected.col, selected.id)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-200 dark:shadow-none"
+                  >
+                    Concluir
+                  </button>
+                )}
+                {selected.col !== "finalizado" && (
+                  <button onClick={saveTaskModal} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none">Salvar</button>
+                )}
               </div>
             </div>
           </div>
