@@ -18,7 +18,8 @@ export default function ProfileDropdown({ userData, onLogout }: ProfileDropdownP
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        setMounted(true);
+        const timer = setTimeout(() => setMounted(true), 0);
+        return () => clearTimeout(timer);
     }, []);
 
     // Close on click outside
