@@ -77,8 +77,7 @@ type Usuario = {
     setor: string;
 };
 
-// const ESTOQUE_BASE = serviceUrl("estoque");
-const ESTOQUE_BASE = "http://localhost:8000";
+const ESTOQUE_BASE = serviceUrl("estoque");
 
 const estoqueUrl = (path: string) =>
     `${ESTOQUE_BASE}${path.startsWith("/") ? path : `/${path}`}`;
