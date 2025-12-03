@@ -34,6 +34,7 @@ type ContagemListaItem = {
     colaborador: string;
     contagem: number;
     contagem_cuid: string;
+    piso?: string;
     liberado_contagem: boolean;
     created_at: string;
     usuario: {
@@ -76,7 +77,9 @@ type Usuario = {
     setor: string;
 };
 
-const ESTOQUE_BASE = serviceUrl("estoque");
+// const ESTOQUE_BASE = serviceUrl("estoque");
+const ESTOQUE_BASE = "http://localhost:8000";
+
 const estoqueUrl = (path: string) =>
     `${ESTOQUE_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
@@ -158,6 +161,19 @@ function ContagemCard({
                         </span>
                     </div>
                 </div>
+                {contagem.piso !== undefined && (
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                        <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-500 dark:text-purple-400 shrink-0">
+                            <FaBox size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Piso</span>
+                            <span className="font-medium text-sm">
+                                {contagem.piso}
+                            </span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="p-4 pt-0 mt-auto">
@@ -180,6 +196,7 @@ export default function Tela() {
     // ===== Box superior (criar cotação) =====
     const [formularioAberto, setFormularioAberto] = useState(false);
     const [pedido, setPedido] = useState("");
+    const [piso, setPiso] = useState("");
     const [itensCotacao, setItensCotacao] = useState<CotacaoItem[]>([]);
     const [loadingCot, setLoadingCot] = useState(false);
     const [postingCot, setPostingCot] = useState(false);
@@ -321,6 +338,7 @@ export default function Tela() {
                     contagem: 1,
                     colaborador: usuario1?.nome,
                     contagem_cuid: contagem_cuid,
+                    piso: piso ? String(piso) : undefined,
                     produtos: produtosSelecionados,
                 };
 
@@ -340,6 +358,7 @@ export default function Tela() {
                     contagem: 2,
                     colaborador: usuario2?.nome,
                     contagem_cuid: contagem_cuid,
+                    piso: piso ? String(piso) : undefined,
                     produtos: produtosSelecionados,
                 };
 
@@ -359,6 +378,7 @@ export default function Tela() {
                     contagem: 3,
                     colaborador: usuario3?.nome,
                     contagem_cuid: contagem_cuid,
+                    piso: piso ? String(piso) : undefined,
                     produtos: produtosSelecionados,
                 };
 
@@ -602,7 +622,7 @@ export default function Tela() {
                             Nova Contagem
                         </h4>
 
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 mb-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Data Inicial
@@ -623,6 +643,19 @@ export default function Tela() {
                                     type="date"
                                     value={dataFinal}
                                     onChange={(e) => setDataFinal(e.target.value)}
+                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Piso
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ex: 1"
+                                    value={piso}
+                                    onChange={(e) => setPiso(e.target.value)}
                                     className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
                                 />
                             </div>
