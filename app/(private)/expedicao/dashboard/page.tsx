@@ -58,6 +58,7 @@ interface EntregaProcessada extends Entrega {
 const MAPA_ENTREGADORES: { [key: number]: string } = {
     18: "ALEX SILVA E SILVA",
     31: "FRANCISCO DOS SANTOS",
+    57: "JOÃO MORO",
 };
 
 const calcularDuracao = (inicio: string, fim: string): number => {
