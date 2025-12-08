@@ -88,8 +88,17 @@ function Card({
     default:
       priorityClasses = "bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/5 dark:text-white/80 dark:border-transparent";
   }
-  const dueDate = task.due ? new Date(task.due) : null;
-  const isOverdue = dueDate ? dueDate < new Date() : false;
+  // Fix timezone issue by parsing string directly
+  const dueDisplay = task.due ? task.due.split("-").reverse().slice(0, 2).join("/") : null;
+
+  // Calculate overdue based on local date string comparison
+  const isOverdue = React.useMemo(() => {
+    if (!task.due) return false;
+    const now = new Date();
+    // Format "YYYY-MM-DD" in local time
+    const localToday = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0') + "-" + String(now.getDate()).padStart(2, '0');
+    return task.due < localToday;
+  }, [task.due]);
 
   return (
     <motion.div
@@ -123,7 +132,7 @@ function Card({
 
       <div className="mt-3 flex items-center justify-between gap-2">
         <div>
-          {dueDate && (
+          {dueDisplay && (
             <span
               className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] leading-tight font-semibold border whitespace-nowrap
                 ${isOverdue
@@ -132,7 +141,7 @@ function Card({
                 }
               `}
             >
-              Prazo: {dueDate.toLocaleDateString("pt-BR").slice(0, 5)}
+              Prazo: {dueDisplay}
             </span>
           )}
         </div>
@@ -949,9 +958,7 @@ export default function Page() {
                           {taskForm.due && (
                             <li>
                               <span className="font-semibold">Prazo: </span>
-                              {new Date(taskForm.due).toLocaleDateString(
-                                "pt-BR"
-                              )}
+                              {taskForm.due.split("-").reverse().join("/")}
                             </li>
                           )}
                           <li>
