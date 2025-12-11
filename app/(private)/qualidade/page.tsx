@@ -93,7 +93,7 @@ export default function QualidadeHome() {
   }, [statusFilter]);
 
   return (
-    <div className="w-full space-y-6">
+    <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
       <FormModal
         open={novaGarantiaOpen}
         title="Nova Garantia"
@@ -106,21 +106,33 @@ export default function QualidadeHome() {
           onCancel={() => setNovaGarantiaOpen(false)}
         />
       </FormModal>
-      <PageHeader title="Central de Garantias" subtitle="Monitoramento dos processos">
-        <ActionButton
-          label="Nova Garantia"
-          icon={<MdAddCircleOutline size={18} />}
-          shape="rounded"
-          onClick={() => setNovaGarantiaOpen(true)}
-        />
-        <ActionButton
-          label="e-mail"
-          variant="ghost"
-          icon={<MdMailOutline size={18} />}
-          shape="rounded"
-          onClick={() => router.push("/qualidade/caixa")}
-        />
-      </PageHeader>
+
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-black dark:text-white">
+            <a href="/" className="hover:text-primary transition-colors">Intranet</a> / Central de Garantias
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Monitoramento dos processos
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <ActionButton
+            label="Nova Garantia"
+            icon={<MdAddCircleOutline size={18} />}
+            shape="rounded"
+            onClick={() => setNovaGarantiaOpen(true)}
+          />
+          <ActionButton
+            label="e-mail"
+            variant="ghost"
+            icon={<MdMailOutline size={18} />}
+            shape="rounded"
+            onClick={() => router.push("/qualidade/caixa")}
+          />
+        </div>
+      </div>
 
       <div
         className="bg-white dark:bg-boxdark rounded-xl border border-gray-100 dark:border-strokedark p-5 shadow-sm space-y-4"
@@ -237,7 +249,6 @@ export default function QualidadeHome() {
         )}
       </div>
 
-      {/* Pagination Controls */}
       {filtered.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-strokedark">
           <div className="text-sm text-gray-600 dark:text-gray-400">

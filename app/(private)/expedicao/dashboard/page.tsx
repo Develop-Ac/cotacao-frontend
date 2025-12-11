@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { serviceUrl } from '@/lib/services';
 import { Bar, Pie, Line } from 'react-chartjs-2';
+import { motion } from 'framer-motion';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -419,7 +420,13 @@ export default function EntregasPage() {
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3 2xl:gap-7.5 mb-6">
+            <motion.div
+                key={`kpis-${filteredData.length}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ease: 'easeOut', duration: 0.4 }}
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3 2xl:gap-7.5 mb-6"
+            >
                 <div className="rounded-xl border border-stroke bg-white p-6 shadow-md dark:border-strokedark dark:bg-boxdark flex items-center justify-between">
                     <div>
                         <h4 className="text-title-md font-bold text-black dark:text-white">
@@ -461,7 +468,7 @@ export default function EntregasPage() {
                         </svg>
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Filtros */}
             <div className="rounded-xl border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1 mb-6">
@@ -512,7 +519,13 @@ export default function EntregasPage() {
             </div>
 
             {/* Charts Grid */}
-            <div className="grid grid-cols-12 gap-4 md:gap-6 2xl:gap-7.5 mb-6">
+            <motion.div
+                key={`charts-${filteredData.length}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ease: 'easeOut', duration: 0.4, delay: 0.1 }}
+                className="grid grid-cols-12 gap-4 md:gap-6 2xl:gap-7.5 mb-6"
+            >
                 {/* Entregas por Dia */}
                 <div className="col-span-12 rounded-xl border border-stroke bg-white px-5 pt-7.5 pb-5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:col-span-12">
                     <h4 className="mb-2 text-xl font-semibold text-black dark:text-white">
@@ -613,10 +626,16 @@ export default function EntregasPage() {
                         />
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Gargalos Operacionais */}
-            <div className="rounded-xl border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1 mb-6">
+            <motion.div
+                key={`gargalos-${filteredData.length}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ease: 'easeOut', duration: 0.4, delay: 0.2 }}
+                className="rounded-xl border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1 mb-6"
+            >
                 <h4 className="mb-6 text-xl font-semibold text-black dark:text-white">
                     Gargalos Operacionais (Tempo Médio por Etapa)
                 </h4>
@@ -637,10 +656,16 @@ export default function EntregasPage() {
                         </div>
                     ))}
                 </div>
-            </div>
+            </motion.div>
 
             {/* Tabela de Médias por Entregador */}
-            <div className="rounded-xl border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1 mb-6">
+            <motion.div
+                key={`medias-${filteredData.length}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ease: 'easeOut', duration: 0.4, delay: 0.3 }}
+                className="rounded-xl border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1 mb-6"
+            >
                 <h4 className="mb-6 text-xl font-semibold text-black dark:text-white">
                     Médias por Entregador
                 </h4>
@@ -682,10 +707,16 @@ export default function EntregasPage() {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Tabela Detalhada */}
-            <div className="rounded-xl border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
+            <motion.div
+                key={`detalhada-${filteredData.length}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ease: 'easeOut', duration: 0.4, delay: 0.4 }}
+                className="rounded-xl border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-md dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1"
+            >
                 <h4 className="mb-6 text-xl font-semibold text-black dark:text-white">
                     Detalhamento de Entregas
                 </h4>
@@ -728,7 +759,7 @@ export default function EntregasPage() {
                         Mostrando 50 de {filteredData.length} registros
                     </p>
                 )}
-            </div>
+            </motion.div>
         </div>
     );
 }

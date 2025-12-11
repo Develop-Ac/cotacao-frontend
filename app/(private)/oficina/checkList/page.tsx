@@ -18,6 +18,7 @@ import {
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { serviceUrl } from "@/lib/services";
+import Link from "next/link";
 
 // ===============================
 // Tipos esperados da API
@@ -792,320 +793,322 @@ export default function ChecklistsList() {
   const pageSizes: (10 | 20 | 50)[] = [10, 20, 50];
 
   return (
-    <div className="main-panel min-h-screen text-black">
-      <div className="content-wrapper p-2">
-        {/* Page header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h3 className="text-2xl font-semibold mb-3 md:mb-0">Checklists (Oficina)</h3>
-          <div className="flex items-center gap-2">
-            {/* Recarregar */}
+    <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
+        <h2 className="text-3xl font-bold text-black dark:text-white">
+          <Link href="/" className="hover:text-primary transition-colors">Intranet</Link> / Checklist Oficina
+        </h2>
+
+        <div className="flex items-center gap-2">
+          {/* Recarregar */}
+          <button
+            onClick={fetchAll}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-meta-4 text-gray-700 dark:text-white border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-opacity-90 hover:border-gray-300 shadow-sm transition-all duration-200 disabled:opacity-50"
+            title="Recarregar do servidor"
+          >
+            <FaSync className={loading ? "animate-spin" : ""} size={18} />
+            <span className="text-sm font-medium">Atualizar</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Listagem */}
+      <div id="list" className="space-y-6">
+        {/* Filtros */}
+        <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex flex-1 gap-3 flex-wrap">
+            <input
+              type="text"
+              value={qOsInterna}
+              onChange={(e) => setQOSInterna(e.target.value)}
+              className="flex-1 min-w-[160px] h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+              placeholder="OS Interna"
+            />
+            <input
+              type="text"
+              value={qPlaca}
+              onChange={(e) => setQPlaca(e.target.value.toUpperCase().trim())}
+              className="flex-1 min-w-[140px] h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+              placeholder="Placa"
+            />
+            <input
+              type="date"
+              value={qDataDe}
+              onChange={(e) => setQDataDe(e.target.value)}
+              className="h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+              placeholder="Data De"
+            />
+            <input
+              type="date"
+              value={qDataAte}
+              onChange={(e) => setQDataAte(e.target.value)}
+              className="h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
+              placeholder="Data Até"
+            />
             <button
-              onClick={fetchAll}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-meta-4 text-gray-700 dark:text-white border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-opacity-90 hover:border-gray-300 shadow-sm transition-all duration-200 disabled:opacity-50"
-              title="Recarregar do servidor"
+              className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm"
+              onClick={onClear}
             >
-              <FaSync className={loading ? "animate-spin" : ""} size={18} />
-              <span className="text-sm font-medium">Atualizar</span>
+              Limpar filtros
             </button>
           </div>
-        </div>
 
-        {/* Listagem */}
-        <div id="list" className="space-y-6">
-          {/* Filtros */}
-          <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex flex-1 gap-3 flex-wrap">
-              <input
-                type="text"
-                value={qOsInterna}
-                onChange={(e) => setQOSInterna(e.target.value)}
-                className="flex-1 min-w-[160px] h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
-                placeholder="OS Interna"
-              />
-              <input
-                type="text"
-                value={qPlaca}
-                onChange={(e) => setQPlaca(e.target.value.toUpperCase().trim())}
-                className="flex-1 min-w-[140px] h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
-                placeholder="Placa"
-              />
-              <input
-                type="date"
-                value={qDataDe}
-                onChange={(e) => setQDataDe(e.target.value)}
-                className="h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
-                placeholder="Data De"
-              />
-              <input
-                type="date"
-                value={qDataAte}
-                onChange={(e) => setQDataAte(e.target.value)}
-                className="h-10 px-4 border border-gray-300 dark:border-form-strokedark rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white"
-                placeholder="Data Até"
-              />
+          {/* PageSize dropdown */}
+          <div className="flex items-center gap-2">
+            <div className="relative" ref={pageSizeRef}>
               <button
-                className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm"
-                onClick={onClear}
+                className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
+                aria-haspopup="listbox"
+                aria-expanded={pageSizeOpen}
+                onClick={() => setPageSizeOpen((v) => !v)}
               >
-                Limpar filtros
+                <span className="mr-1">{pageSize} itens</span>
+                <FaCaretDown />
               </button>
-            </div>
-
-            {/* PageSize dropdown */}
-            <div className="flex items-center gap-2">
-              <div className="relative" ref={pageSizeRef}>
-                <button
-                  className="bg-white dark:bg-meta-4 border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-opacity-90 h-10 px-4 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
-                  aria-haspopup="listbox"
-                  aria-expanded={pageSizeOpen}
-                  onClick={() => setPageSizeOpen((v) => !v)}
-                >
-                  <span className="mr-1">{pageSize} itens</span>
-                  <FaCaretDown />
-                </button>
-                {pageSizeOpen && (
-                  <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-lg shadow-xl z-10 overflow-hidden" role="listbox" tabIndex={-1}>
-                    {pageSizes.map((n) => (
-                      <button
-                        key={n}
-                        role="option"
-                        aria-selected={pageSize === (n as 10 | 20 | 50)}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-700 dark:text-gray-300 ${pageSize === n ? "bg-gray-50 dark:bg-meta-4 font-semibold" : ""
-                          }`}
-                        onClick={() => {
-                          setPageSize(n as 10 | 20 | 50);
-                          setPage(1);
-                          setPageSizeOpen(false);
-                        }}
-                      >
-                        {n} itens
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Info topo */}
-          <div className="text-sm text-gray-600 mb-2">
-            Registros carregados: <b>{rawItems.length}</b> · Filtrados: <b>{filtered.length}</b>
-            {!isDateRangeValid && <span className="ml-3 text-red-600">Intervalo de datas inválido.</span>}
-          </div>
-
-          {/* Grid de Cards */}
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white dark:bg-boxdark h-80 rounded-xl shadow-sm border border-gray-100 dark:border-strokedark animate-pulse"></div>
-              ))}
-            </div>
-          ) : paged.length === 0 ? (
-            <div className="text-center py-12 bg-white dark:bg-boxdark rounded-xl border border-dashed border-gray-300 dark:border-strokedark shadow-sm mb-6">
-              <p className="text-gray-500 dark:text-gray-400">Nenhum checklist encontrado.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-              {paged.map((row) => (
-                <ChecklistCard
-                  key={row.id}
-                  item={row}
-                  isAdmin={isAdmin}
-                  onView={openViewModal}
-                  onGallery={openGallery}
-                  onPdf={downloadChecklistPdf}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Paginação */}
-        {/* Pagination Controls */}
-        {filtered.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-strokedark mt-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Mostrando página <span className="font-semibold text-black dark:text-white">{page}</span> de <span className="font-semibold text-black dark:text-white">{totalPages}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                Anterior
-              </button>
-
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pNum = page;
-                  if (totalPages <= 5) {
-                    pNum = i + 1;
-                  } else if (page <= 3) {
-                    pNum = i + 1;
-                  } else if (page >= totalPages - 2) {
-                    pNum = totalPages - 4 + i;
-                  } else {
-                    pNum = page - 2 + i;
-                  }
-
-                  return (
+              {pageSizeOpen && (
+                <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-lg shadow-xl z-10 overflow-hidden" role="listbox" tabIndex={-1}>
+                  {pageSizes.map((n) => (
                     <button
-                      key={pNum}
-                      onClick={() => setPage(pNum)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${page === pNum
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                      key={n}
+                      role="option"
+                      aria-selected={pageSize === (n as 10 | 20 | 50)}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-700 dark:text-gray-300 ${pageSize === n ? "bg-gray-50 dark:bg-meta-4 font-semibold" : ""
                         }`}
+                      onClick={() => {
+                        setPageSize(n as 10 | 20 | 50);
+                        setPage(1);
+                        setPageSizeOpen(false);
+                      }}
                     >
-                      {pNum}
+                      {n} itens
                     </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                Próximo
-              </button>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+
+        {/* Info topo */}
+        <div className="text-sm text-gray-600 mb-2">
+          Registros carregados: <b>{rawItems.length}</b> · Filtrados: <b>{filtered.length}</b>
+          {!isDateRangeValid && <span className="ml-3 text-red-600">Intervalo de datas inválido.</span>}
+        </div>
+
+        {/* Grid de Cards */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-boxdark h-80 rounded-xl shadow-sm border border-gray-100 dark:border-strokedark animate-pulse"></div>
+            ))}
+          </div>
+        ) : paged.length === 0 ? (
+          <div className="text-center py-12 bg-white dark:bg-boxdark rounded-xl border border-dashed border-gray-300 dark:border-strokedark shadow-sm mb-6">
+            <p className="text-gray-500 dark:text-gray-400">Nenhum checklist encontrado.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+            {paged.map((row) => (
+              <ChecklistCard
+                key={row.id}
+                item={row}
+                isAdmin={isAdmin}
+                onView={openViewModal}
+                onGallery={openGallery}
+                onPdf={downloadChecklistPdf}
+              />
+            ))}
           </div>
         )}
       </div>
 
-      {/* ====== MODAL GALERIA ====== */}
-      {galleryOpen && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center" aria-modal="true" role="dialog">
-          {/* overlay */}
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeGallery} />
+      {/* Paginação */}
+      {/* Pagination Controls */}
+      {filtered.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-strokedark mt-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Mostrando página <span className="font-semibold text-black dark:text-white">{page}</span> de <span className="font-semibold text-black dark:text-white">{totalPages}</span>
+          </div>
 
-          {/* content */}
-          <div className="relative z-10 w-full max-w-5xl mx-4 rounded-xl bg-white dark:bg-boxdark shadow-2xl">
-            {/* header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-strokedark">
-              <div className="font-semibold text-black dark:text-white">
-                Galeria de fotos {galleryItems.length ? `(${galleryIndex + 1}/${galleryItems.length})` : ""}
-              </div>
-              <button
-                className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
-                onClick={closeGallery}
-                title="Fechar"
-              >
-                <FaTimes />
-              </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            >
+              Anterior
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pNum = page;
+                if (totalPages <= 5) {
+                  pNum = i + 1;
+                } else if (page <= 3) {
+                  pNum = i + 1;
+                } else if (page >= totalPages - 2) {
+                  pNum = totalPages - 4 + i;
+                } else {
+                  pNum = page - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pNum}
+                    onClick={() => setPage(pNum)}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${page === pNum
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                      }`}
+                  >
+                    {pNum}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* body */}
-            <div className="p-4">
-              {galleryLoading && <div className="py-16 text-center text-gray-600">Carregando imagens...</div>}
-              {galleryError && <div className="py-16 text-center text-red-600">{galleryError}</div>}
-
-              {!galleryLoading && !galleryError && galleryItems.length === 0 && (
-                <div className="py-16 text-center text-gray-600">Nenhuma imagem encontrada para este checklist.</div>
-              )}
-
-              {!galleryLoading && !galleryError && galleryItems.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                  {/* área da imagem com navegação lateral */}
-                  <div className="lg:col-span-8">
-                    <div className="relative w-full aspect-[4/3] bg-gray-50 dark:bg-meta-4 rounded-lg overflow-hidden flex items-center justify-center">
-                      {/* seta esquerda */}
-                      <button
-                        className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
-                        onClick={prevImage}
-                        title="Anterior"
-                      >
-                        <FaChevronLeft />
-                      </button>
-
-                      {/* imagem */}
-                      {galleryItems[galleryIndex]?.imageUrl ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={galleryItems[galleryIndex].imageUrl}
-                            alt="Avaria"
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </>
-                      ) : (
-                        <div className="text-gray-500">Carregando imagem...</div>
-                      )}
-
-                      {/* seta direita */}
-                      <button
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
-                        onClick={nextImage}
-                        title="Próxima"
-                      >
-                        <FaChevronRight />
-                      </button>
-                    </div>
-
-                    {/* mini navegação (pontos) */}
-                    {galleryItems.length > 1 && (
-                      <div className="mt-3 flex items-center justify-center gap-2">
-                        {galleryItems.map((_, i) => (
-                          <button
-                            key={i}
-                            className={`h-2.5 rounded-full transition-all ${i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"
-                              }`}
-                            onClick={() => setGalleryIndex(i)}
-                            aria-label={`Ir para imagem ${i + 1}`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* metadados + ações */}
-                  <div className="lg:col-span-4">
-                    <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3 bg-gray-50 dark:bg-meta-4">
-                      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Informações da avaria</div>
-                      <dl className="text-sm text-black dark:text-white">
-                        <dt className="font-semibold">Tipo</dt>
-                        <dd className="mb-2">{galleryItems[galleryIndex]?.tipo ?? "—"}</dd>
-
-                        <dt className="font-semibold">Peça</dt>
-                        <dd className="mb-2">{galleryItems[galleryIndex]?.peca ?? "—"}</dd>
-
-                        <dt className="font-semibold">Observações</dt>
-                        <dd className="mb-2 whitespace-pre-wrap break-words">
-                          {galleryItems[galleryIndex]?.observacoes ?? "—"}
-                        </dd>
-                      </dl>
-                    </div>
-
-                    <div className="mt-3">
-                      <button
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 w-full"
-                        onClick={downloadCurrentImage}
-                        title="Baixar esta imagem"
-                        disabled={!galleryItems[galleryIndex]?.imageUrl}
-                      >
-                        <FaDownload />
-                        Baixar imagem
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* footer */}
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-strokedark flex items-center justify-end gap-2">
-              <button className="h-10 px-4 rounded bg-gray-200 dark:bg-meta-4 hover:bg-gray-300 dark:hover:bg-opacity-90 text-black dark:text-white" onClick={closeGallery}>
-                Fechar
-              </button>
-            </div>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            >
+              Próximo
+            </button>
           </div>
         </div>
-      )
+      )}
+
+
+      {/* ====== MODAL GALERIA ====== */}
+      {
+        galleryOpen && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center" aria-modal="true" role="dialog">
+            {/* overlay */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeGallery} />
+
+            {/* content */}
+            <div className="relative z-10 w-full max-w-5xl mx-4 rounded-xl bg-white dark:bg-boxdark shadow-2xl">
+              {/* header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-strokedark">
+                <div className="font-semibold text-black dark:text-white">
+                  Galeria de fotos {galleryItems.length ? `(${galleryIndex + 1}/${galleryItems.length})` : ""}
+                </div>
+                <button
+                  className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+                  onClick={closeGallery}
+                  title="Fechar"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {/* body */}
+              <div className="p-4">
+                {galleryLoading && <div className="py-16 text-center text-gray-600">Carregando imagens...</div>}
+                {galleryError && <div className="py-16 text-center text-red-600">{galleryError}</div>}
+
+                {!galleryLoading && !galleryError && galleryItems.length === 0 && (
+                  <div className="py-16 text-center text-gray-600">Nenhuma imagem encontrada para este checklist.</div>
+                )}
+
+                {!galleryLoading && !galleryError && galleryItems.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                    {/* área da imagem com navegação lateral */}
+                    <div className="lg:col-span-8">
+                      <div className="relative w-full aspect-[4/3] bg-gray-50 dark:bg-meta-4 rounded-lg overflow-hidden flex items-center justify-center">
+                        {/* seta esquerda */}
+                        <button
+                          className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+                          onClick={prevImage}
+                          title="Anterior"
+                        >
+                          <FaChevronLeft />
+                        </button>
+
+                        {/* imagem */}
+                        {galleryItems[galleryIndex]?.imageUrl ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={galleryItems[galleryIndex].imageUrl}
+                              alt="Avaria"
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </>
+                        ) : (
+                          <div className="text-gray-500">Carregando imagem...</div>
+                        )}
+
+                        {/* seta direita */}
+                        <button
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+                          onClick={nextImage}
+                          title="Próxima"
+                        >
+                          <FaChevronRight />
+                        </button>
+                      </div>
+
+                      {/* mini navegação (pontos) */}
+                      {galleryItems.length > 1 && (
+                        <div className="mt-3 flex items-center justify-center gap-2">
+                          {galleryItems.map((_, i) => (
+                            <button
+                              key={i}
+                              className={`h-2.5 rounded-full transition-all ${i === galleryIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"
+                                }`}
+                              onClick={() => setGalleryIndex(i)}
+                              aria-label={`Ir para imagem ${i + 1}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* metadados + ações */}
+                    <div className="lg:col-span-4">
+                      <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3 bg-gray-50 dark:bg-meta-4">
+                        <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Informações da avaria</div>
+                        <dl className="text-sm text-black dark:text-white">
+                          <dt className="font-semibold">Tipo</dt>
+                          <dd className="mb-2">{galleryItems[galleryIndex]?.tipo ?? "—"}</dd>
+
+                          <dt className="font-semibold">Peça</dt>
+                          <dd className="mb-2">{galleryItems[galleryIndex]?.peca ?? "—"}</dd>
+
+                          <dt className="font-semibold">Observações</dt>
+                          <dd className="mb-2 whitespace-pre-wrap break-words">
+                            {galleryItems[galleryIndex]?.observacoes ?? "—"}
+                          </dd>
+                        </dl>
+                      </div>
+
+                      <div className="mt-3">
+                        <button
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 w-full"
+                          onClick={downloadCurrentImage}
+                          title="Baixar esta imagem"
+                          disabled={!galleryItems[galleryIndex]?.imageUrl}
+                        >
+                          <FaDownload />
+                          Baixar imagem
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* footer */}
+              <div className="px-4 py-3 border-t border-gray-200 dark:border-strokedark flex items-center justify-end gap-2">
+                <button className="h-10 px-4 rounded bg-gray-200 dark:bg-meta-4 hover:bg-gray-300 dark:hover:bg-opacity-90 text-black dark:text-white" onClick={closeGallery}>
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       }
 
       {/* ====== MODAL DE EDIÇÃO CHECKLIST ====== */}
@@ -1498,7 +1501,7 @@ export default function ChecklistsList() {
           </div>
         )
       }
-    </div>
+    </div >
 
   );
 }

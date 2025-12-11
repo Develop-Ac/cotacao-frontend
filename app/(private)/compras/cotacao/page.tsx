@@ -185,6 +185,8 @@ function PedidoCard({
   );
 }
 
+import Loading from "@/components/Loading";
+
 export default function Tela() {
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [pedido, setPedido] = useState("");
@@ -267,7 +269,7 @@ export default function Tela() {
   };
 
   const [pedidos, setPedidos] = useState<PedidoResumo[]>([]);
-  const [loadingPedidos, setLoadingPedidos] = useState(false);
+  const [loadingPedidos, setLoadingPedidos] = useState(true);
   const [msgPedidos, setMsgPedidos] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<number>(20);
   const [filterText, setFilterText] = useState("");
@@ -485,6 +487,10 @@ export default function Tela() {
       setFornMsg(null);
     }, 2000);
   };
+
+  if (loadingPedidos && pedidos.length === 0) {
+    return <Loading />;
+  }
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">

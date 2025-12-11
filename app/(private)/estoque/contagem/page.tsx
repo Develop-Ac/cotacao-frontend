@@ -454,7 +454,12 @@ export default function Tela() {
     );
     const [pageSize, setPageSize] = useState<number>(20);
     const [page, setPage] = useState(1);
+
     const [totalPages, setTotalPages] = useState(1);
+
+    // Filtros da listagem
+    const [filtroData, setFiltroData] = useState("");
+    const [filtroPiso, setFiltroPiso] = useState("");
 
     // ===== Estados do modal de logs =====
     const [modalLogsAberto, setModalLogsAberto] = useState(false);
@@ -467,10 +472,17 @@ export default function Tela() {
         setMsgContagensLista(null);
         setLoadingContagensLista(true);
         try {
+            const queryParams = new URLSearchParams({
+                page: String(page),
+                pageSize: String(pageSize),
+                empresa: "3" // Assumindo empresa fixa como nas outras chamadas
+            });
+
+            if (filtroData) queryParams.append("data", filtroData);
+            if (filtroPiso) queryParams.append("piso", filtroPiso);
+
             const res = await fetch(
-                `${estoqueUrl(
-                    "/estoque/contagem/lista"
-                )}?page=${page}&pageSize=${pageSize}`,
+                `${estoqueUrl("/estoque/contagem/lista")}?${queryParams.toString()}`,
                 { headers: { Accept: "application/json" } }
             );
 
@@ -496,7 +508,12 @@ export default function Tela() {
         } finally {
             setLoadingContagensLista(false);
         }
-    }, [page, pageSize]);
+    }, [page, pageSize, filtroData, filtroPiso]);
+
+    // Debounce para recarregar quando os filtros mudarem (opcional, ou recarregar no botão)
+    // Vou optar por recarregar no botão "Atualizar" ou quando mudar paginação.
+    // Se quiser recarregar ao mudar o filtro, adicione filtroData/filtroPiso no array de deps do useEffect abaixo.
+    // O usuário geralmente espera um botão "Filtrar" ou "Atualizar". O botão "Atualizar" já existe e chama `carregarContagensLista`.
 
     useEffect(() => {
         setPage(1);
@@ -895,9 +912,35 @@ export default function Tela() {
 
             {/* LISTAGEM INFERIOR (Cards) */}
             <div className="space-y-4">
-                <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                        Listagem de Contagens
+                <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full xl:w-auto">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">
+                            Listagem de Contagens
+                        </div>
+
+                        {/* Filtros */}
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <input
+                                type="date"
+                                className="h-9 rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input px-3 text-sm focus:ring-2 focus:ring-blue-500 text-black dark:text-white"
+                                value={filtroData}
+                                onChange={(e) => setFiltroData(e.target.value)}
+                                title="Filtrar por data"
+                            />
+                            <input
+                                type="text"
+                                placeholder="Piso"
+                                className="h-9 w-24 rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input px-3 text-sm focus:ring-2 focus:ring-blue-500 text-black dark:text-white"
+                                value={filtroPiso}
+                                onChange={(e) => setFiltroPiso(e.target.value)}
+                            />
+                            <button
+                                onClick={() => { setPage(1); carregarContagensLista(); }}
+                                className="h-9 px-3 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 text-sm font-medium transition-colors"
+                            >
+                                Filtrar
+                            </button>
+                        </div>
                     </div>
 
                     <select
@@ -919,7 +962,7 @@ export default function Tela() {
                 )}
 
                 {loadingContagensLista ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[...Array(4)].map((_, i) => (
                             <div
                                 key={i}
@@ -934,7 +977,7 @@ export default function Tela() {
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {contagensLista.map((item, idx) => (
                             <ContagemCard
                                 key={idx}

@@ -3,6 +3,7 @@
 
 import { useMemo, useState, useCallback, useRef } from "react";
 import { serviceUrl } from "@/lib/services";
+import Link from "next/link";
 
 type ApiItem = {
   id: string | number;
@@ -221,7 +222,7 @@ export default function ComparativoPage() {
           const e = await res.json();
           if (e?.error) emsg = e.error;
           else if (e?.message) emsg = e.message;
-        } catch {}
+        } catch { }
         throw new Error(emsg);
       }
       const data = await res.json();
@@ -267,10 +268,10 @@ export default function ComparativoPage() {
           typeof it.custo_fabrica === "number"
             ? it.custo_fabrica
             : it.custo_fabrica != null
-            ? parseMoney(it.custo_fabrica as any)
-            : it.preco_custo != null
-            ? (typeof it.preco_custo === "number" ? it.preco_custo : parseMoney(it.preco_custo as any))
-            : null;
+              ? parseMoney(it.custo_fabrica as any)
+              : it.preco_custo != null
+                ? (typeof it.preco_custo === "number" ? it.preco_custo : parseMoney(it.preco_custo as any))
+                : null;
 
         if (!map.has(pc)) {
           map.set(pc, {
@@ -365,7 +366,7 @@ export default function ComparativoPage() {
         try {
           const e = await res.json();
           if (e?.error) emsg = e.error;
-        } catch {}
+        } catch { }
         throw new Error(emsg);
       }
       const data: ApiResponseTodos = await res.json();
@@ -455,7 +456,7 @@ export default function ComparativoPage() {
           const e = await res.json();
           if (e?.error) emsg = e.error;
           else if (e?.message) emsg = e.message;
-        } catch {}
+        } catch { }
         throw new Error(emsg);
       }
 
@@ -491,26 +492,26 @@ export default function ComparativoPage() {
           cpf_cnpj: info?.cpf_cnpj ?? null,
           itens: Array.isArray(f.itens)
             ? f.itens.map((it: any): ApiItem => ({
-                id: it.id,
-                pro_codigo: it.pro_codigo,
-                pro_descricao: it.pro_descricao,
-                mar_descricao: it.mar_descricao ?? null,
-                referencia: it.referencia ?? null,
-                unidade: it.unidade ?? null,
-                quantidade: it.quantidade,
-                emissao: it.emissao,
-                valor_unitario: it.valor_unitario,
-                custo_fabrica:
-                  typeof it.custo_fabrica === "number"
-                    ? it.custo_fabrica
-                    : (parseMoney(it.custo_fabrica as any) ?? null),
-                preco_custo:
-                  it.preco_custo != null
-                    ? (typeof it.preco_custo === "number"
-                        ? it.preco_custo
-                        : parseMoney(it.preco_custo as any))
-                    : null,
-              }))
+              id: it.id,
+              pro_codigo: it.pro_codigo,
+              pro_descricao: it.pro_descricao,
+              mar_descricao: it.mar_descricao ?? null,
+              referencia: it.referencia ?? null,
+              unidade: it.unidade ?? null,
+              quantidade: it.quantidade,
+              emissao: it.emissao,
+              valor_unitario: it.valor_unitario,
+              custo_fabrica:
+                typeof it.custo_fabrica === "number"
+                  ? it.custo_fabrica
+                  : (parseMoney(it.custo_fabrica as any) ?? null),
+              preco_custo:
+                it.preco_custo != null
+                  ? (typeof it.preco_custo === "number"
+                    ? it.preco_custo
+                    : parseMoney(it.preco_custo as any))
+                  : null,
+            }))
             : [],
         };
       });
@@ -577,9 +578,9 @@ export default function ComparativoPage() {
       if (el) return { r: nr, c: nc };
 
       if ((dir === "left" && nc === 0) ||
-          (dir === "right" && nc === maxC) ||
-          (dir === "up" && nr === 0) ||
-          (dir === "down" && nr === maxR)) {
+        (dir === "right" && nc === maxC) ||
+        (dir === "up" && nr === 0) ||
+        (dir === "down" && nr === maxR)) {
         break;
       }
     }
@@ -595,8 +596,8 @@ export default function ComparativoPage() {
       e.preventDefault();
       const dir =
         e.key === "ArrowLeft" ? "left" :
-        e.key === "ArrowRight" ? "right" :
-        e.key === "ArrowUp" ? "up" : "down";
+          e.key === "ArrowRight" ? "right" :
+            e.key === "ArrowUp" ? "up" : "down";
       const next = findNext(r, c, dir);
       if (next) focusCell(next.r, next.c);
       return;
@@ -772,7 +773,7 @@ export default function ComparativoPage() {
           const e = await res.json();
           if (e?.error) emsg = e.error;
           else if (e?.message) emsg = e.message;
-        } catch {}
+        } catch { }
         throw new Error(emsg);
       }
       setSaveMsg({ type: "ok", text: "Itens salvos com sucesso!" });
@@ -784,90 +785,92 @@ export default function ComparativoPage() {
   };
 
   return (
-    <main className="min-h-screen text-gray-900">
-      <div className="mx-auto py-10">
-        <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Comparativo de Preços por Fornecedor</h1>
-            <p className="text-sm text-gray-500">
-              Inputs editáveis. Semente de quantidade só no(s) menor(es) preço(s) de cada linha.
-              Use ⬅️➡️⬆️⬇️, Enter/Shift+Enter e Tab/Shift+Tab para navegar. Clique no valor para editar.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:items-end">
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm">
-              <div className="flex items-center gap-3">
-                <span className="font-semibold">Selecionados:</span>
-                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
-                  {resumo.itens} {resumo.itens === 1 ? "item" : "itens"}
-                </span>
-                <span className="text-gray-400">•</span>
-                <span className="font-medium">Total: {fmtBRL(resumo.total)}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={salvar}
-                disabled={saving}
-                className={`h-10 rounded-lg px-4 text-white font-semibold transition
-                  ${saving ? "bg-gray-400 cursor-wait" : "bg-emerald-600 hover:bg-emerald-700"}`}
-                title="Enviar itens preenchidos"
-              >
-                {saving ? "Salvando..." : "Salvar"}
-              </button>
-              {saveMsg && (
-                <span className={`text-sm ${saveMsg.type === "ok" ? "text-emerald-700" : "text-red-700"}`}>
-                  {saveMsg.text}
-                </span>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Busca */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="Pedido de cotação (ex: 921)"
-              value={pedido}
-              onChange={(e) => setPedido(e.target.value.replace(/[^\d]/g, ""))}
-              className="h-11 w-full rounded-lg border border-gray-300 px-3 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 sm:max-w-xs"
-            />
-            <button
-              onClick={buscar}
-              disabled={loading || loadingSync || !pedido.trim()}
-              className={`h-11 rounded-lg px-4 text-white font-semibold transition
-                ${loading || loadingSync || !pedido.trim()
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-indigo-600 hover:bg-indigo-700"}`}
-            >
-              {loading ? "Buscando..." : "Buscar"}
-            </button>
-
-            <button
-              onClick={sincronizar}
-              disabled={loadingSync || loading || !pedido.trim()}
-              className={`h-11 rounded-lg px-4 text-white font-semibold transition
-                ${loadingSync || loading || !pedido.trim()
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-emerald-600 hover:bg-emerald-700"}`}
-            >
-              {loadingSync ? "Sincronizando..." : "Sincronizar"}
-            </button>
-
-            {pedidoCarregado && (
-              <span className="text-sm text-gray-600">Pedido carregado: {pedidoCarregado}</span>
-            )}
-          </div>
-          {msg && <p className="mt-3 text-sm text-gray-600">{msg}</p>}
+    <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-black dark:text-white">
+            <Link href="/" className="hover:text-primary transition-colors">Intranet</Link> / <Link href="/compras/cotacao" className="hover:text-primary transition-colors">Cotação</Link> / Comparativo
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Inputs editáveis. Semente de quantidade só no(s) menor(es) preço(s) de cada linha.
+            Use ⬅️➡️⬆️⬇️, Enter/Shift+Enter e Tab/Shift+Tab para navegar. Clique no valor para editar.
+          </p>
         </div>
 
-        {/* Tabela */}
-        {fornecedores.length > 0 && (
+        <div className="flex flex-col gap-2 sm:items-end">
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold">Selecionados:</span>
+              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
+                {resumo.itens} {resumo.itens === 1 ? "item" : "itens"}
+              </span>
+              <span className="text-gray-400">•</span>
+              <span className="font-medium">Total: {fmtBRL(resumo.total)}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={salvar}
+              disabled={saving}
+              className={`h-10 rounded-lg px-4 text-white font-semibold transition
+                  ${saving ? "bg-gray-400 cursor-wait" : "bg-emerald-600 hover:bg-emerald-700"}`}
+              title="Enviar itens preenchidos"
+            >
+              {saving ? "Salvando..." : "Salvar"}
+            </button>
+            {saveMsg && (
+              <span className={`text-sm ${saveMsg.type === "ok" ? "text-emerald-700" : "text-red-700"}`}>
+                {saveMsg.text}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Busca */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="Pedido de cotação (ex: 921)"
+            value={pedido}
+            onChange={(e) => setPedido(e.target.value.replace(/[^\d]/g, ""))}
+            className="h-11 w-full rounded-lg border border-gray-300 px-3 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 sm:max-w-xs"
+          />
+          <button
+            onClick={buscar}
+            disabled={loading || loadingSync || !pedido.trim()}
+            className={`h-11 rounded-lg px-4 text-white font-semibold transition
+                ${loading || loadingSync || !pedido.trim()
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700"}`}
+          >
+            {loading ? "Buscando..." : "Buscar"}
+          </button>
+
+          <button
+            onClick={sincronizar}
+            disabled={loadingSync || loading || !pedido.trim()}
+            className={`h-11 rounded-lg px-4 text-white font-semibold transition
+                ${loadingSync || loading || !pedido.trim()
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-emerald-600 hover:bg-emerald-700"}`}
+          >
+            {loadingSync ? "Sincronizando..." : "Sincronizar"}
+          </button>
+
+          {pedidoCarregado && (
+            <span className="text-sm text-gray-600">Pedido carregado: {pedidoCarregado}</span>
+          )}
+        </div>
+        {msg && <p className="mt-3 text-sm text-gray-600">{msg}</p>}
+      </div>
+
+      {/* Tabela */}
+      {
+        fornecedores.length > 0 && (
           <section className="mt-6 rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <h2 className="text-lg font-semibold">Comparativo</h2>
@@ -1036,113 +1039,118 @@ export default function ComparativoPage() {
               </table>
             </div>
           </section>
-        )}
-      </div>
+        )
+      }
+
 
       {/* ===== Modal de observações do fornecedor ===== */}
-      {obsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setObsOpen(false)} />
-          <div className="relative z-10 w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
-            <div className="mb-3 flex items-start justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">Observações do fornecedor</h3>
-                {obsTarget && (
-                  <p className="mt-1 text-sm text-gray-600">
-                    {obsTarget.for_nome} <span className="text-gray-500">#{obsTarget.for_codigo}</span> • Pedido {pedidoCarregado}
-                  </p>
+      {
+        obsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setObsOpen(false)} />
+            <div className="relative z-10 w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
+              <div className="mb-3 flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Observações do fornecedor</h3>
+                  {obsTarget && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      {obsTarget.for_nome} <span className="text-gray-500">#{obsTarget.for_codigo}</span> • Pedido {pedidoCarregado}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setObsOpen(false)}
+                  className="h-9 w-9 rounded-md hover:bg-gray-100"
+                  aria-label="Fechar"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="max-h-[60vh] overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+                {obsLoading && <div className="text-gray-600">Carregando...</div>}
+                {!obsLoading && obsError && (
+                  <div className="text-red-700">{obsError}</div>
+                )}
+                {!obsLoading && !obsError && (
+                  <ObservacaoContent data={obsData} />
                 )}
               </div>
-              <button
-                onClick={() => setObsOpen(false)}
-                className="h-9 w-9 rounded-md hover:bg-gray-100"
-                aria-label="Fechar"
-              >
-                ✕
-              </button>
-            </div>
 
-            <div className="max-h-[60vh] overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
-              {obsLoading && <div className="text-gray-600">Carregando...</div>}
-              {!obsLoading && obsError && (
-                <div className="text-red-700">{obsError}</div>
-              )}
-              {!obsLoading && !obsError && (
-                <ObservacaoContent data={obsData} />
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center justify-end">
-              <button
-                onClick={() => setObsOpen(false)}
-                className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-gray-700 hover:bg-gray-50"
-              >
-                Fechar
-              </button>
+              <div className="mt-4 flex items-center justify-end">
+                <button
+                  onClick={() => setObsOpen(false)}
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-gray-700 hover:bg-gray-50"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* ===== Modal de edição de preço ===== */}
-      {editOpen && editTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setEditOpen(false)} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
-            <div className="mb-3 flex items-start justify-between">
-              <h3 className="text-lg font-semibold">Editar valor</h3>
-              <button
-                onClick={() => setEditOpen(false)}
-                className="h-9 w-9 rounded-md hover:bg-gray-100"
-                aria-label="Fechar"
-              >
-                ✕
-              </button>
-            </div>
+      {
+        editOpen && editTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setEditOpen(false)} />
+            <div className="relative z-10 w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
+              <div className="mb-3 flex items-start justify-between">
+                <h3 className="text-lg font-semibold">Editar valor</h3>
+                <button
+                  onClick={() => setEditOpen(false)}
+                  className="h-9 w-9 rounded-md hover:bg-gray-100"
+                  aria-label="Fechar"
+                >
+                  ✕
+                </button>
+              </div>
 
-            <div className="space-y-2 text-sm text-gray-700">
-              <div><span className="font-semibold">Produto:</span> {editTarget.produto}</div>
-              <div><span className="font-semibold">Fornecedor:</span> {editTarget.fornecedor} <span className="text-gray-500">#{editTarget.for_codigo}</span></div>
-              <div><span className="font-semibold">Código:</span> {editTarget.pro_codigo}</div>
-            </div>
+              <div className="space-y-2 text-sm text-gray-700">
+                <div><span className="font-semibold">Produto:</span> {editTarget.produto}</div>
+                <div><span className="font-semibold">Fornecedor:</span> {editTarget.fornecedor} <span className="text-gray-500">#{editTarget.for_codigo}</span></div>
+                <div><span className="font-semibold">Código:</span> {editTarget.pro_codigo}</div>
+              </div>
 
-            <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Novo valor (R$)</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="any"
-                min={0}
-                autoFocus
-                value={editTarget.value ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setEditTarget((prev) => prev ? { ...prev, value: v === "" ? null : Number(v) } : prev);
-                }}
-                className="h-11 w-full rounded-lg border border-gray-300 px-3 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
-                placeholder="Ex.: 39.9"
-              />
-              <p className="mt-1 text-xs text-gray-500">Deixe em branco ou 0 para remover a edição e voltar ao valor original.</p>
-            </div>
+              <div className="mt-4">
+                <label className="mb-1 block text-sm font-medium text-gray-700">Novo valor (R$)</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min={0}
+                  autoFocus
+                  value={editTarget.value ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setEditTarget((prev) => prev ? { ...prev, value: v === "" ? null : Number(v) } : prev);
+                  }}
+                  className="h-11 w-full rounded-lg border border-gray-300 px-3 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                  placeholder="Ex.: 39.9"
+                />
+                <p className="mt-1 text-xs text-gray-500">Deixe em branco ou 0 para remover a edição e voltar ao valor original.</p>
+              </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setEditOpen(false)}
-                className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmEditPrice}
-                className="h-10 rounded-lg bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-700"
-              >
-                Confirmar
-              </button>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setEditOpen(false)}
+                  className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmEditPrice}
+                  className="h-10 rounded-lg bg-indigo-600 px-4 font-semibold text-white hover:bg-indigo-700"
+                >
+                  Confirmar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </main>
+        )
+      }
+    </div >
   );
 }
 

@@ -2,8 +2,10 @@
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   MdAdd,
+  MdArrowBack,
   MdAttachFile,
   MdBlock,
   MdCheckCircle,
@@ -1017,17 +1019,31 @@ export default function GarantiaDetalhePage() {
   ]);
 
   return (
-    <div className="w-full space-y-6">
-      <PageHeader
-        title={garantia ? `Garantia #${garantia.id}` : "Detalhes da Garantia"}
-        subtitle="Acompanhe as interações e atualize o processo"
-        onBack={() => router.back()}
-      />
+    <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 w-full space-y-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-black dark:text-white">
+            <Link href="/qualidade" className="hover:text-primary transition-colors">Qualidade</Link> / {garantia ? `Garantia #${garantia.id}` : "Detalhes"}
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Acompanhe as interações e atualize o processo
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <ActionButton
+            label="Voltar"
+            variant="ghost"
+            icon={<MdArrowBack size={18} />}
+            shape="rounded"
+            onClick={() => router.back()}
+          />
+        </div>
+      </div>
       {alterandoStatus && <p className="text-sm text-gray-500 dark:text-gray-400">Atualizando status...</p>}
       {loading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-32 rounded-3xl bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark animate-pulse" />
+            <div key={index} className="h-32 rounded-xl bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark animate-pulse" />
           ))}
         </div>
       ) : garantia ? (
@@ -1140,7 +1156,7 @@ export default function GarantiaDetalhePage() {
               value={mensagem}
               onChange={(event) => setMensagem(event.target.value)}
               placeholder="Descreva a atualização e ela será registrada neste processo."
-              className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-3 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
+              className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-3 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
             />
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <input
@@ -1154,7 +1170,7 @@ export default function GarantiaDetalhePage() {
               <button
                 type="button"
                 onClick={() => mensagemFileInputRef.current?.click()}
-                className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-meta-4 px-4 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                className="keep-color inline-flex items-center gap-2 w-fit rounded-xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-meta-4 px-4 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
               >
                 <MdAttachFile size={16} />
                 Anexar arquivos
@@ -1185,7 +1201,7 @@ export default function GarantiaDetalhePage() {
               onClick={handleAtualizacao}
               loading={enviando}
               disabled={!mensagem.trim() && mensagemAnexos.length === 0}
-              className="rounded-2xl px-6 py-3"
+              className="rounded-xl px-6 py-3"
             />
           </SectionCard>
 
@@ -1222,7 +1238,7 @@ export default function GarantiaDetalhePage() {
           </SectionCard>
         </div>
       ) : (
-        <div className="rounded-3xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark p-10 text-center space-y-3">
+        <div className="rounded-xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark p-10 text-center space-y-3">
           <p className="text-lg font-semibold text-gray-900 dark:text-white">Nenhum dado encontrado.</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">{error ?? "Tente atualizar para buscar novamente."}</p>
           <ActionButton label="Tentar novamente" icon={<MdRefresh size={18} />} onClick={carregar} />
@@ -1232,7 +1248,7 @@ export default function GarantiaDetalhePage() {
       {anexoViewerOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center" aria-modal="true" role="dialog">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeAnexoModal} />
-          <div className="relative z-10 w-full max-w-4xl mx-4 rounded-2xl bg-white dark:bg-boxdark shadow-2xl max-h-[90vh] flex flex-col border border-gray-100 dark:border-strokedark">
+          <div className="relative z-10 w-full max-w-4xl mx-4 rounded-xl bg-white dark:bg-boxdark shadow-2xl max-h-[90vh] flex flex-col border border-gray-100 dark:border-strokedark">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-strokedark">
               <div className="font-semibold text-gray-900 dark:text-white">
                 Visualizar anexos{" "}
@@ -1320,7 +1336,7 @@ export default function GarantiaDetalhePage() {
                     </div>
                     <button
                       type="button"
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-semibold text-white transition hover:bg-primary/90 disabled:opacity-60"
                       onClick={() => currentAnexo && handleDownloadAnexo(currentAnexo)}
                       disabled={downloadingCurrentAnexo}
                     >
@@ -1399,7 +1415,7 @@ export default function GarantiaDetalhePage() {
             value={anomaliaCfop}
             onChange={(event) => setAnomaliaCfop(event.target.value)}
             placeholder="CFOP *"
-            className="mt-4 w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-4 w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </FormModal>
@@ -1441,7 +1457,7 @@ export default function GarantiaDetalhePage() {
                 type="text"
                 value={aprovarCfop}
                 onChange={(event) => setAprovarCfop(event.target.value)}
-                className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </label>
           )}
@@ -1491,7 +1507,7 @@ export default function GarantiaDetalhePage() {
             value={concluirNf}
             onChange={(event) => setConcluirNf(event.target.value)}
             placeholder="Número da NF *"
-            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {garantia && NF_E_VALOR_REQUIRED_STATUS.has(garantia.status) && (
             <input
@@ -1499,7 +1515,7 @@ export default function GarantiaDetalhePage() {
               value={concluirValor}
               onChange={(event) => setConcluirValor(formatCurrencyMask(event.target.value))}
               placeholder="Valor (R$) *"
-              className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           )}
         </div>
@@ -1574,7 +1590,7 @@ export default function GarantiaDetalhePage() {
               </div>
 
               {envioFrete === "loja" ? (
-                <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3 text-sm text-gray-700 dark:text-white">
+                <div className="rounded-xl border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3 text-sm text-gray-700 dark:text-white">
                   <p className="font-semibold">Transportadora padrão ST</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Dados serão preenchidos automaticamente para a coleta.
@@ -1598,7 +1614,7 @@ export default function GarantiaDetalhePage() {
                         type="text"
                         value={codigoObjeto}
                         onChange={(event) => setCodigoObjeto(event.target.value)}
-                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </label>
                   ) : (
@@ -1608,7 +1624,7 @@ export default function GarantiaDetalhePage() {
                         placeholder="Transportadora *"
                         value={coletaForm.razao}
                         onChange={(event) => setColetaForm((prev) => ({ ...prev, razao: event.target.value }))}
-                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <div className="grid gap-3 md:grid-cols-2">
                         <input
@@ -1616,14 +1632,14 @@ export default function GarantiaDetalhePage() {
                           placeholder="CNPJ *"
                           value={coletaForm.cnpj}
                           onChange={(event) => setColetaForm((prev) => ({ ...prev, cnpj: event.target.value }))}
-                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <input
                           type="text"
                           placeholder="I.E. (opcional)"
                           value={coletaForm.ie}
                           onChange={(event) => setColetaForm((prev) => ({ ...prev, ie: event.target.value }))}
-                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <input
@@ -1631,7 +1647,7 @@ export default function GarantiaDetalhePage() {
                         placeholder="Endereço *"
                         value={coletaForm.endereco}
                         onChange={(event) => setColetaForm((prev) => ({ ...prev, endereco: event.target.value }))}
-                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <div className="grid gap-3 md:grid-cols-2">
                         <input
@@ -1639,14 +1655,14 @@ export default function GarantiaDetalhePage() {
                           placeholder="Cidade *"
                           value={coletaForm.cidade}
                           onChange={(event) => setColetaForm((prev) => ({ ...prev, cidade: event.target.value }))}
-                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <input
                           type="text"
                           placeholder="UF *"
                           value={coletaForm.uf}
                           onChange={(event) => setColetaForm((prev) => ({ ...prev, uf: event.target.value.toUpperCase() }))}
-                          className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <input
@@ -1654,14 +1670,14 @@ export default function GarantiaDetalhePage() {
                         placeholder="Código de coleta/envio (opcional)"
                         value={coletaForm.codigo}
                         onChange={(event) => setColetaForm((prev) => ({ ...prev, codigo: event.target.value }))}
-                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <textarea
                         rows={3}
                         placeholder="Observações (opcional)"
                         value={coletaForm.obs}
                         onChange={(event) => setColetaForm((prev) => ({ ...prev, obs: event.target.value }))}
-                        className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   )}
@@ -1690,7 +1706,7 @@ export default function GarantiaDetalhePage() {
             value={notaNumero}
             onChange={(event) => setNotaNumero(event.target.value)}
             placeholder="Número da NF *"
-            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <div className="mt-4 flex flex-col gap-2 text-sm">
             <span className="font-semibold text-gray-500 dark:text-gray-400">Comprovantes (opcional)</span>
@@ -1706,7 +1722,7 @@ export default function GarantiaDetalhePage() {
             <button
               type="button"
               onClick={() => notaFileInputRef.current?.click()}
-              className="keep-color inline-flex items-center gap-2 w-fit rounded-2xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-meta-4 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+              className="keep-color inline-flex items-center gap-2 w-fit rounded-xl border border-dashed border-gray-300 dark:border-strokedark bg-white dark:bg-meta-4 px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
             >
               <MdAttachFile size={16} />
               Escolher arquivo
@@ -1789,7 +1805,7 @@ export default function GarantiaDetalhePage() {
             value={dataEnvioInput}
             onChange={(event) => setDataEnvioInput(formatDateMask(event.target.value))}
             placeholder="Data (dd/mm/aaaa)"
-            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </FormModal>
@@ -1812,7 +1828,7 @@ export default function GarantiaDetalhePage() {
             value={valorCreditoInput}
             onChange={(event) => setValorCreditoInput(formatCurrencyMask(event.target.value))}
             placeholder="Valor (R$)"
-            className="w-full rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </FormModal>
@@ -1857,7 +1873,7 @@ export default function GarantiaDetalhePage() {
               </p>
               <div className="space-y-3">
                 {abaterRows.map((row, index) => (
-                  <div key={index} className="rounded-2xl border border-gray-200 dark:border-strokedark p-3 space-y-2 relative">
+                  <div key={index} className="rounded-xl border border-gray-200 dark:border-strokedark p-3 space-y-2 relative">
                     <div className="grid gap-3 md:grid-cols-2">
                       <input
                         type="text"
@@ -1866,7 +1882,7 @@ export default function GarantiaDetalhePage() {
                         onChange={(event) =>
                           setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, nf: event.target.value } : item)))
                         }
-                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <input
                         type="text"
@@ -1875,7 +1891,7 @@ export default function GarantiaDetalhePage() {
                         onChange={(event) =>
                           setAbaterRows((prev) => prev.map((item, idx) => (idx === index ? { ...item, parcela: event.target.value } : item)))
                         }
-                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <input
                         type="text"
@@ -1888,7 +1904,7 @@ export default function GarantiaDetalhePage() {
                             ),
                           )
                         }
-                        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <input
                         type="text"

@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { serviceUrl } from "@/lib/services";
 import Alert from "@/components/Alert";
+import Link from "next/link";
 
 const COMPRAS_API = serviceUrl("compras");
 const comprasUrl = (path: string) => `${COMPRAS_API}/compras${path}`;
@@ -313,10 +314,12 @@ export default function Tela() {
   }, [pedidosFiltrados, page, pageSize]);
 
   return (
-    <div className="text-gray-900 dark:text-white space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Listagem de Pedido</h1>
+          <h2 className="text-3xl font-bold text-black dark:text-white">
+            <Link href="/" className="hover:text-primary transition-colors">Intranet</Link> / <Link href="/compras/cotacao" className="hover:text-primary transition-colors">Cotação</Link> / Pedido
+          </h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie Seus Pedidos</p>
         </div>
 
