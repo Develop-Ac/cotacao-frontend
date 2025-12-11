@@ -593,7 +593,7 @@ export default function GarantiaDetalhePage() {
       } catch {
         // segue mesmo se falhar o registro
       }
-      await updateStatus(STATUS_CODES.concluida, { numero_nf_credito: nf, valor_credito_utilizado: valor });
+      await updateStatus(STATUS_CODES.concluida, { nf_abatida_boleto: nf, valor_credito_utilizado: valor });
       setConcluirVisible(false);
       return;
     }
@@ -800,7 +800,7 @@ export default function GarantiaDetalhePage() {
         await updateStatus(garantia.status, {
           abatimentos: linhas,
           valor_credito_utilizado: novoUtilizado,
-          numero_nf_credito: linhas[0]?.nf,
+          nf_abatida_boleto: linhas[0]?.nf,
         });
         setAbaterCreditoVisible(false);
         setAbaterNf("");
@@ -837,7 +837,7 @@ export default function GarantiaDetalhePage() {
       });
       await updateStatus(garantia.status, {
         valor_credito_utilizado: novoUtilizado,
-        numero_nf_credito: nf,
+        nf_abatida_boleto: nf,
       });
       setAbaterCreditoVisible(false);
       setAbaterNf("");
@@ -890,7 +890,7 @@ export default function GarantiaDetalhePage() {
       }
     }
     if (liberarStatus !== STATUS_CODES.abatimentoEmBoleto && nfInformada) {
-      payload.numero_nf_credito = nfInformada;
+      payload.nf_abatida_boleto = nfInformada;
     }
     await updateStatus(liberarStatus, Object.keys(payload).length > 0 ? payload : undefined);
     setLiberarVisible(false);
