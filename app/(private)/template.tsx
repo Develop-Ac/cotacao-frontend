@@ -7,16 +7,20 @@ import { ImSpinner8 } from "react-icons/im";
 
 export default function Template({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+
+    return <InnerTemplate key={pathname}>{children}</InnerTemplate>;
+}
+
+function InnerTemplate({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        setIsLoading(true);
         const timer = setTimeout(() => {
             setIsLoading(false);
         }, 1000);
 
         return () => clearTimeout(timer);
-    }, [pathname]);
+    }, []);
 
     if (isLoading) {
         return (
