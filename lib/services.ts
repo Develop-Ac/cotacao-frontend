@@ -11,7 +11,7 @@ type ServiceKey =
 
 const FALLBACKS: Record<ServiceKey, string> = {
   compras: "http://compras-service.acacessorios.local",
-  estoque: "http://estoque-service.acacessorios.local",
+  estoque: "http://localhost:8000",
   expedicao: "http://expedicao-service.acacessorios.local",
   oficina: "http://oficina-service.acacessorios.local",
   sac: "http://sac-service.acacessorios.local",
@@ -35,15 +35,11 @@ const envNames: Record<ServiceKey, string> = {
 
 const sanitize = (value?: string | null) => value?.trim().replace(/\/+$/, "");
 
-const serviceBases = Object.keys(FALLBACKS).reduce(
-  (acc, key) => {
-    const typed = key as ServiceKey;
-    const envValue = process.env[envNames[typed]];
-    acc[typed] = sanitize(envValue) || FALLBACKS[typed];
-    return acc;
-  },
-  {} as Record<ServiceKey, string>,
-);
+export const getServiceBase = (service: ServiceKey) => {
+  const envName = envNames[service];
+  const envValue = process.env[envName];
+  return sanitize(envValue) || FALLBACKS[service];
+};
 
 const join = (base: string, path?: string) => {
   if (!path) return base;
@@ -51,5 +47,4 @@ const join = (base: string, path?: string) => {
   return `${base}${normalized}`;
 };
 
-export const getServiceBase = (service: ServiceKey) => serviceBases[service];
 export const serviceUrl = (service: ServiceKey, path?: string) => join(getServiceBase(service), path);
