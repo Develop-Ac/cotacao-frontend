@@ -424,6 +424,15 @@ export default function Tela() {
                 case "BOX":
                     passaLocalizacao = localizacao.startsWith("BOX");
                     break;
+                case "A-BOX":
+                    passaLocalizacao = localizacao.startsWith("A-BOX");
+                    break;
+                case "A-BOQUETA":
+                    passaLocalizacao = localizacao.startsWith("A-BOQUETA");
+                    break;
+                case "A-CX ESCADA":
+                    passaLocalizacao = localizacao.startsWith("A-CX ESCADA");
+                    break;
                 case "VITRINE":
                     passaLocalizacao =
                         localizacao === "VITRINE" || /^V\d/.test(localizacao);
@@ -536,109 +545,101 @@ export default function Tela() {
         setModalLogsAberto(true);
         setLoadingLogs(true);
         setLogsGroupData({});
+        setLogsDetalhes([]); // Limpa antes de carregar
 
         try {
-            // 1. Carregar logs da contagem atual
-            let logsAtuais: any[] = [];
-            let itensAtuais: any[] = (contagem as any).itens || []; // Access items if available
-            if ((contagem as any).logs) {
-                logsAtuais = (contagem as any).logs;
-            } else {
-                const res = await fetch(
-                    `${estoqueUrl(`/estoque/contagem/logs/${contagem.id}`)}`,
-                    { headers: { Accept: "application/json" } }
-                );
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                logsAtuais = data.logs || [];
-            }
+            // NOVA LÓGICA: Buscar logs AGREGADOS diretamente do backend.
+            // O backend agora cruza todos os identificadores de item e traz TUDO.
+            const res = await fetch(
+                `${estoqueUrl(`/estoque/contagem/logs-agregados/${contagem.id}`)}`,
+                { headers: { Accept: "application/json" } }
+            );
 
-            // AGREGAR LOGS (Unique Rows por Produto)
-            // Soma 'contado' de todas as entradas do mesmo produto nesta contagem
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            // O backend retorna uma lista plana de logs
+            const allLogs = await res.json();
+
+            // 1. Popular o Mapa de Detalhes (Sub-Modal)
+            // Mapa: ProdutoID -> { r1: { total: 0, locais: [] }, r2: { total: 0, locais: [] } }
+            const groupMap: Record<number, any> = {};
+
+            // 2. Preparar logs para a tabela principal (apenas da rodada atual)
+            let logsDaRodadaAtual: any[] = [];
+            const rodadaAtual = contagem.contagem;
+
+            allLogs.forEach((log: any) => {
+                const codProd = log.item?.cod_produto ? Number(log.item.cod_produto) : null;
+                if (!codProd) return;
+
+                // --- Popular GroupMap (Detalhes) ---
+                if (!groupMap[codProd]) {
+                    groupMap[codProd] = {
+                        r1: { total: 0, locais: [] },
+                        r2: { total: 0, locais: [] },
+                        r3: { total: 0, locais: [] }
+                    };
+                }
+
+                const qtd = log.contado || 0;
+                const loc = log.item?.localizacao || 'N/D';
+                const usuario = log.usuario?.nome || 'Desc.';
+                const logRound = log.contagem?.contagem || 1; // Backend traz isso no include
+                const detalheStr = `${loc} (${usuario}): ${qtd}`;
+
+                const rKey = `r${logRound}`;
+                // Só adiciona ao detalhe se a rodada for menor ou igual a atual (histórico)
+                if (logRound <= rodadaAtual && groupMap[codProd][rKey]) {
+                    groupMap[codProd][rKey].total += qtd;
+                    groupMap[codProd][rKey].locais.push(detalheStr);
+                }
+
+                // --- Filtrar para Tabela Principal ---
+                // Na tabela, mostramos a SOMA do que foi contado NA RODADA ATUAL
+                if (logRound === rodadaAtual) {
+                    logsDaRodadaAtual.push(log);
+                }
+            });
+
+
+
+            // --- Ordenar detalhes (locais) alfabeticamente ---
+            Object.keys(groupMap).forEach(key => {
+                const cod = Number(key);
+                ['r1', 'r2', 'r3'].forEach(rKey => {
+                    if (groupMap[cod][rKey] && groupMap[cod][rKey].locais) {
+                        groupMap[cod][rKey].locais.sort((a: string, b: string) => a.localeCompare(b));
+                    }
+                });
+            });
+
+            setLogsGroupData(groupMap);
+
+            // 3. AGREGAR LOGS para a Tabela Principal (Unique Rows por Produto)
+            // Soma 'contado' de todas as entradas do mesmo produto nesta rodada
             const logsMap = new Map<number, any>();
 
-            logsAtuais.forEach((log: any) => {
+            logsDaRodadaAtual.forEach((log: any) => {
                 const cod = log.item?.cod_produto ? Number(log.item.cod_produto) : null;
                 if (!cod) return;
 
                 if (!logsMap.has(cod)) {
-                    // Tenta achar localização cruzando log.item_id com itensAtuais
-                    const itemReal = itensAtuais.find(i => i.id === log.item_id);
-                    const localizacao = itemReal?.localizacao || log.item?.localizacao || '-';
-
                     logsMap.set(cod, {
                         ...log,
-                        localizacao,
                         contado: 0 // Reset para somar
                     });
                 }
 
                 const entry = logsMap.get(cod);
                 entry.contado += (log.contado || 0);
-                // Mantemos o estoque do primeiro registro (deve ser igual)
             });
 
-            const logsAgregados = Array.from(logsMap.values());
+            // Converte Map para Array e ordena por descrição
+            const logsAgregados = Array.from(logsMap.values()).sort((a, b) =>
+                (a.item?.desc_produto || '').localeCompare(b.item?.desc_produto || '')
+            );
+
             setLogsDetalhes(logsAgregados);
-
-            // 2. Buscar dados do GRUPO para o Sub-Modal (Detalhes)
-            if (contagem.contagem_cuid) {
-                const resGrupo = await fetch(
-                    `${estoqueUrl(`/estoque/contagem/grupo/${contagem.contagem_cuid}`)}?empresa=3`,
-                    { headers: { Accept: "application/json" } }
-                );
-
-                if (resGrupo.ok) {
-                    const grupoContagens: ContagemListaItem[] = await resGrupo.json();
-
-                    // Mapa: ProdutoID -> { r1: { total: 0, locais: [] }, r2: { total: 0, locais: [] } }
-                    const groupMap: Record<number, any> = {};
-
-                    const promisesLogs = grupoContagens.map(c =>
-                        fetch(`${estoqueUrl(`/estoque/contagem/logs/${c.id}`)}`, { headers: { Accept: "application/json" } })
-                            .then(r => r.ok ? r.json() : { logs: [] })
-                            .then(d => ({ ...c, logs: d.logs || [] }))
-                    );
-
-                    const contagensComLogs = await Promise.all(promisesLogs);
-
-                    contagensComLogs.forEach(c => {
-                        const round = c.contagem;
-                        // Mágica do filtro: se a rodada do loop for MAIOR que a rodada atual que estou vendo, ignora.
-                        // Ex: Vendo Round 1, ignora Round 2 e 3.
-                        if (round > contagem.contagem) return;
-
-                        const logs = c.logs || [];
-
-                        logs.forEach((log: any) => {
-                            const codProd = log.item?.cod_produto ? Number(log.item.cod_produto) : null;
-                            if (!codProd) return;
-
-                            if (!groupMap[codProd]) {
-                                groupMap[codProd] = {
-                                    r1: { total: 0, locais: [] },
-                                    r2: { total: 0, locais: [] }
-                                };
-                            }
-
-                            const qtd = log.contado || 0;
-                            const itemReal = c.itens?.find((i: any) => i.id === log.item_id);
-                            const loc = itemReal?.localizacao || log.item?.localizacao || 'N/D';
-                            const usuario = c.usuario?.nome || 'Desc.';
-                            const detalheStr = `${loc} (${usuario}): ${qtd}`;
-
-                            if (round === 1) {
-                                groupMap[codProd].r1.total += qtd;
-                                groupMap[codProd].r1.locais.push(detalheStr);
-                            } else if (round === 2) {
-                                groupMap[codProd].r2.total += qtd;
-                                groupMap[codProd].r2.locais.push(detalheStr);
-                            }
-                        });
-                    });
-                    setLogsGroupData(groupMap);
-                }
-            }
 
         } catch (error) {
             console.error("Erro ao carregar logs:", error);
@@ -809,7 +810,10 @@ export default function Tela() {
                                                 <option value="PISO_B">PISO B</option>
                                                 <option value="PISO_C">PISO C</option>
                                                 <option value="VITRINE">VITRINE</option>
-                                                <option value="BOX">BOX</option>
+                                                <option value="BOX">BOX (Antigo)</option>
+                                                <option value="A-BOX">A-BOX</option>
+                                                <option value="A-BOQUETA">A-BOQUETA</option>
+                                                <option value="A-CX ESCADA">A-CX ESCADA</option>
                                                 <option value="VENDA CASADA">VENDA CASADA</option>
                                             </select>
                                         </div>

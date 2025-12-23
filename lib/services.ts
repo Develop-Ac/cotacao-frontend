@@ -11,7 +11,7 @@ type ServiceKey =
 
 const FALLBACKS: Record<ServiceKey, string> = {
   compras: "http://compras-service.acacessorios.local",
-  estoque: "http://estoque-service.acacessorios.local/",
+  estoque: "http://localhost:8000",
   expedicao: "http://expedicao-service.acacessorios.local",
   oficina: "http://oficina-service.acacessorios.local",
   sac: "http://sac-service.acacessorios.local",
