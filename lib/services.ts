@@ -7,6 +7,7 @@ type ServiceKey =
   | "sistema"
   | "metabase"
   | "qualidade"
+  | "calculadoraSt"
   | "atendimentoLog";
 
 const FALLBACKS: Record<ServiceKey, string> = {
@@ -18,6 +19,7 @@ const FALLBACKS: Record<ServiceKey, string> = {
   sistema: "http://sistema-service.acacessorios.local",
   metabase: "http://bi.acacessorios.local",
   qualidade: "http://garantia-service.acacessorios.local/api",
+  calculadoraSt: "http://localhost:3001/api",
   atendimentoLog: "http://atendimento-log.acacessorios.com.br",
 };
 
@@ -30,6 +32,7 @@ const envNames: Record<ServiceKey, string> = {
   sistema: "NEXT_PUBLIC_SISTEMA_SERVICE_BASE",
   metabase: "NEXT_PUBLIC_METABASE_BASE",
   qualidade: "NEXT_PUBLIC_QUALIDADE_API_BASE",
+  calculadoraSt: "NEXT_PUBLIC_CALCULADORA_ST_BASE",
   atendimentoLog: "NEXT_PUBLIC_ATENDIMENTO_LOG_URL",
 };
 
