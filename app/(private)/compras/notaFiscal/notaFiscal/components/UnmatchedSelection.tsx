@@ -2,7 +2,7 @@
 
 import { StCalculationResult } from "@/types/icms";
 import { useState } from "react";
-import { FaCheckSquare, FaSquare, FaExclamationTriangle, FaArrowRight, FaTrash } from "react-icons/fa";
+import { FaCheckSquare, FaSquare, FaExclamationTriangle, FaArrowRight } from "react-icons/fa";
 
 type Props = {
     unmatchedItems: StCalculationResult[];
