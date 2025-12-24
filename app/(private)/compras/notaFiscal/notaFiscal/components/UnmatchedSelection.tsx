@@ -41,7 +41,7 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
 
             <p className="mb-6 text-gray-600 dark:text-gray-300">
                 Os seguintes produtos não possuem MVA cadastrado na referência (Portaria 195).
-                Selecione abaixo os que você deseja <b>incluir no relatório</b> mesmo sem cálculo de ST (aparecerão como "NCM s/ Ref").
+                Selecione abaixo os que você deseja <b>incluir no relatório</b> mesmo sem cálculo de ST (aparecerão como &quot;NCM s/ Ref&quot;).
                 Os não selecionados serão descartados desta análise.
             </p>
 
