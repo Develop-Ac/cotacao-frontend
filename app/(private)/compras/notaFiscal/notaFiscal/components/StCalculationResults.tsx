@@ -1,5 +1,6 @@
 "use client";
 
+import { serviceUrl } from "@/lib/services";
 import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
 import { useMemo, useState, useEffect } from "react";
 import { FaExclamationTriangle, FaCheckCircle, FaMoneyBillWave, FaCalculator, FaArrowLeft, FaFilePdf, FaFileArchive, FaCheckSquare, FaSquare } from "react-icons/fa";
@@ -30,7 +31,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
             if (item.XML_COMPLETO) {
                 setGenerating(true);
                 // Use relative URL or env var
-                fetch('http://localhost:3001/api/icms/danfe', {
+                fetch(`${serviceUrl("calculadoraSt")}/icms/danfe`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ xml: item.XML_COMPLETO })
@@ -56,7 +57,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 .filter(i => i.XML_COMPLETO)
                 .map(i => ({ xml: i.XML_COMPLETO!, chave: i.CHAVE_NFE }));
 
-            const res = await fetch('http://localhost:3001/api/icms/danfe/batch', {
+            const res = await fetch(`${serviceUrl("calculadoraSt")}/icms/danfe/batch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ invoices })
@@ -167,7 +168,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
         });
 
         try {
-            const res = await fetch("http://localhost:3001/api/icms/payment-status", {
+            const res = await fetch(`${serviceUrl("calculadoraSt")}/icms/payment-status`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
