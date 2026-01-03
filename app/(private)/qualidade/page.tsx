@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MdAddCircleOutline, MdMailOutline, MdRefresh, MdSearch, MdFilterList } from "react-icons/md";
 import { QualidadeApi } from "@/lib/qualidade/api";
 import { Garantia } from "@/lib/qualidade/types";
@@ -109,8 +110,9 @@ export default function QualidadeHome() {
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
+
           <h2 className="text-3xl font-bold text-black dark:text-white">
-            <a href="/" className="hover:text-primary transition-colors">Intranet</a> / Central de Garantias
+            <Link href="/" className="hover:text-primary transition-colors">Intranet</Link> / Central de Garantias
           </h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
             Monitoramento dos processos

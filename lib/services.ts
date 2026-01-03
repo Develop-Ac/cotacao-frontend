@@ -7,17 +7,19 @@ type ServiceKey =
   | "sistema"
   | "metabase"
   | "qualidade"
+  | "calculadoraSt"
   | "atendimentoLog";
 
 const FALLBACKS: Record<ServiceKey, string> = {
   compras: "http://compras-service.acacessorios.local",
-  estoque: "http://estoque-service.acacessorios.local",
+  estoque: "http://estoque-service.acacessorios.local/",
   expedicao: "http://expedicao-service.acacessorios.local",
   oficina: "http://oficina-service.acacessorios.local",
   sac: "http://sac-service.acacessorios.local",
   sistema: "http://sistema-service.acacessorios.local",
   metabase: "http://bi.acacessorios.local",
   qualidade: "http://garantia-service.acacessorios.local/api",
+  calculadoraSt: "http://calculadora-st-service.acacessorios.local/api",
   atendimentoLog: "http://atendimento-log.acacessorios.com.br",
 };
 
@@ -30,20 +32,17 @@ const envNames: Record<ServiceKey, string> = {
   sistema: "NEXT_PUBLIC_SISTEMA_SERVICE_BASE",
   metabase: "NEXT_PUBLIC_METABASE_BASE",
   qualidade: "NEXT_PUBLIC_QUALIDADE_API_BASE",
+  calculadoraSt: "NEXT_PUBLIC_CALCULADORA_ST_BASE",
   atendimentoLog: "NEXT_PUBLIC_ATENDIMENTO_LOG_URL",
 };
 
 const sanitize = (value?: string | null) => value?.trim().replace(/\/+$/, "");
 
-const serviceBases = Object.keys(FALLBACKS).reduce(
-  (acc, key) => {
-    const typed = key as ServiceKey;
-    const envValue = process.env[envNames[typed]];
-    acc[typed] = sanitize(envValue) || FALLBACKS[typed];
-    return acc;
-  },
-  {} as Record<ServiceKey, string>,
-);
+export const getServiceBase = (service: ServiceKey) => {
+  const envName = envNames[service];
+  const envValue = process.env[envName];
+  return sanitize(envValue) || FALLBACKS[service];
+};
 
 const join = (base: string, path?: string) => {
   if (!path) return base;
@@ -51,5 +50,4 @@ const join = (base: string, path?: string) => {
   return `${base}${normalized}`;
 };
 
-export const getServiceBase = (service: ServiceKey) => serviceBases[service];
 export const serviceUrl = (service: ServiceKey, path?: string) => join(getServiceBase(service), path);

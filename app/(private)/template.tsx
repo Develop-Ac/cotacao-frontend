@@ -1,8 +1,41 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { ImSpinner8 } from "react-icons/im";
 
 export default function Template({ children }: { children: React.ReactNode }) {
+    const pathname = usePathname();
+
+    return <InnerTemplate key={pathname}>{children}</InnerTemplate>;
+}
+
+function InnerTemplate({ children }: { children: React.ReactNode }) {
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    if (isLoading) {
+        return (
+            <div className="w-full h-full min-h-[calc(100vh-100px)] flex items-center justify-center">
+                <motion.div
+                    initial={{ rotate: 0 }}
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                >
+                    <ImSpinner8 className="text-4xl text-primary-600" />
+                </motion.div>
+            </div>
+        );
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}

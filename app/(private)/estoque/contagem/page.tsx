@@ -11,6 +11,7 @@ import {
     FaSync,
     FaTimes,
     FaUser,
+    FaMapMarkerAlt,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useEffect, useState, useCallback } from "react";
@@ -53,8 +54,10 @@ type ContagemListaItem = {
         item?: {
             cod_produto: number;
             desc_produto: string;
+            localizacao?: string;
         };
     }>;
+    itens?: any[];
 };
 
 type ContagemItem = {
@@ -421,6 +424,15 @@ export default function Tela() {
                 case "BOX":
                     passaLocalizacao = localizacao.startsWith("BOX");
                     break;
+                case "A-BOX":
+                    passaLocalizacao = localizacao.startsWith("A-BOX");
+                    break;
+                case "A-BOQUETA":
+                    passaLocalizacao = localizacao.startsWith("A-BOQUETA");
+                    break;
+                case "A-CX ESCADA":
+                    passaLocalizacao = localizacao.startsWith("A-CX ESCADA");
+                    break;
                 case "VITRINE":
                     passaLocalizacao =
                         localizacao === "VITRINE" || /^V\d/.test(localizacao);
@@ -466,6 +478,9 @@ export default function Tela() {
     const [contagemSelecionada, setContagemSelecionada] =
         useState<ContagemListaItem | null>(null);
     const [logsDetalhes, setLogsDetalhes] = useState<any[]>([]);
+    const [logsGroupData, setLogsGroupData] = useState<Record<number, any>>({});
+    const [itemDetalheSelecionado, setItemDetalheSelecionado] = useState<any | null>(null);
+    const [subModalAberto, setSubModalAberto] = useState(false);
     const [loadingLogs, setLoadingLogs] = useState(false);
 
     const carregarContagensLista = useCallback(async () => {
@@ -529,21 +544,103 @@ export default function Tela() {
         setContagemSelecionada(contagem);
         setModalLogsAberto(true);
         setLoadingLogs(true);
+        setLogsGroupData({});
+        setLogsDetalhes([]); // Limpa antes de carregar
 
         try {
-            // Se os logs já estão na contagem (conforme o exemplo que você mostrou)
-            if ((contagem as any).logs) {
-                setLogsDetalhes((contagem as any).logs);
-            } else {
-                // Caso precise fazer uma requisição separada para buscar os logs
-                const res = await fetch(
-                    `${estoqueUrl(`/estoque/contagem/logs/${contagem.id}`)}`,
-                    { headers: { Accept: "application/json" } }
-                );
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                setLogsDetalhes(data.logs || []);
-            }
+            // NOVA LÓGICA: Buscar logs AGREGADOS diretamente do backend.
+            // O backend agora cruza todos os identificadores de item e traz TUDO.
+            const res = await fetch(
+                `${estoqueUrl(`/estoque/contagem/logs-agregados/${contagem.id}`)}`,
+                { headers: { Accept: "application/json" } }
+            );
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            // O backend retorna uma lista plana de logs
+            const allLogs = await res.json();
+
+            // 1. Popular o Mapa de Detalhes (Sub-Modal)
+            // Mapa: ProdutoID -> { r1: { total: 0, locais: [] }, r2: { total: 0, locais: [] } }
+            const groupMap: Record<number, any> = {};
+
+            // 2. Preparar logs para a tabela principal (apenas da rodada atual)
+            let logsDaRodadaAtual: any[] = [];
+            const rodadaAtual = contagem.contagem;
+
+            allLogs.forEach((log: any) => {
+                const codProd = log.item?.cod_produto ? Number(log.item.cod_produto) : null;
+                if (!codProd) return;
+
+                // --- Popular GroupMap (Detalhes) ---
+                if (!groupMap[codProd]) {
+                    groupMap[codProd] = {
+                        r1: { total: 0, locais: [] },
+                        r2: { total: 0, locais: [] },
+                        r3: { total: 0, locais: [] }
+                    };
+                }
+
+                const qtd = log.contado || 0;
+                const loc = log.item?.localizacao || 'N/D';
+                const usuario = log.usuario?.nome || 'Desc.';
+                const logRound = log.contagem?.contagem || 1; // Backend traz isso no include
+                const detalheStr = `${loc} (${usuario}): ${qtd}`;
+
+                const rKey = `r${logRound}`;
+                // Só adiciona ao detalhe se a rodada for menor ou igual a atual (histórico)
+                if (logRound <= rodadaAtual && groupMap[codProd][rKey]) {
+                    groupMap[codProd][rKey].total += qtd;
+                    groupMap[codProd][rKey].locais.push(detalheStr);
+                }
+
+                // --- Filtrar para Tabela Principal ---
+                // Na tabela, mostramos a SOMA do que foi contado NA RODADA ATUAL
+                if (logRound === rodadaAtual) {
+                    logsDaRodadaAtual.push(log);
+                }
+            });
+
+
+
+            // --- Ordenar detalhes (locais) alfabeticamente ---
+            Object.keys(groupMap).forEach(key => {
+                const cod = Number(key);
+                ['r1', 'r2', 'r3'].forEach(rKey => {
+                    if (groupMap[cod][rKey] && groupMap[cod][rKey].locais) {
+                        groupMap[cod][rKey].locais.sort((a: string, b: string) => a.localeCompare(b));
+                    }
+                });
+            });
+
+            setLogsGroupData(groupMap);
+
+            // 3. AGREGAR LOGS para a Tabela Principal (Unique Rows por Produto)
+            // Soma 'contado' de todas as entradas do mesmo produto nesta rodada
+            const logsMap = new Map<number, any>();
+
+            logsDaRodadaAtual.forEach((log: any) => {
+                const cod = log.item?.cod_produto ? Number(log.item.cod_produto) : null;
+                if (!cod) return;
+
+                if (!logsMap.has(cod)) {
+                    logsMap.set(cod, {
+                        ...log,
+                        contado: 0 // Reset para somar
+                    });
+                }
+
+                const entry = logsMap.get(cod);
+                entry.contado += (log.contado || 0);
+            });
+
+            // Converte Map para Array e ordena por descrição
+            const logsAgregados = Array.from(logsMap.values()).sort((a, b) =>
+                (a.item?.desc_produto || '').localeCompare(b.item?.desc_produto || '')
+            );
+
+            setLogsDetalhes(logsAgregados);
+
         } catch (error) {
             console.error("Erro ao carregar logs:", error);
             setLogsDetalhes([]);
@@ -713,7 +810,10 @@ export default function Tela() {
                                                 <option value="PISO_B">PISO B</option>
                                                 <option value="PISO_C">PISO C</option>
                                                 <option value="VITRINE">VITRINE</option>
-                                                <option value="BOX">BOX</option>
+                                                <option value="BOX">BOX (Antigo)</option>
+                                                <option value="A-BOX">A-BOX</option>
+                                                <option value="A-BOQUETA">A-BOQUETA</option>
+                                                <option value="A-CX ESCADA">A-CX ESCADA</option>
                                                 <option value="VENDA CASADA">VENDA CASADA</option>
                                             </select>
                                         </div>
@@ -1101,15 +1201,18 @@ export default function Tela() {
                                             </tr>
                                         ) : (
                                             logsDetalhes.map((log, idx) => {
-                                                const isDiff = log.estoque !== log.contado;
-                                                const rowClass = isDiff
-                                                    ? "bg-red-50/50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 border-l-4 border-red-500"
-                                                    : "bg-green-50/50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 border-l-4 border-green-500";
+                                                const estoque = log.estoque || 0;
+                                                const contado = log.contado || 0;
+                                                const isMatch = estoque === contado;
+
+                                                const rowClass = isMatch
+                                                    ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400 border-l-4 border-green-500"
+                                                    : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400 border-l-4 border-red-500";
 
                                                 return (
                                                     <tr
                                                         key={idx}
-                                                        className={`${rowClass} transition-colors`}
+                                                        className={`${rowClass} transition-colors border-b border-gray-100 dark:border-strokedark`}
                                                     >
                                                         <td className="px-4 py-3 font-medium">
                                                             {log.item?.cod_produto || "-"}
@@ -1118,10 +1221,28 @@ export default function Tela() {
                                                             {log.item?.desc_produto || "-"}
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
-                                                            {log.estoque}
+                                                            {estoque}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-bold">
-                                                            {log.contado}
+                                                        <td className="px-4 py-3 text-right font-bold text-lg">
+                                                            {contado}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const cod = log.item?.cod_produto;
+                                                                    const details = logsGroupData[cod];
+                                                                    setItemDetalheSelecionado({
+                                                                        cod,
+                                                                        desc: log.item?.desc_produto,
+                                                                        details
+                                                                    });
+                                                                    setSubModalAberto(true);
+                                                                }}
+                                                                className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors"
+                                                                title="Ver detalhes de localização"
+                                                            >
+                                                                <FaMapMarkerAlt size={18} />
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 );
@@ -1130,6 +1251,70 @@ export default function Tela() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SUB-MODAL DE DETALHES */}
+            {subModalAberto && itemDetalheSelecionado && (
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-boxdark rounded-lg shadow-2xl w-full max-w-lg border border-gray-200 dark:border-strokedark flex flex-col max-h-[80vh]">
+                        <div className="p-4 border-b border-gray-100 dark:border-strokedark flex justify-between items-center bg-gray-50 dark:bg-meta-4">
+                            <h4 className="font-bold text-gray-800 dark:text-white">
+                                Detalhes: {itemDetalheSelecionado.cod}
+                            </h4>
+                            <button
+                                onClick={() => setSubModalAberto(false)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                            >
+                                <FaTimes />
+                            </button>
+                        </div>
+
+                        <div className="p-5 overflow-y-auto space-y-6">
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                {itemDetalheSelecionado.desc}
+                            </div>
+
+                            {/* Detalhes R1 e R2 (Dinâmico conforme contagem atual) */}
+                            {Array.from({ length: contagemSelecionada?.contagem || 1 }, (_, i) => i + 1).map(round => {
+                                const info = itemDetalheSelecionado.details?.[`r${round}`];
+                                if (!info) return null;
+
+                                return (
+                                    <div key={round} className="bg-gray-50 dark:bg-black/20 rounded p-3 border border-gray-100 dark:border-strokedark">
+                                        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 flex justify-between">
+                                            <span>{round}ª Contagem</span>
+                                            <span className="text-black dark:text-white bg-gray-200 dark:bg-meta-4 px-2 py-0.5 rounded text-[10px]">
+                                                Total: {info.total}
+                                            </span>
+                                        </div>
+
+                                        {info.locais && info.locais.length > 0 ? (
+                                            <ul className="text-sm space-y-1">
+                                                {info.locais.map((loc: string, i: number) => (
+                                                    <li key={i} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></span>
+                                                        <span>{loc}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <div className="text-xs text-gray-400 italic">Nenhum registro encontrado.</div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-100 dark:border-strokedark flex justify-end">
+                            <button
+                                onClick={() => setSubModalAberto(false)}
+                                className="px-4 py-2 bg-gray-200 dark:bg-meta-4 text-gray-800 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-opacity-80 transition-colors text-sm font-medium"
+                            >
+                                Fechar
+                            </button>
                         </div>
                     </div>
                 </div>

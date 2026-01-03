@@ -71,7 +71,7 @@ export default function RootLayout({
           { label: 'Comparativo', href: '/compras/cotacao/comparativo' },
           { label: 'Pedido', href: '/compras/cotacao/pedido' },
           { label: 'Kanban', href: '/compras/kanban' },
-          { label: 'NF - Lista', href: '/compras/notaFiscal/notaFiscal' },
+          { label: 'Calculo do ICMS ST', href: '/compras/notaFiscal/notaFiscal' },
         ];
       case 'Oficina':
         return [{ label: 'Check List', href: '/oficina/checkList' }];
