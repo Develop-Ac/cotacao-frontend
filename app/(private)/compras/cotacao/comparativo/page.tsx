@@ -13,6 +13,7 @@ type ApiItem = {
   referencia: string | null;
   unidade: string | null;
   quantidade: string | number; // seed da API (usada só nos menores preços)
+  qtd_sugerida?: number | null; // quantidade sugerida do endpoint
   emissao: string | null;
   valor_unitario: string | number | null;
   custo_fabrica: number | null;
@@ -119,6 +120,7 @@ const fmtBRL = (n: number | null | undefined): string => {
 type Row = {
   pro_codigo: string;
   pro_descricao: string;
+  qtd_sugerida: number | null; // quantidade sugerida do endpoint
   prices: Record<number, number | null>; // preço por fornecedor
   costs: Record<number, number | null>;  // custo_fabrica por fornecedor
 };
@@ -277,6 +279,7 @@ export default function ComparativoPage() {
           map.set(pc, {
             pro_codigo: pc,
             pro_descricao: it.pro_descricao,
+            qtd_sugerida: it.qtd_sugerida ?? null,
             prices: {},
             costs: {},
           });
@@ -499,6 +502,7 @@ export default function ComparativoPage() {
               referencia: it.referencia ?? null,
               unidade: it.unidade ?? null,
               quantidade: it.quantidade,
+              qtd_sugerida: it.qtd_sugerida ?? null,
               emissao: it.emissao,
               valor_unitario: it.valor_unitario,
               custo_fabrica:
@@ -887,6 +891,7 @@ export default function ComparativoPage() {
                   <tr className="[&>th]:border-b [&>th]:border-gray-200 [&>th]:px-4 [&>th]:py-3 [&>th]:text-left [&>th]:text-sm [&>th]:font-semibold">
                     <th style={{ width: 140 }}>Código</th>
                     <th>Descrição</th>
+                    <th style={{ width: 150 }} className="text-center">Quantidade Sugerida</th>
                     {fornecedoresOrd.map((f) => (
                       <th key={f.for_codigo} style={{ width: 260 }} className="text-right">
                         <button
@@ -913,6 +918,17 @@ export default function ComparativoPage() {
                         <td className="px-4 py-3 font-medium text-gray-900">{row.pro_codigo}</td>
                         <td className="px-4 py-3">
                           <div className="whitespace-normal break-words">{row.pro_descricao}</div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="inline-flex items-center justify-center min-h-[2rem]">
+                            {row.qtd_sugerida != null && row.qtd_sugerida > 0 ? (
+                              <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 border border-blue-200">
+                                {row.qtd_sugerida}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">—</span>
+                            )}
+                          </div>
                         </td>
                         {fornecedoresOrd.map((f, cIdx) => {
                           const basePrice = row.prices[f.for_codigo] ?? null;
@@ -1030,7 +1046,7 @@ export default function ComparativoPage() {
 
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={2 + fornecedoresOrd.length} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={3 + fornecedoresOrd.length} className="px-4 py-8 text-center text-gray-500">
                         Nenhum item com preços para comparar.
                       </td>
                     </tr>

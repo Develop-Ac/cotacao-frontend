@@ -30,6 +30,16 @@ type CotacaoItem = {
   UNIDADE: string;
   QUANTIDADE: number;
   DT_ULTIMA_COMPRA: string | null;
+  QTD_SUGERIDA?: number;
+};
+
+type SugestaoCompra = {
+  PRO_CODIGO: string;
+  QTD_SUGERIDA: number;
+};
+
+type SugestaoCompraResponse = {
+  data: SugestaoCompra[];
 };
 
 type PedidoResumo = {
@@ -190,24 +200,99 @@ import Loading from "@/components/Loading";
 export default function Tela() {
   const [formularioAberto, setFormularioAberto] = useState(false);
   const [pedido, setPedido] = useState("");
+  const [diasCompra, setDiasCompra] = useState("");
   const [itensCotacao, setItensCotacao] = useState<CotacaoItem[]>([]);
   const [loadingCot, setLoadingCot] = useState(false);
   const [postingCot, setPostingCot] = useState(false);
   const [msgCot, setMsgCot] = useState<string | null>(null);
+  const [sugestoes, setSugestoes] = useState<SugestaoCompra[]>([]);
+  const [loadingSugestoes, setLoadingSugestoes] = useState(false);
+
+  const buscarSugestoes = async (pedidoCotacao: string, diasCompra: string) => {
+    if (!diasCompra.trim()) return [];
+    
+    setLoadingSugestoes(true);
+    try {
+      const url = `http://sugestao-compras-service-go.acacessorios.local/sugestao-compra?pedido_cotacao=${encodeURIComponent(pedidoCotacao)}&dias_compra=${encodeURIComponent(diasCompra)}`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: SugestaoCompraResponse = await res.json();
+      const sugestoes = Array.isArray(data?.data) ? data.data : [];
+      
+      // Debug: mostrar dados recebidos
+      console.log("🔍 Dados recebidos da API de sugestões:", {
+        url,
+        total: sugestoes.length,
+        amostra: sugestoes.slice(0, 5)
+      });
+      
+      return sugestoes;
+    } catch (e: any) {
+      console.error("Erro ao buscar sugestões:", e);
+      return [];
+    } finally {
+      setLoadingSugestoes(false);
+    }
+  };
 
   const buscarCotacao = async () => {
     setMsgCot(null);
     setItensCotacao([]);
+    setSugestoes([]);
     const p = pedido.trim();
     if (!p) return setMsgCot("Informe o pedido de cotação.");
     setLoadingCot(true);
     try {
+      // Buscar itens da cotação
       const url = `${comprasPath(`/openquery/pedido/${encodeURIComponent(p)}`)}?empresa=3`;
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const arr = Array.isArray(data?.itens) ? data.itens : [];
-      setItensCotacao(arr);
+      
+      // Buscar sugestões se dias_compra foi informado
+      let sugestoesData: SugestaoCompra[] = [];
+      if (diasCompra.trim()) {
+        sugestoesData = await buscarSugestoes(p, diasCompra);
+        setSugestoes(sugestoesData);
+      }
+      
+      // Combinar dados dos itens com sugestões
+      const itensComSugestao = arr.map((item: CotacaoItem) => {
+        // Tentar diferentes formas de comparação
+        const proCodigo = String(item.PRO_CODIGO);
+        const sugestao = sugestoesData.find(s => {
+          // Comparar como string e como número
+          return s.PRO_CODIGO === proCodigo || 
+                 s.PRO_CODIGO === String(item.PRO_CODIGO) ||
+                 Number(s.PRO_CODIGO) === Number(item.PRO_CODIGO);
+        });
+        
+        const resultado = {
+          ...item,
+          QTD_SUGERIDA: sugestao?.QTD_SUGERIDA || 0
+        };
+        
+        // Debug: mostrar correspondências
+        if (sugestao) {
+          console.log(`✅ Match encontrado: PRO_CODIGO ${proCodigo} -> QTD_SUGERIDA ${sugestao.QTD_SUGERIDA}`);
+        } else {
+          console.log(`❌ Sem match: PRO_CODIGO ${proCodigo} (tipos: item=${typeof item.PRO_CODIGO}, sugestões=${sugestoesData.map(s => `${s.PRO_CODIGO}(${typeof s.PRO_CODIGO})`).slice(0, 3).join(', ')}...)`);
+        }
+        
+        return resultado;
+      });
+      
+      // Debug: resumo final
+      const comSugestao: CotacaoItem[] = itensComSugestao.filter((item: CotacaoItem) => (item.QTD_SUGERIDA || 0) > 0);
+      console.log("📊 Resumo final:", {
+        totalItens: itensComSugestao.length,
+        comSugestao: comSugestao.length,
+        semSugestao: itensComSugestao.length - comSugestao.length,
+        exemploComSugestao: comSugestao.slice(0, 3).map(i => ({codigo: i.PRO_CODIGO, qtd: i.QTD_SUGERIDA}))
+      });
+      
+      setItensCotacao(itensComSugestao);
       if (!arr.length) setMsgCot("Nenhum item encontrado.");
     } catch (e: any) {
       setMsgCot(`Erro ao buscar: ${e?.message || "desconhecido"}`);
@@ -235,12 +320,15 @@ export default function Tela() {
           REFERENCIA: it.REFERENCIA ?? null,
           UNIDADE: it.UNIDADE ?? null,
           QUANTIDADE: Number(it.QUANTIDADE),
+          QTD_SUGERIDA: Number(it.QTD_SUGERIDA) || 0,
           DT_ULTIMA_COMPRA: it.DT_ULTIMA_COMPRA ?? null,
         })),
       };
 
+      console.log("OLA");
+      console.log(payload);
+
       const res = await fetch(comprasPath("/pedidos-cotacao"), {
-        // const res = await fetch("http://localhost:8000/compras/pedidos-cotacao", {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -416,7 +504,7 @@ export default function Tela() {
     }
   };
 
-  const buscarFornecedor = async () => {
+  const   buscarFornecedor = async () => {
     setFornMsg(null);
     const raw = forCodigoInput.trim();
     if (!raw) return setFornMsg("Informe o código do fornecedor.");
@@ -507,6 +595,8 @@ export default function Tela() {
               if (formularioAberto) {
                 setItensCotacao([]);
                 setPedido("");
+                setDiasCompra("");
+                setSugestoes([]);
                 setMsgCot(null);
               }
               setFormularioAberto(!formularioAberto);
@@ -554,8 +644,22 @@ export default function Tela() {
                   <FaSearch className="absolute left-3 top-3 text-gray-400" />
                 </div>
               </div>
-              <button onClick={buscarCotacao} disabled={loadingCot || !pedido} className="bg-primary text-white hover:bg-opacity-90 rounded-lg transition-all duration-300 ease-in-out active:scale-95 h-10 px-6 font-medium">
-                {loadingCot ? "Buscando..." : "Buscar Itens"}
+              <div className="flex-1 w-full">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dias para Compra (opcional)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Ex: 30"
+                    value={diasCompra}
+                    onChange={(e) => setDiasCompra(e.target.value.replace(/[^\d]/g, ""))}
+                    className="w-full h-10 pl-10 pr-4 border border-gray-300 dark:border-form-strokedark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-form-input text-black dark:text-white"
+                  />
+                  <FaSearch className="absolute left-3 top-3 text-gray-400" />
+                </div>
+              </div>
+              <button onClick={buscarCotacao} disabled={loadingCot || loadingSugestoes || !pedido} className="bg-primary text-white hover:bg-opacity-90 rounded-lg transition-all duration-300 ease-in-out active:scale-95 h-10 px-6 font-medium">
+                {(loadingCot || loadingSugestoes) ? "Buscando..." : "Buscar Itens"}
               </button>
               <button
                 onClick={criarCotacao}
@@ -588,6 +692,7 @@ export default function Tela() {
                         <th className="px-4 py-3">Referência</th>
                         <th className="px-4 py-3">Unidade</th>
                         <th className="px-4 py-3 text-right">Qtd.</th>
+                        <th className="px-4 py-3 text-right">Qtd. Sugerida</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -599,6 +704,15 @@ export default function Tela() {
                           <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{it.REFERENCIA}</td>
                           <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{it.UNIDADE}</td>
                           <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{it.QUANTIDADE}</td>
+                          <td className="px-4 py-3 text-right font-medium">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              (it.QTD_SUGERIDA || 0) > 0 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                                : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                            }`}>
+                              {it.QTD_SUGERIDA || 0}
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
