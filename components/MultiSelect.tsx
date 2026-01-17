@@ -124,9 +124,9 @@ export default function MultiSelect({
                     <div
                         className="multi-select-dropdown-portal fixed z-[9999] bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-lg shadow-lg max-h-60 overflow-y-auto"
                         style={{
-                            top: containerRef.current?.getBoundingClientRect().bottom || 0,
-                            left: containerRef.current?.getBoundingClientRect().left || 0,
-                            width: containerRef.current?.getBoundingClientRect().width || 0,
+                            top: dropdownPosition.top,
+                            left: dropdownPosition.left,
+                            width: dropdownPosition.width,
                         }}
                     >
                         {options.map((option) => {

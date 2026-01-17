@@ -105,6 +105,7 @@ export default function Login() {
 
   // Estado para armazenar visualmente as permissões originais do usuário (para decidir se faz POST ou PUT)
   const [permissoesOriginais, setPermissoesOriginais] = useState<Record<string, boolean>>({});
+  const [searchTerm, setSearchTerm] = useState("");
 
   // === CLASSES REUTILIZÁVEIS ===
   const BTN =
@@ -337,6 +338,11 @@ export default function Login() {
     }
   };
 
+  const filteredUsuarios = usuarios.filter(u =>
+    u.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.codigo && u.codigo.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
     <div className="main-panel min-h-screen text-black">
       <div className="content-wrapper p-2">
@@ -488,7 +494,7 @@ export default function Login() {
 
                   <div className="flex gap-2">
                     <button type="button" className={BTN} onClick={handleSubmit}>Salvar</button>
-                    <button type="button" className="h-12 px-6 inline-flex items-center justify-center rounded bg-gray-200 text-gray-700">Cancelar</button>
+                    <button type="button" className="h-12 px-6 inline-flex items-center justify-center rounded bg-gray-200 text-gray-700" onClick={() => setFormularioAberto(false)}>Cancelar</button>
                   </div>
                 </form>
               </div>
@@ -512,7 +518,9 @@ export default function Login() {
                   <input
                     type="text"
                     className="flex-1 h-12 border border-gray-300 rounded-l px-3 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Buscar"
+                    placeholder="Buscar por nome ou código"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                   <button className={`${BTN} rounded-l-none`}>Pesquisar</button>
                 </div>
@@ -557,8 +565,8 @@ export default function Login() {
                     </tr>
                   </thead>
                   <tbody>
-                    {usuarios.length > 0 ? (
-                      usuarios.map((usuario, idx) => (
+                    {filteredUsuarios.length > 0 ? (
+                      filteredUsuarios.map((usuario, idx) => (
                         <tr key={usuario.id} className="border-t">
                           <td className="p-4">
                             <input type="checkbox" />

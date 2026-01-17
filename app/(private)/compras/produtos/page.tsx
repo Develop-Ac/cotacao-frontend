@@ -15,7 +15,10 @@ import {
 } from "react-icons/fa";
 import { serviceUrl } from "@/lib/services";
 import Loading from "@/components/Loading";
+
 import MultiSelect from "@/components/MultiSelect";
+import { useContext } from "react";
+import { SidebarContext } from "@/components/SidebarContext";
 
 type AnaliseItem = {
     id: number;
@@ -396,7 +399,10 @@ export default function AnaliseProdutosPage() {
     const [search, setSearch] = useState("");
     const [onlyChanges, setOnlyChanges] = useState(true);
     const [critical, setCritical] = useState(false);
+
     const [pageSize] = useState(50);
+
+    const { sidebarCollapsed } = useContext(SidebarContext);
 
     const [selectedCurves, setSelectedCurves] = useState<string[]>([]);
     const [selectedTrends, setSelectedTrends] = useState<string[]>([]);
@@ -585,7 +591,7 @@ export default function AnaliseProdutosPage() {
             {/* Filters */}
             <div className="bg-white dark:bg-boxdark rounded-xl shadow-md p-4 mb-6 border border-gray-100 dark:border-strokedark">
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="relative w-full md:flex-1 md:min-w-[200px]">
+                    <div className="relative w-full md:flex-1 md:min-w-[150px]">
                         <input
                             type="text"
                             placeholder="Buscar por código ou descrição..."
@@ -596,7 +602,7 @@ export default function AnaliseProdutosPage() {
                         <FaSearch className="absolute left-3 top-3.5 text-gray-400" />
                     </div>
 
-                    <div className="flex gap-4 w-full md:w-auto flex-nowrap items-center overflow-x-auto md:overflow-visible">
+                    <div className="flex gap-2 xl:gap-4 w-full md:w-auto flex-nowrap items-center overflow-x-auto md:overflow-visible">
                         <div className="flex items-center gap-2 border-r border-gray-200 dark:border-strokedark pr-4 mr-2 flex-shrink-0">
                             <span className="text-sm font-medium text-gray-500 whitespace-nowrap">Cob. (Dias):</span>
                             <input
@@ -660,7 +666,7 @@ export default function AnaliseProdutosPage() {
                                 className="hidden"
                             />
                             <FaExchangeAlt />
-                            <span className="hidden sm:inline">Mudanças</span>
+                            <span className={`${sidebarCollapsed ? 'hidden sm:inline' : 'hidden 2xl:inline'}`}>Mudanças</span>
                         </label>
 
                     </div>

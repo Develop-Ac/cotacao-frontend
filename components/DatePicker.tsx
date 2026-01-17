@@ -32,16 +32,28 @@ export default function DatePicker({
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
 
     // Estado do calendário (mês/ano sendo visualizado)
-    const [viewDate, setViewDate] = useState(new Date());
+    // Initialize viewDate based on value or today
+    const [viewDate, setViewDate] = useState(() => {
+        if (value) {
+            const [y, m, d] = value.split('-').map(Number);
+            return new Date(y, m - 1, d, 12);
+        }
+        return new Date();
+    });
 
     useEffect(() => {
         if (value) {
             const [y, m, d] = value.split('-').map(Number);
-            // Ajuste para garantir que a data seja interpretada corretamente no fuso local ou UTC
-            // Criando data com hora 12:00 para evitar problemas de fuso
-            setViewDate(new Date(y, m - 1, d, 12));
+            const newDate = new Date(y, m - 1, d, 12);
+            // Only update if month/year changed to avoid redundant renders? 
+            // Actually, just checking if time differs significantly or just resetting view to selection is standard.
+            // To fix "synchronous" warning, we just need to ensure dependency stability or rely on the fact that 
+            // splitting the effect logic might help. But here I'll just keep the effect but with a guard check.
+            if (newDate.getMonth() !== viewDate.getMonth() || newDate.getFullYear() !== viewDate.getFullYear()) {
+                setViewDate(newDate);
+            }
         }
-    }, [isOpen, value]);
+    }, [value, viewDate]); // Removed isOpen from deps as it might cause loops if isOpen toggles reset view
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

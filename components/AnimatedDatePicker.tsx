@@ -18,31 +18,38 @@ interface AnimatedDatePickerProps {
 }
 
 export default function AnimatedDatePicker({ value, onChange, placeholder = "Selecione a data...", className = "" }: AnimatedDatePickerProps) {
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    // Memoize parsed date from value prop to avoid state sync effect
+    const selectedDate = React.useMemo(() => {
+        if (!value) return null;
+        const [y, m, d] = value.split('-').map(Number);
+        if (y && m && d) {
+            return new Date(y, m - 1, d, 12, 0, 0);
+        }
+        return null;
+    }, [value]);
+
     const [inputValue, setInputValue] = useState("");
 
-    // Sincroniza o valor externo (string) com o estado interno (Date e Input)
     useEffect(() => {
+        let newVal = "";
         if (value) {
-            // Split para evitar problemas de timezone com new Date("YYYY-MM-DD")
             const [y, m, d] = value.split('-').map(Number);
             if (y && m && d) {
-                const date = new Date(y, m - 1, d, 12, 0, 0);
-                setSelectedDate(date);
-                // Formata para exibição no input (dd/mm/yyyy) se a data for válida
                 const dayStr = String(d).padStart(2, '0');
                 const monthStr = String(m).padStart(2, '0');
-                setInputValue(`${dayStr}/${monthStr}/${y}`);
-            } else {
-                setSelectedDate(null);
-                setInputValue("");
+                newVal = `${dayStr}/${monthStr}/${y}`;
             }
-        } else {
-            setSelectedDate(null);
-            // Se value for limpo externamente, limpamos o input também
-            setInputValue("");
         }
+
+        if (inputValue !== newVal) {
+            setInputValue(newVal);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [value]);
+
+    // Remove setSelectedDate since we use derived state now
+    // We need a dummy setter or change how handleChange works
+
 
     const parseDate = (input: string): Date | null => {
         // Remove caracteres não numéricos
@@ -98,7 +105,8 @@ export default function AnimatedDatePicker({ value, onChange, placeholder = "Sel
     };
 
     const handleChange = (date: Date | null) => {
-        setSelectedDate(date);
+        // setSelectedDate(date); // Removed: driven by prop
+
 
         if (date) {
             const year = date.getFullYear();
@@ -127,7 +135,7 @@ export default function AnimatedDatePicker({ value, onChange, placeholder = "Sel
     const commitDate = (val: string) => {
         const parsed = parseDate(val);
         if (parsed && !isNaN(parsed.getTime())) {
-            setSelectedDate(parsed);
+            // setSelectedDate(parsed);
             const year = parsed.getFullYear();
             const month = String(parsed.getMonth() + 1).padStart(2, '0');
             const day = String(parsed.getDate()).padStart(2, '0');
@@ -142,7 +150,7 @@ export default function AnimatedDatePicker({ value, onChange, placeholder = "Sel
             // Mas se estiver vazio, passamos vazio pro pai.
             if (!val.trim()) {
                 onChange("");
-                setSelectedDate(null);
+                // setSelectedDate(null);
             }
         }
     };
