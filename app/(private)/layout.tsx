@@ -1,8 +1,8 @@
 "use client";
 
 import "../globals.css";
-import logoSidebarFull from './assets/images/logo_completa.png';
-import logoSidebarIcon from './assets/images/logo_icon.png';
+import logoSidebarFull from './assets/images/logo-verde-branca.png';
+import logoSidebarIcon from './assets/images/icon-logoverde-branca.png';
 import PrivateRoute from "@/components/PrivateRoute";
 import { useRouter, usePathname } from "next/navigation";
 import Image from 'next/image';
@@ -58,9 +58,18 @@ export default function RootLayout({
 
   // ---------- Permissões: helpers ----------
   const canViewPath = React.useCallback((href: string) => {
+    // [FIX] Permitir acesso à nova tela de produtos se tiver acesso ao módulo Compras
+    if (href === '/compras/produtos') {
+      return hasAccessToModule('Compras');
+    }
+
+    if (href === '/estoque/auditoria') {
+      return hasAccessToModule('Estoque');
+    }
+
     const target = normalizePath(href);
     return canOnPathPrefix(ability, "read", target); // read herda por prefixo
-  }, [ability]);
+  }, [ability, userData]); // Adicionado userData às dependências
 
   // Submenus completos para cada seção (sem filtro)
   const getSubmenuItems = (section: string) => {
@@ -72,11 +81,15 @@ export default function RootLayout({
           { label: 'Pedido', href: '/compras/cotacao/pedido' },
           { label: 'Kanban', href: '/compras/kanban' },
           { label: 'Calculo do ICMS ST', href: '/compras/notaFiscal/notaFiscal' },
+          { label: 'Análise de Produtos', href: '/compras/produtos' },
         ];
       case 'Oficina':
         return [{ label: 'Check List', href: '/oficina/checkList' }];
       case 'Estoque':
-        return [{ label: 'Contagem', href: '/estoque/contagem' }];
+        return [
+          { label: 'Contagem', href: '/estoque/contagem' },
+          { label: 'Auditoria', href: '/estoque/auditoria' },
+        ];
       case 'Expedicao':
         return [
           { label: 'Dashboard', href: '/expedicao/dashboard' },
@@ -249,8 +262,8 @@ export default function RootLayout({
           {/* Header Start */}
           {/* Header Start */}
           <header className="sticky top-0 z-999 flex w-full border-b border-gray-700 bg-gray-800">
-            <div className="flex grow flex-col items-center justify-between lg:flex-row lg:px-6">
-              <div className="flex w-full items-center justify-between gap-2 border-b border-gray-700 px-3 py-3 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
+            <div className="flex grow items-center justify-between px-3 py-3 lg:px-6">
+              <div className="flex items-center gap-2 sm:gap-4">
                 {/* Hamburger Toggle BTN */}
                 <button
                   onClick={(e) => {
@@ -269,8 +282,6 @@ export default function RootLayout({
                   <MdMenu className="text-xl" />
                 </button>
                 {/* Hamburger Toggle BTN */}
-
-
               </div>
 
               <div className="flex items-center gap-3 2xsm:gap-7">
@@ -282,7 +293,6 @@ export default function RootLayout({
                       className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-700 bg-black text-gray-400 hover:text-primary"
                     >
                       <MdOutlineNotificationsNone className="text-xl" />
-                      <span className="absolute -top-0.5 right-0 z-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-black"></span>
                     </Link>
                   </li>
                   {/* Notification Menu Area */}
