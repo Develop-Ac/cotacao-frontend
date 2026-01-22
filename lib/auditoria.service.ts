@@ -20,6 +20,12 @@ export interface AuditoriaItem {
     };
     ja_auditado: boolean;
     audit_id?: string;
+    recorrencia_erro?: boolean;
+    audit_dados?: {
+        tipo: string;
+        qtd: number;
+        obs: string;
+    } | null;
 }
 
 export interface LogAudit {

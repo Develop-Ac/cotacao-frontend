@@ -15,6 +15,8 @@ interface SelectProps {
     onChange: (value: string | number) => void;
     placeholder?: string;
     className?: string;
+    triggerClassName?: string;
+    dropdownWidth?: number;
 }
 
 export default function Select({
@@ -23,6 +25,8 @@ export default function Select({
     onChange,
     placeholder = "Selecione...",
     className = "",
+    triggerClassName = "",
+    dropdownWidth,
 }: SelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -68,7 +72,7 @@ export default function Select({
             setDropdownPosition({
                 top: rect.bottom + window.scrollY + 4, // +4px margin
                 left: rect.left + window.scrollX,
-                width: rect.width,
+                width: dropdownWidth || rect.width,
             });
         }
     };
@@ -91,7 +95,7 @@ export default function Select({
         <div className={`relative ${className}`} ref={containerRef}>
             <div
                 onClick={toggleOpen}
-                className="h-11 px-3 rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input text-black dark:text-white focus:ring-2 focus:ring-primary cursor-pointer flex items-center justify-between min-w-[150px] transition-all"
+                className={triggerClassName || "h-11 px-3 rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input text-black dark:text-white focus:ring-2 focus:ring-primary cursor-pointer flex items-center justify-between min-w-[150px] transition-all"}
             >
                 <div className="truncate mr-2 text-sm">
                     {selectedOption ? (
@@ -116,6 +120,7 @@ export default function Select({
                             top: dropdownPosition.top,
                             left: dropdownPosition.left,
                             width: dropdownPosition.width,
+                            minWidth: dropdownWidth ? undefined : '120px'
                         }}
                     >
                         {options.map((option) => {

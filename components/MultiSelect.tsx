@@ -40,8 +40,15 @@ export default function MultiSelect({
             }
         };
 
-        const handleScroll = () => {
-            if (isOpen) setIsOpen(false); // Close on scroll to avoid detached popup
+        const handleScroll = (event: Event) => {
+            // Do not close if the scroll event originated from the dropdown content itself
+            if (
+                event.target instanceof Element &&
+                event.target.closest('.multi-select-dropdown-portal')
+            ) {
+                return;
+            }
+            if (isOpen) setIsOpen(false); // Close on outside scroll to avoid detached popup
         };
 
         document.addEventListener("mousedown", handleClickOutside);
@@ -86,11 +93,18 @@ export default function MultiSelect({
         onChange([]);
     };
 
+    const [searchTerm, setSearchTerm] = useState("");
+
+    // Filter options based on search
+    const filteredOptions = options.filter(opt =>
+        opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
         <div className={`relative ${className}`} ref={containerRef}>
             <div
                 onClick={toggleOpen}
-                className="h-11 px-3 rounded-lg border border-gray-300 dark:border-form-strokedark bg-transparent dark:text-white focus:ring-2 focus:ring-primary cursor-pointer flex items-center justify-between min-w-[150px]"
+                className="h-11 px-3 rounded-lg border border-gray-300 dark:border-form-strokedark bg-transparent dark:text-white focus:ring-2 focus:ring-primary cursor-pointer flex items-center justify-between w-full"
             >
                 <div className="truncate mr-2 text-sm">
                     {value.length === 0 ? (
@@ -122,30 +136,50 @@ export default function MultiSelect({
             {isOpen &&
                 createPortal(
                     <div
-                        className="multi-select-dropdown-portal fixed z-[9999] bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        className="multi-select-dropdown-portal fixed z-[9999] bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col"
                         style={{
                             top: dropdownPosition.top,
                             left: dropdownPosition.left,
                             width: dropdownPosition.width,
                         }}
                     >
-                        {options.map((option) => {
-                            const isSelected = value.includes(option.value);
-                            return (
-                                <div
-                                    key={option.value}
-                                    onClick={() => toggleOption(option.value)}
-                                    className={`
-                                    px-3 py-2 text-sm cursor-pointer flex items-center justify-between
-                                    hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors
-                                    ${isSelected ? "bg-blue-50 dark:bg-meta-4/50 text-primary" : "text-black dark:text-white"}
-                                `}
-                                >
-                                    <span>{option.label}</span>
-                                    {isSelected && <FaCheck size={12} className="text-primary" />}
+                        <div className="p-2 border-b border-gray-100 dark:border-strokedark">
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Buscar..."
+                                autoFocus
+                                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-form-strokedark rounded bg-transparent dark:text-white focus:outline-none focus:border-primary"
+                            />
+                        </div>
+
+                        <div className="overflow-y-auto max-h-48">
+                            {filteredOptions.length > 0 ? (
+                                filteredOptions.map((option) => {
+                                    const isSelected = value.includes(option.value);
+                                    return (
+                                        <div
+                                            key={option.value}
+                                            onClick={() => toggleOption(option.value)}
+                                            className={`
+                                            px-3 py-2 text-sm cursor-pointer flex items-center justify-between
+                                            hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors
+                                            ${isSelected ? "bg-blue-50 dark:bg-meta-4/50 text-primary" : "text-black dark:text-white"}
+                                        `}
+                                        >
+                                            <span>{option.label}</span>
+                                            {isSelected && <FaCheck size={12} className="text-primary" />}
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                                    Nenhuma opção encontrada
                                 </div>
-                            );
-                        })}
+                            )}
+                        </div>
                     </div>,
                     document.body
                 )}
