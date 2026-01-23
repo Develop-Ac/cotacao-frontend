@@ -31,6 +31,11 @@ export default function Select({
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+    const [searchTerm, setSearchTerm] = useState("");
+
+    const filteredOptions = options.filter(option =>
+        String(option.label).toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -80,6 +85,7 @@ export default function Select({
     const toggleOpen = () => {
         if (!isOpen) {
             updatePosition();
+            setSearchTerm(""); // Reset search on open
         }
         setIsOpen(!isOpen);
     };
@@ -115,7 +121,7 @@ export default function Select({
             {isOpen &&
                 createPortal(
                     <div
-                        className="select-dropdown-portal fixed z-[9999] bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 ease-out"
+                        className="select-dropdown-portal fixed z-[100000] bg-white dark:bg-boxdark border border-gray-200 dark:border-strokedark rounded-xl shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 ease-out"
                         style={{
                             top: dropdownPosition.top,
                             left: dropdownPosition.left,
@@ -123,23 +129,44 @@ export default function Select({
                             minWidth: dropdownWidth ? undefined : '120px'
                         }}
                     >
-                        {options.map((option) => {
-                            const isSelected = value === option.value;
-                            return (
-                                <div
-                                    key={option.value}
-                                    onClick={() => handleSelect(option.value)}
-                                    className={`
+                        {/* Search Input */}
+                        {(options.length > 5 || true) && ( // Sempre mostrar por enquanto ou controlar via prop 'searchable'. Vou assumir searchable por padrão para UX melhor ou adicionar prop.
+                            <div className="p-2 sticky top-0 bg-white dark:bg-boxdark z-10 border-b border-gray-100 dark:border-strokedark">
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-strokedark rounded-md focus:ring-2 focus:ring-primary outline-none dark:bg-form-input dark:text-white"
+                                    placeholder="Buscar..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+
+                        {filteredOptions.length === 0 ? (
+                            <div className="px-3 py-8 text-center text-sm text-gray-400">
+                                Nenhum resultado.
+                            </div>
+                        ) : (
+                            filteredOptions.map((option) => {
+                                const isSelected = value === option.value;
+                                return (
+                                    <div
+                                        key={option.value}
+                                        onClick={() => handleSelect(option.value)}
+                                        className={`
                                     px-3 py-2.5 text-sm cursor-pointer flex items-center justify-between
-                                    hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors first:rounded-t-xl last:rounded-b-xl
+                                    hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors
                                     ${isSelected ? "bg-blue-50 dark:bg-meta-4/50 text-primary font-medium" : "text-black dark:text-white"}
                                 `}
-                                >
-                                    <span>{option.label}</span>
-                                    {isSelected && <FaCheck size={12} className="text-primary" />}
-                                </div>
-                            );
-                        })}
+                                    >
+                                        <span>{option.label}</span>
+                                        {isSelected && <FaCheck size={12} className="text-primary" />}
+                                    </div>
+                                );
+                            })
+                        )}
                     </div>,
                     document.body
                 )}

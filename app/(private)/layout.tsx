@@ -17,6 +17,7 @@ import { canOnPathPrefix, normalizePath } from "../lib/ability";
 import SidebarMenuItem from "./components/SidebarMenuItem";
 import ProfileDropdown from "./components/ProfileDropdown";
 import { SidebarContext } from "@/components/SidebarContext";
+import { ToastProvider } from "@/components/Toast";
 
 export default function RootLayout({
   children,
@@ -179,172 +180,174 @@ export default function RootLayout({
 
   return (
     <SidebarContext.Provider value={{ sidebarCollapsed, setSidebarCollapsed, sidebarOpen, setSidebarOpen }}>
-      <PrivateRoute>
-        <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
-          {/* Sidebar Start */}
-          <aside
-            className={`fixed left-0 top-0 z-9999 flex h-screen flex-col bg-gray-800 lg:static lg:translate-x-0 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-              } ${sidebarCollapsed ? 'lg:w-[90px] overflow-visible' : 'lg:w-[250px] w-[250px] overflow-y-hidden'}`}
-          >
-            {/* Sidebar Header */}
-            <div className={`flex items-center justify-center gap-2 pt-4 pb-2`}>
-              <Link href="/" className="block w-full">
-                <div className="relative flex items-center justify-center h-[50px]">
-                  <span className={`logo transition-opacity duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`}>
+      <ToastProvider>
+        <PrivateRoute>
+          <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
+            {/* Sidebar Start */}
+            <aside
+              className={`fixed left-0 top-0 z-9999 flex h-screen flex-col bg-gray-800 lg:static lg:translate-x-0 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                } ${sidebarCollapsed ? 'lg:w-[90px] overflow-visible' : 'lg:w-[250px] w-[250px] overflow-y-hidden'}`}
+            >
+              {/* Sidebar Header */}
+              <div className={`flex items-center justify-center gap-2 pt-4 pb-2`}>
+                <Link href="/" className="block w-full">
+                  <div className="relative flex items-center justify-center h-[50px]">
+                    <span className={`logo transition-opacity duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`}>
+                      <Image
+                        src={logoSidebarFull}
+                        alt="Logo"
+                        width={150}
+                        height={50}
+                        className="block"
+                        priority
+                      />
+                    </span>
                     <Image
-                      src={logoSidebarFull}
+                      src={logoSidebarIcon}
                       alt="Logo"
-                      width={150}
+                      width={50}
                       height={50}
-                      className="block"
+                      className={`logo-icon transition-all duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
                       priority
                     />
-                  </span>
-                  <Image
-                    src={logoSidebarIcon}
-                    alt="Logo"
-                    width={50}
-                    height={50}
-                    className={`logo-icon transition-all duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
-                    priority
-                  />
-                </div>
-              </Link>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="block lg:hidden"
-              >
-                <MdChevronRight className="rotate-180 text-2xl text-gray-500" />
-              </button>
-            </div>
-
-            <div className={`flex flex-col mt-3 duration-300 ease-linear no-scrollbar ${sidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
-              <nav className="mt-0 py-2 px-4 lg:mt-0 lg:px-6">
-                <div>
-                  <h3 className={`mb-4 text-xs uppercase leading-[20px] text-gray-400 font-semibold transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}`}>
-                    MENU
-                  </h3>
-
-                  <ul className="flex flex-col gap-4 mb-6">
-                    {/* Menu Items Configuration */}
-                    {[
-                      { id: 'Compras', label: 'Compras', icon: HiOutlineShoppingCart, path: '/compras' },
-                      { id: 'Oficina', label: 'Oficina', icon: HiOutlineWrench, path: '/oficina' },
-                      { id: 'Estoque', label: 'Estoque', icon: HiOutlineCube, path: '/estoque' },
-                      { id: 'Expedição', label: 'Expedição', icon: HiOutlineTruck, path: '/expedicao' }, // Note: id matches hasAccessToModule
-                      { id: 'Qualidade', label: 'Qualidade', icon: HiOutlineClipboardDocumentCheck, path: '/qualidade' },
-                      { id: 'Sac', label: 'Sac', icon: HiOutlineUser, path: '/sac' },
-                      { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/usuario' },
-                    ].map((section) => {
-                      // Special handling for section keys if they differ from ID
-                      const sectionKey = section.id === 'Expedição' ? 'Expedicao' : section.id;
-
-                      if (!hasAccessToModule(section.id) || !hasAnyVisibleInSection(sectionKey)) return null;
-
-                      return (
-                        <SidebarMenuItem
-                          key={section.id}
-                          label={section.label}
-                          icon={section.icon}
-                          isActive={sectionActive[sectionKey.toLowerCase() as keyof typeof sectionActive]}
-                          isCollapsed={sidebarCollapsed}
-                          submenus={getVisibleSubmenuItems(sectionKey)}
-                          onNavigate={handleNavigation}
-                          isPathActive={isPathActive}
-                          pathname={pathname}
-                        />
-                      );
-                    })}
-                  </ul>
-                </div>
-              </nav>
-            </div>
-          </aside>
-          {/* Sidebar End */}
-
-          {/* Content Area Start */}
-          <div className="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
-            {/* Header Start */}
-            {/* Header Start */}
-            <header className="sticky top-0 z-999 flex w-full border-b border-gray-700 bg-gray-800">
-              <div className="flex grow items-center justify-between px-3 py-3 lg:px-6">
-                <div className="flex items-center gap-2 sm:gap-4">
-                  {/* Hamburger Toggle BTN */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSidebarOpen(!sidebarOpen);
-                    }}
-                    className="z-99999 block rounded-lg border border-gray-700 bg-black p-1.5 shadow-sm lg:hidden"
-                  >
-                    <MdMenu className="text-xl text-white" />
-                  </button>
-
-                  <button
-                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="z-99999 hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-700 text-white lg:flex"
-                  >
-                    <MdMenu className="text-xl" />
-                  </button>
-                  {/* Hamburger Toggle BTN */}
-                </div>
-
-                <div className="flex items-center gap-3 2xsm:gap-7">
-                  <ul className="flex items-center gap-2 2xsm:gap-4">
-                    {/* Notification Menu Area */}
-                    <li className="relative">
-                      <Link
-                        href="#"
-                        className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-700 bg-black text-gray-400 hover:text-primary"
-                      >
-                        <MdOutlineNotificationsNone className="text-xl" />
-                      </Link>
-                    </li>
-                    {/* Notification Menu Area */}
-                  </ul>
-
-                  {/* User Area */}
-                  <ProfileDropdown userData={userData} onLogout={deslogar} />
-                  {/* User Area */}
-                </div>
+                  </div>
+                </Link>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="block lg:hidden"
+                >
+                  <MdChevronRight className="rotate-180 text-2xl text-gray-500" />
+                </button>
               </div>
-            </header>
-            {/* Header End */}
 
-            {/* Main Content Start */}
-            <div className="flex-1 w-full border-l border-gray-700 flex flex-col min-h-0">
-              <main
-                className={`relative flex-1 ${pathname?.startsWith('/compras/kanban') || pathname?.startsWith('/sac/kanban')
-                  ? 'flex flex-col h-full min-h-0 overflow-hidden'
-                  : 'w-full overflow-y-auto'
-                  }`}
-              >
-                {children}
-              </main>
-            </div>
-            {/* Main Content End */}
-          </div>
-          {/* Content Area End */}
-        </div>
+              <div className={`flex flex-col mt-3 duration-300 ease-linear no-scrollbar ${sidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
+                <nav className="mt-0 py-2 px-4 lg:mt-0 lg:px-6">
+                  <div>
+                    <h3 className={`mb-4 text-xs uppercase leading-[20px] text-gray-400 font-semibold transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}`}>
+                      MENU
+                    </h3>
 
-        {isNavigating && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm">
-            <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
-              <span className="inline-flex h-6 w-6 border-2 border-[var(--primary-600)] border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
-              <span className="text-gray-700 font-medium">Carregando...</span>
-            </div>
-          </div>
-        )}
+                    <ul className="flex flex-col gap-4 mb-6">
+                      {/* Menu Items Configuration */}
+                      {[
+                        { id: 'Compras', label: 'Compras', icon: HiOutlineShoppingCart, path: '/compras' },
+                        { id: 'Oficina', label: 'Oficina', icon: HiOutlineWrench, path: '/oficina' },
+                        { id: 'Estoque', label: 'Estoque', icon: HiOutlineCube, path: '/estoque' },
+                        { id: 'Expedição', label: 'Expedição', icon: HiOutlineTruck, path: '/expedicao' }, // Note: id matches hasAccessToModule
+                        { id: 'Qualidade', label: 'Qualidade', icon: HiOutlineClipboardDocumentCheck, path: '/qualidade' },
+                        { id: 'Sac', label: 'Sac', icon: HiOutlineUser, path: '/sac' },
+                        { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/usuario' },
+                      ].map((section) => {
+                        // Special handling for section keys if they differ from ID
+                        const sectionKey = section.id === 'Expedição' ? 'Expedicao' : section.id;
 
-        {isLoggingOut && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
-            <div className="flex flex-col items-center gap-4">
-              <div className="h-12 w-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-white text-lg font-medium">Saindo...</span>
+                        if (!hasAccessToModule(section.id) || !hasAnyVisibleInSection(sectionKey)) return null;
+
+                        return (
+                          <SidebarMenuItem
+                            key={section.id}
+                            label={section.label}
+                            icon={section.icon}
+                            isActive={sectionActive[sectionKey.toLowerCase() as keyof typeof sectionActive]}
+                            isCollapsed={sidebarCollapsed}
+                            submenus={getVisibleSubmenuItems(sectionKey)}
+                            onNavigate={handleNavigation}
+                            isPathActive={isPathActive}
+                            pathname={pathname}
+                          />
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </nav>
+              </div>
+            </aside>
+            {/* Sidebar End */}
+
+            {/* Content Area Start */}
+            <div className="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
+              {/* Header Start */}
+              {/* Header Start */}
+              <header className="sticky top-0 z-999 flex w-full border-b border-gray-700 bg-gray-800">
+                <div className="flex grow items-center justify-between px-3 py-3 lg:px-6">
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    {/* Hamburger Toggle BTN */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSidebarOpen(!sidebarOpen);
+                      }}
+                      className="z-99999 block rounded-lg border border-gray-700 bg-black p-1.5 shadow-sm lg:hidden"
+                    >
+                      <MdMenu className="text-xl text-white" />
+                    </button>
+
+                    <button
+                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                      className="z-99999 hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-700 text-white lg:flex"
+                    >
+                      <MdMenu className="text-xl" />
+                    </button>
+                    {/* Hamburger Toggle BTN */}
+                  </div>
+
+                  <div className="flex items-center gap-3 2xsm:gap-7">
+                    <ul className="flex items-center gap-2 2xsm:gap-4">
+                      {/* Notification Menu Area */}
+                      <li className="relative">
+                        <Link
+                          href="#"
+                          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-700 bg-black text-gray-400 hover:text-primary"
+                        >
+                          <MdOutlineNotificationsNone className="text-xl" />
+                        </Link>
+                      </li>
+                      {/* Notification Menu Area */}
+                    </ul>
+
+                    {/* User Area */}
+                    <ProfileDropdown userData={userData} onLogout={deslogar} />
+                    {/* User Area */}
+                  </div>
+                </div>
+              </header>
+              {/* Header End */}
+
+              {/* Main Content Start */}
+              <div className="flex-1 w-full border-l border-gray-700 flex flex-col min-h-0">
+                <main
+                  className={`relative flex-1 ${pathname?.startsWith('/compras/kanban') || pathname?.startsWith('/sac/kanban')
+                    ? 'flex flex-col h-full min-h-0 overflow-hidden'
+                    : 'w-full overflow-y-auto'
+                    }`}
+                >
+                  {children}
+                </main>
+              </div>
+              {/* Main Content End */}
             </div>
+            {/* Content Area End */}
           </div>
-        )}
-      </PrivateRoute>
+
+          {isNavigating && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+              <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+                <span className="inline-flex h-6 w-6 border-2 border-[var(--primary-600)] border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
+                <span className="text-gray-700 font-medium">Carregando...</span>
+              </div>
+            </div>
+          )}
+
+          {isLoggingOut && (
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-12 w-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-white text-lg font-medium">Saindo...</span>
+              </div>
+            </div>
+          )}
+        </PrivateRoute>
+      </ToastProvider>
     </SidebarContext.Provider >
   );
 }

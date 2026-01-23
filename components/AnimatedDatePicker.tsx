@@ -211,7 +211,7 @@ export default function AnimatedDatePicker({ value, onChange, placeholder = "Sel
             <style jsx global>{`
                 /* Animação de entrada do Popper */
                 .animated-datepicker-popper {
-                    z-index: 100 !important; /* Menor que o Header (999) para passar por baixo ao rolar */
+                    z-index: 100000 !important; /* Alto z-index para ficar acima de Modais (z-99999) */
                     padding-top: 10px !important; /* Reduzido pois o portal já posiciona */
                 }
 
