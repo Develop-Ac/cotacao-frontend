@@ -5,7 +5,7 @@ import logo from "../logo.svg";
 import Image from "next/image";
 import { serviceUrl } from "@/lib/services";
 import { writeUserToLocalStorage } from "../lib/user"; // ✅ importa o writer que dispara o evento
-import fundoNatal from "../(private)/assets/images/fundo/fundo_natal.jpg";
+
 
 export default function Login() {
   const [codigo, setCodigo] = useState("");
@@ -66,21 +66,29 @@ export default function Login() {
     }
   };
 
+  // Mapeamento dos meses para os arquivos de imagem
+  const backgroundImages = [
+    "JANEIRO.png", "FEVEREIRO.png", "MARÇO.png", "ABRIL.png", "MAIO.png", "JUNHO.png",
+    "JULHO.png", "AGOSTO.png", "SETEMBRO.png", "OUTUBRO.png", "NOVEMBRO.png", "DEZEMBRO.png"
+  ];
+
+  const currentMonthIndex = new Date().getMonth();
+  const currentBackgroundImage = `/images/fundo/${backgroundImages[currentMonthIndex]}`;
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image
-          src={fundoNatal}
+          src={currentBackgroundImage}
           alt="Background"
           fill
-          className="object-cover opacity-100"
+          className="object-fill opacity-100"
           priority
           quality={100}
-          placeholder="blur"
         />
         {/* Overlay for better readability if needed */}
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-black/10" />
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">

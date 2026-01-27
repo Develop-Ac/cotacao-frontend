@@ -12,12 +12,20 @@ import {
     FaTimes,
     FaUser,
     FaMapMarkerAlt,
+    FaTrash,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useEffect, useState, useCallback } from "react";
 import { genId } from "../../../utils/genId";
 import { serviceUrl } from "@/lib/services";
 import Link from "next/link";
+import Select from "@/components/Select";
+import DatePicker from "@/components/AnimatedDatePicker";
+
+const ESTOQUE_BASE = serviceUrl("estoque");
+
+const estoqueUrl = (path: string) =>
+    `${ESTOQUE_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
 type CotacaoItem = {
     PEDIDO_COTACAO: number;
@@ -58,6 +66,7 @@ type ContagemListaItem = {
         };
     }>;
     itens?: any[];
+    grupo_iniciado?: boolean; // Novo campo vindo do backend
 };
 
 type ContagemItem = {
@@ -80,17 +89,16 @@ type Usuario = {
     setor: string;
 };
 
-const ESTOQUE_BASE = serviceUrl("estoque");
 
-const estoqueUrl = (path: string) =>
-    `${ESTOQUE_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
 function ContagemCard({
     contagem,
     onOpenLogs,
+    onDelete,
 }: {
     contagem: ContagemListaItem;
     onOpenLogs: (c: ContagemListaItem) => void;
+    onDelete: (id: string) => void;
 }) {
     const getStatus = () => {
         if (contagem.liberado_contagem) {
@@ -157,9 +165,14 @@ function ContagemCard({
                         <FaCalendar size={14} />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Data Criação</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Data de Contagem</span>
                         <span className="font-medium text-sm">
-                            {new Date(contagem.created_at).toLocaleDateString("pt-BR")}
+                            {contagem.itens && contagem.itens[0]?.data
+                                ? new Date(contagem.itens[0].data).toLocaleDateString("pt-BR", { timeZone: 'UTC' })
+                                : new Date(contagem.created_at).toLocaleDateString("pt-BR")}
+                        </span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                            Criado em: {new Date(contagem.created_at).toLocaleDateString("pt-BR")}
                         </span>
                     </div>
                 </div>
@@ -186,8 +199,18 @@ function ContagemCard({
                     <FaClipboardList />
                     Listar Produtos
                 </button>
+                {contagem.contagem === 1 && !contagem.grupo_iniciado && (
+                    <button
+                        onClick={() => onDelete(contagem.id)}
+                        className="w-full mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:border-red-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-sm py-2 px-4"
+                        title="Excluir Contagem"
+                    >
+                        <FaTrash size={14} />
+                        Excluir
+                    </button>
+                )}
             </div>
-        </div>
+        </div >
     );
 }
 
@@ -222,6 +245,7 @@ export default function Tela() {
     const [contagem2, setContagem2] = useState("");
     const [contagem3, setContagem3] = useState("");
     const [loadingUsuarios, setLoadingUsuarios] = useState(false);
+    const [tipoContagem, setTipoContagem] = useState(1); // 1 = Diária, 2 = Avulsa
 
     const buscarCotacao = async () => {
         setMsgCot(null);
@@ -257,11 +281,13 @@ export default function Tela() {
 
         setLoadingContagem(true);
         try {
+
+
             const url = `${estoqueUrl(
                 `/estoque/contagem`
             )}?data_inicial=${encodeURIComponent(
                 dataInicial
-            )}&data_final=${encodeURIComponent(dataFinal)}&empresa=3`;
+            )}&data_final=${encodeURIComponent(dataFinal)}&empresa=3&tipo=${tipoContagem}`;
 
             const res = await fetch(url, { headers: { Accept: "application/json" } });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -342,6 +368,7 @@ export default function Tela() {
                     contagem_cuid: contagem_cuid,
                     piso: piso ? String(piso) : undefined,
                     produtos: produtosSelecionados,
+                    tipo: tipoContagem,
                 };
 
                 await fetch(estoqueUrl("/estoque/contagem"), {
@@ -362,6 +389,7 @@ export default function Tela() {
                     contagem_cuid: contagem_cuid,
                     piso: piso ? String(piso) : undefined,
                     produtos: produtosSelecionados,
+                    tipo: tipoContagem,
                 };
 
                 await fetch(estoqueUrl("/estoque/contagem"), {
@@ -382,6 +410,7 @@ export default function Tela() {
                     contagem_cuid: contagem_cuid,
                     piso: piso ? String(piso) : undefined,
                     produtos: produtosSelecionados,
+                    tipo: tipoContagem,
                 };
 
                 await fetch(estoqueUrl("/estoque/contagem"), {
@@ -464,7 +493,7 @@ export default function Tela() {
     const [msgContagensLista, setMsgContagensLista] = useState<string | null>(
         null
     );
-    const [pageSize, setPageSize] = useState<number>(20);
+    const [pageSize, setPageSize] = useState<number>(21);
     const [page, setPage] = useState(1);
 
     const [totalPages, setTotalPages] = useState(1);
@@ -655,7 +684,6 @@ export default function Tela() {
         setLogsDetalhes([]);
     };
 
-    // Função para gerar Excel dos logs
     const gerarExcelLogs = () => {
         if (!logsDetalhes.length) return;
         const data = logsDetalhes.map((log) => ({
@@ -668,6 +696,24 @@ export default function Tela() {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Logs");
         XLSX.writeFile(wb, `logs-contagem-${contagemSelecionada?.contagem}.xlsx`);
+    };
+
+    const handleDeleteContagem = async (id: string) => {
+        if (!confirm("Tem certeza que deseja excluir esta contagem?")) return;
+        try {
+            const res = await fetch(estoqueUrl(`/estoque/contagem/${id}`), {
+                method: "DELETE",
+                headers: { Accept: "application/json" }
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || "Erro ao excluir");
+            }
+            // Sucesso
+            carregarContagensLista();
+        } catch (e: any) {
+            alert(e.message || "Erro desconhecido ao excluir");
+        }
     };
 
 
@@ -735,16 +781,16 @@ export default function Tela() {
                             Nova Contagem
                         </h4>
 
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto_auto] gap-4 mb-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Data Inicial
                                 </label>
-                                <input
-                                    type="date"
+                                <DatePicker
                                     value={dataInicial}
-                                    onChange={(e) => setDataInicial(e.target.value)}
-                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                    onChange={setDataInicial}
+                                    placeholder="Início"
+                                    className="w-full"
                                 />
                             </div>
 
@@ -752,11 +798,11 @@ export default function Tela() {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Data Final
                                 </label>
-                                <input
-                                    type="date"
+                                <DatePicker
                                     value={dataFinal}
-                                    onChange={(e) => setDataFinal(e.target.value)}
-                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                    onChange={setDataFinal}
+                                    placeholder="Fim"
+                                    className="w-full"
                                 />
                             </div>
 
@@ -769,8 +815,39 @@ export default function Tela() {
                                     placeholder="Ex: 1"
                                     value={piso}
                                     onChange={(e) => setPiso(e.target.value)}
-                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-form-input text-black dark:text-white"
                                 />
+                            </div>
+
+                            <div className="min-w-[150px]">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Tipo
+                                </label>
+                                <div className="flex gap-3 items-center h-11">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="tipoContagem"
+                                            value={1}
+                                            checked={tipoContagem === 1}
+                                            onChange={() => setTipoContagem(1)}
+                                            className="w-4 h-4 text-primary border-gray-300 focus:ring-primary dark:border-strokedark dark:bg-form-input"
+                                        />
+                                        <span className="text-sm text-black dark:text-white">Diária</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-not-allowed opacity-50" title="Desabilitado temporariamente para manutenção">
+                                        <input
+                                            type="radio"
+                                            name="tipoContagem"
+                                            value={2}
+                                            checked={tipoContagem === 2}
+                                            onChange={() => { }} // Disabled
+                                            disabled={true}
+                                            className="w-4 h-4 text-primary border-gray-300 focus:ring-primary dark:border-strokedark dark:bg-form-input cursor-not-allowed"
+                                        />
+                                        <span className="text-sm text-black dark:text-white">Avulsa</span>
+                                    </label>
+                                </div>
                             </div>
 
                             <div className="flex items-end">
@@ -800,22 +877,24 @@ export default function Tela() {
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                 Filtrar por localização:
                                             </label>
-                                            <select
+                                            <Select
+                                                options={[
+                                                    { label: "Todas as localizações", value: "" },
+                                                    { label: "PISO A", value: "PISO_A" },
+                                                    { label: "PISO B", value: "PISO_B" },
+                                                    { label: "PISO C", value: "PISO_C" },
+                                                    { label: "VITRINE", value: "VITRINE" },
+                                                    { label: "BOX (Antigo)", value: "BOX" },
+                                                    { label: "A-BOX", value: "A-BOX" },
+                                                    { label: "A-BOQUETA", value: "A-BOQUETA" },
+                                                    { label: "A-CX ESCADA", value: "A-CX ESCADA" },
+                                                    { label: "VENDA CASADA", value: "VENDA CASADA" }
+                                                ]}
                                                 value={localizacaoFiltro}
-                                                onChange={(e) => setLocalizacaoFiltro(e.target.value)}
-                                                className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
-                                            >
-                                                <option value="">Todas as localizações</option>
-                                                <option value="PISO_A">PISO A</option>
-                                                <option value="PISO_B">PISO B</option>
-                                                <option value="PISO_C">PISO C</option>
-                                                <option value="VITRINE">VITRINE</option>
-                                                <option value="BOX">BOX (Antigo)</option>
-                                                <option value="A-BOX">A-BOX</option>
-                                                <option value="A-BOQUETA">A-BOQUETA</option>
-                                                <option value="A-CX ESCADA">A-CX ESCADA</option>
-                                                <option value="VENDA CASADA">VENDA CASADA</option>
-                                            </select>
+                                                onChange={(val) => setLocalizacaoFiltro(String(val))}
+                                                placeholder="Todas as localizações"
+                                                className="w-full"
+                                            />
                                         </div>
 
                                         <div>
@@ -827,11 +906,11 @@ export default function Tela() {
                                                 placeholder="Ex: 13"
                                                 value={prateleira}
                                                 onChange={(e) => setPrateleira(e.target.value)}
-                                                className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
+                                                className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-form-input text-black dark:text-white"
                                             />
                                         </div>
 
-                                        <div>
+                                        <div className="flex items-center">
                                             {(localizacaoFiltro || prateleira) && (
                                                 <span className="text-sm text-gray-600 dark:text-gray-400">
                                                     Exibindo {itensFiltrados.length} de{" "}
@@ -848,57 +927,39 @@ export default function Tela() {
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                     Contagem 1:
                                                 </label>
-                                                <select
+                                                <Select
+                                                    options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
                                                     value={contagem1}
-                                                    onChange={(e) => setContagem1(e.target.value)}
-                                                    className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
-                                                    disabled={loadingUsuarios}
-                                                >
-                                                    <option value="">Selecionar usuário</option>
-                                                    {usuarios.map((usuario) => (
-                                                        <option key={usuario.id} value={usuario.id}>
-                                                            {usuario.nome}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => setContagem1(String(val))}
+                                                    placeholder="Selecionar usuário"
+                                                    className="w-full"
+                                                />
                                             </div>
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                     Contagem 2:
                                                 </label>
-                                                <select
+                                                <Select
+                                                    options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
                                                     value={contagem2}
-                                                    onChange={(e) => setContagem2(e.target.value)}
-                                                    className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
-                                                    disabled={loadingUsuarios}
-                                                >
-                                                    <option value="">Selecionar usuário</option>
-                                                    {usuarios.map((usuario) => (
-                                                        <option key={usuario.id} value={usuario.id}>
-                                                            {usuario.nome}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => setContagem2(String(val))}
+                                                    placeholder="Selecionar usuário"
+                                                    className="w-full"
+                                                />
                                             </div>
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                                     Auditoria:
                                                 </label>
-                                                <select
+                                                <Select
+                                                    options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
                                                     value={contagem3}
-                                                    onChange={(e) => setContagem3(e.target.value)}
-                                                    className="h-10 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-blue-500 bg-white dark:bg-form-input text-black dark:text-white"
-                                                    disabled={loadingUsuarios}
-                                                >
-                                                    <option value="">Selecionar usuário</option>
-                                                    {usuarios.map((usuario) => (
-                                                        <option key={usuario.id} value={usuario.id}>
-                                                            {usuario.nome}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => setContagem3(String(val))}
+                                                    placeholder="Selecionar usuário"
+                                                    className="w-full"
+                                                />
                                             </div>
                                         </div>
 
@@ -1012,47 +1073,49 @@ export default function Tela() {
 
             {/* LISTAGEM INFERIOR (Cards) */}
             <div className="space-y-4">
-                <div className="bg-white dark:bg-boxdark shadow-md rounded-xl p-4 border border-gray-100 dark:border-strokedark flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full xl:w-auto">
-                        <div className="text-sm text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">
-                            Listagem de Contagens
-                        </div>
-
-                        {/* Filtros */}
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <input
-                                type="date"
-                                className="h-9 rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input px-3 text-sm focus:ring-2 focus:ring-blue-500 text-black dark:text-white"
-                                value={filtroData}
-                                onChange={(e) => setFiltroData(e.target.value)}
-                                title="Filtrar por data"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Piso"
-                                className="h-9 w-24 rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input px-3 text-sm focus:ring-2 focus:ring-blue-500 text-black dark:text-white"
-                                value={filtroPiso}
-                                onChange={(e) => setFiltroPiso(e.target.value)}
-                            />
+                {/* Filtros Padronizados */}
+                <div className="bg-white dark:bg-boxdark rounded-xl shadow-md p-4 mb-6 border border-gray-100 dark:border-strokedark">
+                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
+                            <div className="w-full sm:w-auto">
+                                <DatePicker
+                                    value={filtroData}
+                                    onChange={setFiltroData}
+                                    placeholder="Data"
+                                    className="w-full sm:w-auto"
+                                />
+                            </div>
+                            <div className="w-full sm:w-auto">
+                                <input
+                                    type="text"
+                                    placeholder="Filtrar por Piso..."
+                                    className="w-full sm:w-40 h-11 border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-form-input text-black dark:text-white transition-all"
+                                    value={filtroPiso}
+                                    onChange={(e) => setFiltroPiso(e.target.value)}
+                                />
+                            </div>
                             <button
                                 onClick={() => { setPage(1); carregarContagensLista(); }}
-                                className="h-9 px-3 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 text-sm font-medium transition-colors"
+                                className="w-full sm:w-auto h-11 px-6 rounded-lg bg-primary text-white hover:bg-opacity-90 transition-all active:scale-95 font-medium shadow-sm flex items-center justify-center gap-2"
                             >
+                                <FaSearch />
                                 Filtrar
                             </button>
                         </div>
-                    </div>
 
-                    <select
-                        className="h-10 border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white w-full sm:w-auto"
-                        value={pageSize}
-                        onChange={(e) => setPageSize(Number(e.target.value))}
-                    >
-                        <option value={10}>10 contagens</option>
-                        <option value={20}>20 contagens</option>
-                        <option value={50}>50 contagens</option>
-                        <option value={100}>100 contagens</option>
-                    </select>
+                        <div className="w-full md:w-auto">
+                            <Select
+                                className="w-full md:w-auto min-w-[160px]"
+                                value={pageSize}
+                                onChange={(val: string | number) => setPageSize(Number(val))}
+                                options={[
+                                    { label: "21 por página", value: 21 },
+                                    { label: "51 por página", value: 51 },
+                                    { label: "102 por página", value: 102 }
+                                ]}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {msgContagensLista && (
@@ -1083,6 +1146,7 @@ export default function Tela() {
                                 key={idx}
                                 contagem={item}
                                 onOpenLogs={abrirModalLogs}
+                                onDelete={handleDeleteContagem}
                             />
                         ))}
                     </div>
