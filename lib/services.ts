@@ -22,7 +22,7 @@ const FALLBACKS: Record<ServiceKey, string> = {
   qualidade: "http://garantia-service.acacessorios.local/api",
   calculadoraSt: "http://calculadora-st-service.acacessorios.local/api",
   atendimentoLog: "http://atendimento-log.acacessorios.com.br",
-  analiseEstoque: "http://analise-estoque-service.acacessorios.local",
+  analiseEstoque: "http://localhost:8000",//"http://analise-estoque-service.acacessorios.local",
 };
 
 const envNames: Record<ServiceKey, string> = {
