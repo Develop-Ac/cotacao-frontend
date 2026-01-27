@@ -49,6 +49,10 @@ export default function AuditoriaPage() {
     const [auditoriaValores, setAuditoriaValores] = useState<Record<string, { tipo?: 'BAIXA' | 'INCLUSAO' | 'CORRETO', qtd?: number }>>({});
     const [observacoes, setObservacoes] = useState<Record<string, string>>({});
 
+    // UX Improvements State
+    const [expandedHistory, setExpandedHistory] = useState<number | null>(null); // Toggle Histórico Inline
+    const [historicoMap, setHistoricoMap] = useState<Record<number, any[]>>({}); // Cache de histórico por produto
+
     const usuarios = useUsuarios();
 
     // Mock de usuário logado (pegar do contexto de auth real se existir)
@@ -137,13 +141,21 @@ export default function AuditoriaPage() {
         }
     };
 
-    const handleOpenHistorico = async (codProduto: number) => {
+    const handleToggleHistorico = async (codProduto: number) => {
+        if (expandedHistory === codProduto) {
+            setExpandedHistory(null);
+            return;
+        }
+
+        setExpandedHistory(codProduto);
+
+        // Se já tem no cache, não busca de novo
+        if (historicoMap[codProduto]) return;
+
         setLoadingHistorico(true);
-        setShowHistoricoModal(true);
-        setHistoricoList([]);
         try {
             const data = await AuditoriaService.getHistorico(codProduto);
-            setHistoricoList(data);
+            setHistoricoMap(prev => ({ ...prev, [codProduto]: data }));
         } catch (e) {
             alert("Erro ao buscar histórico");
         } finally {
@@ -481,7 +493,7 @@ export default function AuditoriaPage() {
                                     <div className="text-sm text-gray-500 mb-2">
                                         Locais: {item.locacoes.join(", ")}
                                     </div>
-                                    <div className="grid grid-cols-5 gap-2 text-center text-sm">
+                                    <div className="grid grid-cols-5 gap-2 text-center text-sm mb-3">
                                         <div className="bg-gray-50 p-2 rounded">
                                             <div className="text-gray-400 text-xs text-[10px] whitespace-nowrap">Estoque (Contagem)</div>
                                             <div className="font-bold">{item.estoque_snapshot ?? '-'}</div>
@@ -503,78 +515,69 @@ export default function AuditoriaPage() {
                                             <div className="font-bold">{item.diferencas[3] > 0 ? `+ ${item.diferencas[3]} ` : item.diferencas[3]}</div>
                                         </div>
                                     </div>
+
+                                    {/* Botões movidos para a esquerda para otimizar espaço */}
+                                    <div className="flex gap-4">
+                                        <button
+                                            onClick={() => setExpandedItem(expandedItem === item.cod_produto ? null : item.cod_produto)}
+                                            className={`text-xs hover:underline flex items-center gap-1 ${expandedItem === item.cod_produto ? 'text-primary font-bold' : 'text-gray-500 hover:text-primary'}`}
+                                        >
+                                            <FaHistory /> {expandedItem === item.cod_produto ? 'Ocultar Detalhes' : 'Ver Detalhes das Contagens'}
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleToggleHistorico(item.cod_produto)}
+                                            className={`text-xs hover:underline flex items-center gap-1 ${expandedHistory === item.cod_produto ? 'text-primary font-bold' : 'text-gray-500 hover:text-primary'}`}
+                                        >
+                                            <FaClipboardCheck /> {expandedHistory === item.cod_produto ? 'Ocultar Histórico' : 'Ver Histórico de Auditorias'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex-1 min-w-[300px] flex flex-col gap-2">
-                                    <button
-                                        onClick={() => setExpandedItem(expandedItem === item.cod_produto ? null : item.cod_produto)}
-                                        className="text-primary text-sm hover:underline flex items-center gap-1 mb-2"
-                                    >
-                                        <FaHistory /> Ver Detalhes das Contagens
-                                    </button>
+                                    {/* Botões antigos removidos daqui */}
 
-                                    <button
-                                        onClick={() => handleOpenHistorico(item.cod_produto)}
-                                        className="text-gray-500 text-sm hover:text-primary hover:underline flex items-center gap-1 mb-2"
-                                    >
-                                        <FaClipboardCheck /> Ver Histórico de Auditorias
-                                    </button>
-
-                                    {/* Área de Ação de Auditoria */}
+                                    {/* Área de Ação de Auditoria - Layout Estável */}
                                     {!item.ja_auditado ? (
-                                        <div className="flex flex-col gap-2 bg-gray-50 dark:bg-meta-4 p-2 rounded">
-                                            {/* Linha 1: Tipo e Botão */}
-                                            <div className="flex items-center justify-between gap-4 text-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Tipo:</span>
-                                                    <label className="flex items-center gap-1 cursor-pointer">
-                                                        <input
-                                                            type="radio"
-                                                            name={`tipo_${item.cod_produto} `}
-                                                            className="form-radio text-red-600 focus:ring-red-600 h-4 w-4"
-                                                            checked={!auditoriaValores[item.cod_produto]?.tipo || auditoriaValores[item.cod_produto]?.tipo === 'BAIXA'}
-                                                            onChange={() => setAuditoriaValores(prev => ({ ...prev, [item.cod_produto]: { ...prev[item.cod_produto], tipo: 'BAIXA' } }))}
-                                                        />
-                                                        <span className="text-red-700 font-medium text-xs">Baixa</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-1 cursor-pointer">
-                                                        <input
-                                                            type="radio"
-                                                            name={`tipo_${item.cod_produto} `}
-                                                            className="form-radio text-blue-600 focus:ring-blue-600 h-4 w-4"
-                                                            checked={auditoriaValores[item.cod_produto]?.tipo === 'INCLUSAO'}
-                                                            onChange={() => setAuditoriaValores(prev => ({ ...prev, [item.cod_produto]: { ...prev[item.cod_produto], tipo: 'INCLUSAO' } }))}
-                                                        />
-                                                        <span className="text-blue-700 font-medium text-xs">Inclusão</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-1 cursor-pointer">
-                                                        <input
-                                                            type="radio"
-                                                            name={`tipo_${item.cod_produto} `}
-                                                            className="form-radio text-green-600 focus:ring-green-600 h-4 w-4"
-                                                            checked={auditoriaValores[item.cod_produto]?.tipo === 'CORRETO'}
-                                                            onChange={() => setAuditoriaValores(prev => ({ ...prev, [item.cod_produto]: { ...prev[item.cod_produto], tipo: 'CORRETO', qtd: 0 } }))}
-                                                        />
-                                                        <span className="text-green-700 font-medium text-xs">Correto</span>
-                                                    </label>
-                                                </div>
+                                        <div className="flex flex-col gap-3 bg-gray-50 dark:bg-meta-4 p-3 rounded border border-gray-100 dark:border-strokedark transition-all">
+                                            {/* Tabs de Tipo de Ação */}
+                                            <div className="flex bg-white dark:bg-boxdark rounded-lg p-1 border border-gray-200 dark:border-strokedark shadow-sm">
+                                                {['BAIXA', 'INCLUSAO', 'CORRETO'].map((t) => {
+                                                    const currentType = auditoriaValores[item.cod_produto]?.tipo || 'BAIXA';
+                                                    const isActive = currentType === t;
 
-                                                <button
-                                                    onClick={() => handleSave(item)}
-                                                    className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700 transition-colors flex items-center gap-1 h-[28px]"
-                                                >
-                                                    <FaCheck /> Confirmar
-                                                </button>
+                                                    let activeClass = "";
+                                                    if (t === 'BAIXA') activeClass = "bg-red-50 text-red-700 border-red-200";
+                                                    if (t === 'INCLUSAO') activeClass = "bg-blue-50 text-blue-700 border-blue-200";
+                                                    if (t === 'CORRETO') activeClass = "bg-green-50 text-green-700 border-green-200";
+
+                                                    return (
+                                                        <button
+                                                            key={t}
+                                                            onClick={() => setAuditoriaValores(prev => ({
+                                                                ...prev,
+                                                                [item.cod_produto]: {
+                                                                    ...prev[item.cod_produto],
+                                                                    tipo: t as any,
+                                                                    qtd: t === 'CORRETO' ? 0 : (prev[item.cod_produto]?.qtd || 0)
+                                                                }
+                                                            }))}
+                                                            className={`flex-1 py-1.5 text-xs font-bold rounded transition-all ${isActive ? `${activeClass} shadow-sm border` : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-strokedark'}`}
+                                                        >
+                                                            {t}
+                                                        </button>
+                                                    )
+                                                })}
                                             </div>
 
-                                            {/* Linha 2: Quantidade (compacta) e Observação (expansível) no mesmo row */}
-                                            <div className="flex gap-2 items-center">
-                                                {auditoriaValores[item.cod_produto]?.tipo !== 'CORRETO' && (
-                                                    <div className="w-[80px]">
+                                            {/* Inputs Condicionais com Altura Reservada para evitar pulo */}
+                                            <div className="min-h-[40px] flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200">
+                                                {(auditoriaValores[item.cod_produto]?.tipo || 'BAIXA') !== 'CORRETO' && (
+                                                    <div className="w-[100px]">
                                                         <input
                                                             type="number"
                                                             min="0"
-                                                            className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:border-primary focus:outline-none dark:border-strokedark dark:bg-boxdark"
+                                                            className="w-full h-10 border border-gray-300 rounded px-2 text-sm focus:border-primary focus:outline-none dark:border-strokedark dark:bg-boxdark font-bold"
                                                             placeholder="Qtd"
                                                             value={auditoriaValores[item.cod_produto]?.qtd || ''}
                                                             onChange={(e) => setAuditoriaValores(prev => ({
@@ -588,11 +591,20 @@ export default function AuditoriaPage() {
                                                 <div className="flex-1">
                                                     <input
                                                         type="text"
-                                                        placeholder="Observação (obrigatória para ajustes)"
-                                                        className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:border-primary focus:outline-none dark:border-strokedark dark:bg-boxdark"
+                                                        placeholder={(auditoriaValores[item.cod_produto]?.tipo || 'BAIXA') === 'CORRETO' ? "Observação (Opcional)" : "Observação (Obrigatória)"}
+                                                        className="w-full h-10 border border-gray-300 rounded px-3 text-sm focus:border-primary focus:outline-none dark:border-strokedark dark:bg-boxdark"
+                                                        value={observacoes[item.cod_produto] || ''}
                                                         onChange={(e) => setObservacoes(prev => ({ ...prev, [item.cod_produto]: e.target.value }))}
                                                     />
                                                 </div>
+
+                                                <button
+                                                    onClick={() => handleSave(item)}
+                                                    className="h-10 bg-green-600 text-white px-4 rounded font-bold hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm active:scale-95"
+                                                    title="Confirmar Auditoria"
+                                                >
+                                                    <FaCheck />
+                                                </button>
                                             </div>
                                         </div>
                                     ) : (
@@ -626,25 +638,84 @@ export default function AuditoriaPage() {
                                 </div>
                             </div>
 
-                            {expandedItem === item.cod_produto && (
-                                <div className="mt-4 border-t pt-4 border-gray-100 dark:border-strokedark">
-                                    <h4 className="font-bold text-sm mb-2 text-gray-600">Histórico de Contagens</h4>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        {[1, 2, 3].map(round => (
-                                            <div key={round} className="bg-gray-50 dark:bg-meta-4 p-3 rounded text-xs">
-                                                <div className="font-bold border-b pb-1 mb-2">Contagem {round} (Total: {(item.history as any)[round].total})</div>
-                                                <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
-                                                    {(item.history as any)[round].logs.map((log: any, idx: number) => (
-                                                        <div key={idx} className="flex justify-between border-b border-gray-200 pb-1 last:border-0 hover:bg-white p-1 rounded">
-                                                            <span>{log.usuario} <span className="text-gray-400">({log.local})</span></span>
-                                                            <span className="font-bold">{log.qtd}</span>
+                            {/* Seção de Conteúdo Expandido (Tabs ou Accordion) */}
+                            {(expandedItem === item.cod_produto || expandedHistory === item.cod_produto) && (
+                                <div className="mt-4 border-t pt-4 border-gray-100 dark:border-strokedark animate-in slide-in-from-top-2 duration-300">
+
+                                    {/* Detalhes das Contagens Atuais */}
+                                    {expandedItem === item.cod_produto && (
+                                        <>
+                                            <h4 className="font-bold text-sm mb-3 text-gray-600 flex items-center gap-2">
+                                                <FaHistory /> Detalhes das Contagens (Atual)
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                                {[1, 2, 3].map(round => (
+                                                    <div key={round} className="bg-gray-50 dark:bg-meta-4 p-3 rounded text-xs border border-gray-100 dark:border-strokedark">
+                                                        <div className="font-bold border-b pb-1 mb-2 flex justify-between">
+                                                            <span>Contagem {round}</span>
+                                                            <span className="bg-gray-200 dark:bg-black/20 px-1.5 rounded">Total: {(item.history as any)[round].total}</span>
                                                         </div>
-                                                    ))}
-                                                    {(item.history as any)[round].logs.length === 0 && <span className="text-gray-400 italic">Sem registros</span>}
-                                                </div>
+                                                        <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto custom-scrollbar">
+                                                            {(item.history as any)[round].logs.map((log: any, idx: number) => (
+                                                                <div key={idx} className="flex justify-between border-b border-gray-200 dark:border-strokedark pb-1 last:border-0 hover:bg-white dark:hover:bg-black/10 p-1 rounded transition-colors">
+                                                                    <span>{log.usuario} <span className="text-gray-400">({log.local})</span></span>
+                                                                    <span className="font-bold">{log.qtd}</span>
+                                                                </div>
+                                                            ))}
+                                                            {(item.history as any)[round].logs.length === 0 && <span className="text-gray-400 italic text-center py-2">Sem registros</span>}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
+                                        </>
+                                    )}
+
+                                    {/* Histórico Anterior (Inline) */}
+                                    {expandedHistory === item.cod_produto && (
+                                        <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-100 dark:border-blue-900/30">
+                                            <h4 className="font-bold text-sm mb-3 text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                                                <FaClipboardCheck /> Histórico de Auditorias Anteriores
+                                            </h4>
+
+                                            {loadingHistorico && !historicoMap[item.cod_produto] ? (
+                                                <div className="text-center py-4 text-gray-500"><FaSync className="animate-spin inline mr-2" /> Carregando histórico...</div>
+                                            ) : (historicoMap[item.cod_produto] || []).length === 0 ? (
+                                                <div className="text-center py-4 text-gray-500 italic bg-white dark:bg-black/20 rounded">Nenhuma auditoria anterior encontrada.</div>
+                                            ) : (
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-xs text-left bg-white dark:bg-boxdark rounded overflow-hidden">
+                                                        <thead className="bg-gray-100 dark:bg-meta-4 text-gray-700 dark:text-gray-300">
+                                                            <tr>
+                                                                <th className="p-2">Data</th>
+                                                                <th className="p-2">Usuário</th>
+                                                                <th className="p-2">Tipo</th>
+                                                                <th className="p-2 text-right">Qtd</th>
+                                                                <th className="p-2">Obs</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100 dark:divide-strokedark">
+                                                            {(historicoMap[item.cod_produto] || []).map((h: any) => (
+                                                                <tr key={h.id} className="hover:bg-gray-50 dark:hover:bg-meta-4/50">
+                                                                    <td className="p-2 whitespace-nowrap">{formatDateHeader(new Date(h.created_at).toLocaleDateString())}</td>
+                                                                    <td className="p-2">{h.usuario?.nome || '-'}</td>
+                                                                    <td className="p-2">
+                                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${h.tipo_movimento === 'BAIXA' ? 'bg-red-100 text-red-700' :
+                                                                            h.tipo_movimento === 'INCLUSAO' ? 'bg-blue-100 text-blue-700' :
+                                                                                'bg-green-100 text-green-700'
+                                                                            }`}>
+                                                                            {h.tipo_movimento}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-2 text-right font-mono font-bold">{h.quantidade_movimento}</td>
+                                                                    <td className="p-2 text-gray-500 italic max-w-[200px] truncate" title={h.observacao}>{h.observacao}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -652,64 +723,6 @@ export default function AuditoriaPage() {
                 })}
             </div>
 
-            {/* Modal de Histórico */}
-            {showHistoricoModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.5)] p-4">
-                    <div className="bg-white dark:bg-boxdark rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-                        <div className="p-4 border-b border-gray-200 dark:border-strokedark flex justify-between items-center">
-                            <h3 className="font-bold text-lg dark:text-white flex items-center gap-2">
-                                <FaHistory /> Histórico de Auditorias
-                            </h3>
-                            <button onClick={() => setShowHistoricoModal(false)} className="text-gray-500 hover:text-red-500 text-2xl">&times;</button>
-                        </div>
-                        <div className="p-4 overflow-y-auto flex-1">
-                            {loadingHistorico ? (
-                                <div className="text-center py-10"><FaSync className="animate-spin inline text-primary text-2xl" /> Carregando...</div>
-                            ) : historicoList.length === 0 ? (
-                                <div className="text-center py-10 text-gray-500">Nenhum registro de auditoria encontrado.</div>
-                            ) : (
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-100 dark:bg-meta-4 text-gray-700 dark:text-gray-300">
-                                        <tr>
-                                            <th className="p-2">Data</th>
-                                            <th className="p-2">Usuário</th>
-                                            <th className="p-2">Tipo</th>
-                                            <th className="p-2 text-right">Qtd</th>
-                                            <th className="p-2">Obs</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {historicoList.map((h: any) => (
-                                            <tr key={h.id} className="border-b border-gray-100 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4/50">
-                                                <td className="p-2">{formatDateHeader(new Date(h.created_at).toLocaleDateString())} {new Date(h.created_at).toLocaleTimeString().substring(0, 5)}</td>
-                                                <td className="p-2">{h.usuario?.nome || '-'}</td>
-                                                <td className="p-2">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${h.tipo_movimento === 'BAIXA' ? 'bg-red-100 text-red-700' :
-                                                        h.tipo_movimento === 'INCLUSAO' ? 'bg-blue-100 text-blue-700' :
-                                                            'bg-green-100 text-green-700'
-                                                        }`}>
-                                                        {h.tipo_movimento}
-                                                    </span>
-                                                </td>
-                                                <td className="p-2 text-right font-mono">{h.quantidade_movimento}</td>
-                                                <td className="p-2 text-gray-500 italic max-w-[200px] truncate" title={h.observacao}>{h.observacao}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                        <div className="p-4 border-t border-gray-200 dark:border-strokedark flex justify-end">
-                            <button
-                                onClick={() => setShowHistoricoModal(false)}
-                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-medium"
-                            >
-                                Fechar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div >
     );
 }

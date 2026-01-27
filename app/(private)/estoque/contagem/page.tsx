@@ -13,14 +13,16 @@ import {
     FaUser,
     FaMapMarkerAlt,
     FaTrash,
+    FaChevronDown,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { genId } from "../../../utils/genId";
 import { serviceUrl } from "@/lib/services";
 import Link from "next/link";
 import Select from "@/components/Select";
 import DatePicker from "@/components/AnimatedDatePicker";
+import { AnimatePresence, motion } from "framer-motion";
 
 const ESTOQUE_BASE = serviceUrl("estoque");
 
@@ -246,6 +248,7 @@ export default function Tela() {
     const [contagem3, setContagem3] = useState("");
     const [loadingUsuarios, setLoadingUsuarios] = useState(false);
     const [tipoContagem, setTipoContagem] = useState(1); // 1 = Diária, 2 = Avulsa
+    const [step, setStep] = useState(1);
 
     const buscarCotacao = async () => {
         setMsgCot(null);
@@ -508,8 +511,7 @@ export default function Tela() {
         useState<ContagemListaItem | null>(null);
     const [logsDetalhes, setLogsDetalhes] = useState<any[]>([]);
     const [logsGroupData, setLogsGroupData] = useState<Record<number, any>>({});
-    const [itemDetalheSelecionado, setItemDetalheSelecionado] = useState<any | null>(null);
-    const [subModalAberto, setSubModalAberto] = useState(false);
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
     const [loadingLogs, setLoadingLogs] = useState(false);
 
     const carregarContagensLista = useCallback(async () => {
@@ -768,308 +770,229 @@ export default function Tela() {
                 </div>
             </div>
 
-            {/* BOX ABERTO - Filtros de Data */}
-            <div
-                className={`grid transition-all duration-300 ease-in-out overflow-hidden ${formularioAberto
-                    ? "grid-rows-[1fr] opacity-100 mb-10 p-2"
-                    : "grid-rows-[0fr] opacity-0 mb-0 p-0"
-                    }`}
-            >
-                <div className="min-h-0">
-                    <div className="bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-gray-100 dark:border-strokedark">
-                        <h4 className="text-lg font-semibold mb-4 text-black dark:text-white">
-                            Nova Contagem
-                        </h4>
+            {/* MODAL WIZARD - NOVA CONTAGEM */}
+            {formularioAberto && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] border border-gray-200 dark:border-strokedark">
 
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto_auto] gap-4 mb-6">
+                        {/* HEADER */}
+                        <div className="p-6 border-b border-gray-100 dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4 rounded-t-xl">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Data Inicial
-                                </label>
-                                <DatePicker
-                                    value={dataInicial}
-                                    onChange={setDataInicial}
-                                    placeholder="Início"
-                                    className="w-full"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Data Final
-                                </label>
-                                <DatePicker
-                                    value={dataFinal}
-                                    onChange={setDataFinal}
-                                    placeholder="Fim"
-                                    className="w-full"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Piso
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="Ex: 1"
-                                    value={piso}
-                                    onChange={(e) => setPiso(e.target.value)}
-                                    className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-form-input text-black dark:text-white"
-                                />
-                            </div>
-
-                            <div className="min-w-[150px]">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Tipo
-                                </label>
-                                <div className="flex gap-3 items-center h-11">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="tipoContagem"
-                                            value={1}
-                                            checked={tipoContagem === 1}
-                                            onChange={() => setTipoContagem(1)}
-                                            className="w-4 h-4 text-primary border-gray-300 focus:ring-primary dark:border-strokedark dark:bg-form-input"
-                                        />
-                                        <span className="text-sm text-black dark:text-white">Diária</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-not-allowed opacity-50" title="Desabilitado temporariamente para manutenção">
-                                        <input
-                                            type="radio"
-                                            name="tipoContagem"
-                                            value={2}
-                                            checked={tipoContagem === 2}
-                                            onChange={() => { }} // Disabled
-                                            disabled={true}
-                                            className="w-4 h-4 text-primary border-gray-300 focus:ring-primary dark:border-strokedark dark:bg-form-input cursor-not-allowed"
-                                        />
-                                        <span className="text-sm text-black dark:text-white">Avulsa</span>
-                                    </label>
+                                <h3 className="text-xl font-bold text-black dark:text-white flex items-center gap-2">
+                                    <FaPlusSquare className="text-primary" />
+                                    Nova Contagem
+                                </h3>
+                                <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                                    <span className={`px-2 py-0.5 rounded ${step === 1 ? 'bg-primary text-white font-bold' : 'bg-gray-200 dark:bg-meta-4'}`}>Passo 1: Seleção</span>
+                                    <span className="text-gray-300">&rarr;</span>
+                                    <span className={`px-2 py-0.5 rounded ${step === 2 ? 'bg-primary text-white font-bold' : 'bg-gray-200 dark:bg-meta-4'}`}>Passo 2: Equipe</span>
                                 </div>
                             </div>
-
-                            <div className="flex items-end">
-                                <button
-                                    onClick={buscarContagem}
-                                    disabled={loadingContagem}
-                                    className={BTN}
-                                >
-                                    <FaSearch />
-                                    {loadingContagem ? "Buscando..." : "Buscar"}
-                                </button>
-                            </div>
+                            <button
+                                onClick={() => { setFormularioAberto(false); setStep(1); }}
+                                className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-meta-4 transition-colors"
+                            >
+                                <FaTimes size={24} />
+                            </button>
                         </div>
 
-                        {msgContagem && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                {msgContagem}
-                            </p>
-                        )}
-
-                        {/* Filtros de localização e prateleira após busca */}
-                        {itensContagem.length > 0 && (
-                            <div>
-                                <div className="border-t border-gray-200 dark:border-strokedark pt-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        {/* BODY */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {step === 1 ? (
+                                <div className="space-y-6">
+                                    {/* FILTROS DE BUSCA */}
+                                    <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto_auto] gap-4 p-4 bg-gray-50 dark:bg-meta-4 rounded-lg border border-gray-100 dark:border-strokedark">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Filtrar por localização:
-                                            </label>
-                                            <Select
-                                                options={[
-                                                    { label: "Todas as localizações", value: "" },
-                                                    { label: "PISO A", value: "PISO_A" },
-                                                    { label: "PISO B", value: "PISO_B" },
-                                                    { label: "PISO C", value: "PISO_C" },
-                                                    { label: "VITRINE", value: "VITRINE" },
-                                                    { label: "BOX (Antigo)", value: "BOX" },
-                                                    { label: "A-BOX", value: "A-BOX" },
-                                                    { label: "A-BOQUETA", value: "A-BOQUETA" },
-                                                    { label: "A-CX ESCADA", value: "A-CX ESCADA" },
-                                                    { label: "VENDA CASADA", value: "VENDA CASADA" }
-                                                ]}
-                                                value={localizacaoFiltro}
-                                                onChange={(val) => setLocalizacaoFiltro(String(val))}
-                                                placeholder="Todas as localizações"
-                                                className="w-full"
-                                            />
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Inicial</label>
+                                            <DatePicker value={dataInicial} onChange={setDataInicial} placeholder="Início" className="w-full" />
                                         </div>
-
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Filtrar por prateleira:
-                                            </label>
-                                            <input
-                                                type="number"
-                                                placeholder="Ex: 13"
-                                                value={prateleira}
-                                                onChange={(e) => setPrateleira(e.target.value)}
-                                                className="h-11 w-full border border-gray-300 dark:border-form-strokedark rounded-lg px-3 focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-form-input text-black dark:text-white"
-                                            />
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Final</label>
+                                            <DatePicker value={dataFinal} onChange={setDataFinal} placeholder="Fim" className="w-full" />
                                         </div>
-
-                                        <div className="flex items-center">
-                                            {(localizacaoFiltro || prateleira) && (
-                                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Exibindo {itensFiltrados.length} de{" "}
-                                                    {itensContagem.length} itens
-                                                </span>
-                                            )}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Piso</label>
+                                            <input type="text" placeholder="Ex: 1" value={piso} onChange={(e) => setPiso(e.target.value)} className="h-11 w-full border border-gray-300 dark:border-strokedark rounded-lg px-3 focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-form-input" />
                                         </div>
-                                    </div>
-
-                                    {/* Selects de usuários para contagem */}
-                                    <div className="border-t border-gray-200 dark:border-strokedark pt-4 mt-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Contagem 1:
+                                        <div className="min-w-[150px]">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
+                                            <div className="flex gap-3 items-center h-11">
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <input type="radio" name="tipoContagem" value={1} checked={tipoContagem === 1} onChange={() => setTipoContagem(1)} className="text-primary focus:ring-primary" />
+                                                    <span className="text-sm">Diária</span>
                                                 </label>
-                                                <Select
-                                                    options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
-                                                    value={contagem1}
-                                                    onChange={(val) => setContagem1(String(val))}
-                                                    placeholder="Selecionar usuário"
-                                                    className="w-full"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Contagem 2:
+                                                <label className="flex items-center gap-2 opacity-50 cursor-not-allowed">
+                                                    <input type="radio" name="tipoContagem" value={2} checked={tipoContagem === 2} disabled className="text-primary focus:ring-primary" />
+                                                    <span className="text-sm">Avulsa</span>
                                                 </label>
-                                                <Select
-                                                    options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
-                                                    value={contagem2}
-                                                    onChange={(val) => setContagem2(String(val))}
-                                                    placeholder="Selecionar usuário"
-                                                    className="w-full"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                    Auditoria:
-                                                </label>
-                                                <Select
-                                                    options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
-                                                    value={contagem3}
-                                                    onChange={(val) => setContagem3(String(val))}
-                                                    placeholder="Selecionar usuário"
-                                                    className="w-full"
-                                                />
                                             </div>
                                         </div>
-
-                                        {/* Botão de salvar */}
-                                        <div className="flex justify-end mt-4">
-                                            <button
-                                                onClick={salvarContagem}
-                                                disabled={
-                                                    itensSelecionados.size === 0 ||
-                                                    (!contagem1 && !contagem2 && !contagem3)
-                                                }
-                                                className={BTN}
-                                            >
-                                                <FaCheck />
-                                                Salvar Contagem ({itensSelecionados.size} itens)
+                                        <div className="flex items-end">
+                                            <button onClick={buscarContagem} disabled={loadingContagem} className={BTN}>
+                                                <FaSearch /> {loadingContagem ? "..." : "Buscar"}
                                             </button>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Tabela de Contagem (Preview) */}
-                                <div className="overflow-x-auto mt-6 border border-gray-200 dark:border-strokedark rounded-lg">
-                                    <table className="min-w-full text-sm">
-                                        <thead className="bg-gray-50 dark:bg-meta-4 border-b border-gray-200 dark:border-strokedark">
-                                            <tr>
-                                                <th className="p-3 text-center w-12">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={
-                                                            itensFiltrados.length > 0 &&
-                                                            itensSelecionados.size === itensFiltrados.length
-                                                        }
-                                                        onChange={toggleTodosItens}
-                                                        className="rounded border-gray-300 text-primary focus:ring-primary"
-                                                    />
-                                                </th>
-                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
-                                                    Data
-                                                </th>
-                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
-                                                    Código
-                                                </th>
-                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
-                                                    Produto
-                                                </th>
-                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
-                                                    Marca
-                                                </th>
-                                                <th className="p-3 text-start text-gray-700 dark:text-gray-300">
-                                                    Localização
-                                                </th>
-                                                <th className="p-3 text-end text-gray-700 dark:text-gray-300">
-                                                    Estoque
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-200 dark:divide-strokedark">
-                                            {itensFiltrados.length === 0 && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={7}
-                                                        className="p-4 text-gray-500 text-center dark:text-gray-400"
-                                                    >
-                                                        {loadingContagem
-                                                            ? "Carregando..."
-                                                            : "Nenhum item encontrado"}
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            {itensFiltrados.map((item, idx) => (
-                                                <tr
-                                                    key={idx}
-                                                    className="hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors"
-                                                >
-                                                    <td className="p-3 text-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={itensSelecionados.has(idx)}
-                                                            onChange={() => toggleItemSelecionado(idx)}
-                                                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                                    {msgContagem && <p className="text-sm text-center text-gray-500">{msgContagem}</p>}
+
+                                    {/* RESULTADOS / FILTROS LOCAIS */}
+                                    {itensContagem.length > 0 && (
+                                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-2">
+                                                <div className="flex gap-4 flex-1">
+                                                    <div className="w-full md:w-1/3">
+                                                        <label className="text-xs font-bold text-gray-500 uppercase">Localização</label>
+                                                        <Select
+                                                            options={[
+                                                                { label: "Todas", value: "" },
+                                                                { label: "PISO A", value: "PISO_A" },
+                                                                { label: "PISO B", value: "PISO_B" },
+                                                                { label: "PISO C", value: "PISO_C" },
+                                                                { label: "VITRINE", value: "VITRINE" },
+                                                                { label: "BOX", value: "BOX" },
+                                                                { label: "A-BOX", value: "A-BOX" },
+                                                                { label: "A-BOQUETA", value: "A-BOQUETA" },
+                                                                { label: "A-CX ESCADA", value: "A-CX ESCADA" },
+                                                                { label: "VENDA CASADA", value: "VENDA CASADA" }
+                                                            ]}
+                                                            value={localizacaoFiltro}
+                                                            onChange={(val) => setLocalizacaoFiltro(String(val))}
+                                                            placeholder="Filtrar Local"
+                                                            className="w-full"
                                                         />
-                                                    </td>
-                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
-                                                        {new Date(item.DATA).toLocaleDateString("pt-BR")}
-                                                    </td>
-                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
-                                                        {item.COD_PRODUTO}
-                                                    </td>
-                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
-                                                        {item.DESC_PRODUTO}
-                                                    </td>
-                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
-                                                        {item.MAR_DESCRICAO}
-                                                    </td>
-                                                    <td className="p-3 text-gray-700 dark:text-gray-300">
-                                                        {item.LOCALIZACAO || "-"}
-                                                    </td>
-                                                    <td className="p-3 text-end text-gray-700 dark:text-gray-300">
-                                                        {item.ESTOQUE}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                                    </div>
+                                                    <div className="w-full md:w-1/4">
+                                                        <label className="text-xs font-bold text-gray-500 uppercase">Prateleira</label>
+                                                        <input type="number" value={prateleira} onChange={(e) => setPrateleira(e.target.value)} className="h-10 w-full border border-gray-300 dark:border-strokedark rounded-lg px-3 bg-white dark:bg-form-input" placeholder="Ex: 13" />
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-sm font-bold text-primary">
+                                                        {itensFiltrados.length} itens encontrados
+                                                    </span>
+                                                    <div className="text-xs text-gray-400">
+                                                        {itensSelecionados.size} selecionados
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="overflow-x-auto border border-gray-200 dark:border-strokedark rounded-lg max-h-[40vh]">
+                                                <table className="min-w-full text-sm relative">
+                                                    <thead className="bg-gray-100 dark:bg-meta-4 sticky top-0 z-10 shadow-sm">
+                                                        <tr>
+                                                            <th className="p-3 text-center w-12">
+                                                                <input type="checkbox" checked={itensFiltrados.length > 0 && itensSelecionados.size === itensFiltrados.length} onChange={toggleTodosItens} className="rounded text-primary focus:ring-primary" />
+                                                            </th>
+                                                            <th className="p-3 text-left">Data</th>
+                                                            <th className="p-3 text-left">Código</th>
+                                                            <th className="p-3 text-left">Produto</th>
+                                                            <th className="p-3 text-left">Local</th>
+                                                            <th className="p-3 text-right">Estoque</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 dark:divide-strokedark">
+                                                        {itensFiltrados.map((item, idx) => (
+                                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-meta-4">
+                                                                <td className="p-3 text-center">
+                                                                    <input type="checkbox" checked={itensSelecionados.has(idx)} onChange={() => toggleItemSelecionado(idx)} className="rounded text-primary focus:ring-primary" />
+                                                                </td>
+                                                                <td className="p-3">{new Date(item.DATA).toLocaleDateString("pt-BR")}</td>
+                                                                <td className="p-3 font-mono">{item.COD_PRODUTO}</td>
+                                                                <td className="p-3 max-w-[200px] truncate" title={item.DESC_PRODUTO}>{item.DESC_PRODUTO}</td>
+                                                                <td className="p-3">{item.LOCALIZACAO || "-"}</td>
+                                                                <td className="p-3 text-right font-bold">{item.ESTOQUE}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                // PASSO 2: EQUIPE
+                                <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                                    <div className="text-center">
+                                        <h4 className="text-xl font-bold mb-2">Definir Equipe de Contagem</h4>
+                                        <p className="text-gray-500">Selecione os responsáveis por cada rodada de contagem para os <strong className="text-primary">{itensSelecionados.size} produtos</strong> selecionados.</p>
+                                    </div>
+
+                                    <div className="bg-gray-50 dark:bg-meta-4 p-6 rounded-xl border border-gray-100 dark:border-strokedark space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-bold mb-1 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs">1</span>
+                                                1ª Contagem
+                                            </label>
+                                            <Select
+                                                options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
+                                                value={contagem1}
+                                                onChange={(val) => setContagem1(String(val))}
+                                                placeholder="Responsável pela 1ª Contagem"
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold mb-1 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs">2</span>
+                                                2ª Contagem (Opcional)
+                                            </label>
+                                            <Select
+                                                options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
+                                                value={contagem2}
+                                                onChange={(val) => setContagem2(String(val))}
+                                                placeholder="Responsável pela 2ª Contagem"
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold mb-1 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs">3</span>
+                                                Auditoria / 3ª Contagem
+                                            </label>
+                                            <Select
+                                                options={usuarios.map(u => ({ label: u.nome, value: u.id }))}
+                                                value={contagem3}
+                                                onChange={(val) => setContagem3(String(val))}
+                                                placeholder="Responsável pela Auditoria"
+                                                className="w-full"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* FOOTER */}
+                        <div className="p-6 border-t border-gray-100 dark:border-strokedark bg-gray-50 dark:bg-meta-4 rounded-b-xl flex justify-between items-center">
+                            <button
+                                onClick={() => step === 1 ? setFormularioAberto(false) : setStep(1)}
+                                className="px-6 py-2.5 rounded-lg border border-gray-300 hover:bg-white transition-colors text-gray-700 font-medium"
+                            >
+                                {step === 1 ? "Cancelar" : "Voltar"}
+                            </button>
+
+                            {step === 1 ? (
+                                <button
+                                    onClick={() => setStep(2)}
+                                    disabled={itensSelecionados.size === 0}
+                                    className="px-6 py-2.5 rounded-lg bg-primary text-white font-bold hover:bg-opacity-90 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    Continuar <FaCheck />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={salvarContagem}
+                                    disabled={!contagem1 && !contagem2 && !contagem3}
+                                    className="px-8 py-2.5 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <FaCheck /> Confirmar e Salvar
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* LISTAGEM INFERIOR (Cards) */}
             <div className="space-y-4">
@@ -1253,11 +1176,11 @@ export default function Tela() {
                                             <th className="px-4 py-3 text-right">Contado</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-stroke dark:divide-strokedark">
+                                    <tbody className="divide-y divide-gray-200 dark:divide-strokedark">
                                         {logsDetalhes.length === 0 ? (
                                             <tr>
                                                 <td
-                                                    colSpan={4}
+                                                    colSpan={5}
                                                     className="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
                                                 >
                                                     Nenhum log encontrado para esta contagem.
@@ -1268,47 +1191,121 @@ export default function Tela() {
                                                 const estoque = log.estoque || 0;
                                                 const contado = log.contado || 0;
                                                 const isMatch = estoque === contado;
+                                                const cod = log.item?.cod_produto;
+                                                const isExpanded = expandedRows.has(cod);
+                                                const details = logsGroupData[cod];
+
+                                                // Verifica se tem detalhes para mostrar
+                                                const hasDetails = details && (
+                                                    (details.r1?.locais?.length > 0) ||
+                                                    (details.r2?.locais?.length > 0) ||
+                                                    (details.r3?.locais?.length > 0)
+                                                );
+
+                                                const toggleExpand = () => {
+                                                    const newSet = new Set(expandedRows);
+                                                    if (isExpanded) newSet.delete(cod);
+                                                    else newSet.add(cod);
+                                                    setExpandedRows(newSet);
+                                                };
 
                                                 const rowClass = isMatch
                                                     ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400 border-l-4 border-green-500"
                                                     : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400 border-l-4 border-red-500";
 
                                                 return (
-                                                    <tr
-                                                        key={idx}
-                                                        className={`${rowClass} transition-colors border-b border-gray-100 dark:border-strokedark`}
-                                                    >
-                                                        <td className="px-4 py-3 font-medium">
-                                                            {log.item?.cod_produto || "-"}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {log.item?.desc_produto || "-"}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            {estoque}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-bold text-lg">
-                                                            {contado}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <button
-                                                                onClick={() => {
-                                                                    const cod = log.item?.cod_produto;
-                                                                    const details = logsGroupData[cod];
-                                                                    setItemDetalheSelecionado({
-                                                                        cod,
-                                                                        desc: log.item?.desc_produto,
-                                                                        details
-                                                                    });
-                                                                    setSubModalAberto(true);
-                                                                }}
-                                                                className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 transition-colors"
-                                                                title="Ver detalhes de localização"
-                                                            >
-                                                                <FaMapMarkerAlt size={18} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
+                                                    <React.Fragment key={idx}>
+                                                        {/* LINHA PRINCIPAL */}
+                                                        <tr
+                                                            className={`${rowClass} transition-colors border-b border-gray-100 dark:border-strokedark cursor-pointer hover:brightness-95`}
+                                                            onClick={toggleExpand}
+                                                        >
+                                                            <td className="px-4 py-3 font-medium flex items-center gap-2">
+                                                                {hasDetails ? (
+                                                                    <FaChevronDown className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : '-rotate-90'}`} size={12} />
+                                                                ) : (
+                                                                    <span className="w-3" />
+                                                                )}
+                                                                {log.item?.cod_produto || "-"}
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                {log.item?.desc_produto || "-"}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right">
+                                                                {estoque}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right font-bold text-lg">
+                                                                {contado}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <button
+                                                                    className="p-2 rounded-full text-gray-400 hover:text-primary transition-colors"
+                                                                    title={isExpanded ? "Esconder detalhes" : "Ver detalhes"}
+                                                                >
+                                                                    <FaClipboardList size={16} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+
+                                                        {/* LINHA EXPANDIDA (DETALHES) */}
+                                                        <AnimatePresence>
+                                                            {isExpanded && hasDetails && (
+                                                                <motion.tr
+                                                                    initial={{ opacity: 0 }}
+                                                                    animate={{ opacity: 1 }}
+                                                                    exit={{ opacity: 0 }}
+                                                                    transition={{ duration: 0.2 }}
+                                                                    className="bg-white dark:bg-boxdark"
+                                                                >
+                                                                    <td colSpan={5} className="p-0 border-b border-gray-100 dark:border-strokedark shadow-inner">
+                                                                        <motion.div
+                                                                            initial={{ height: 0, opacity: 0 }}
+                                                                            animate={{ height: "auto", opacity: 1 }}
+                                                                            exit={{ height: 0, opacity: 0 }}
+                                                                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                                            className="overflow-hidden"
+                                                                        >
+                                                                            <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 pl-8">
+                                                                                {Array.from({ length: 3 }, (_, i) => i + 1).map(round => {
+                                                                                    const info = details?.[`r${round}`];
+                                                                                    // Só mostra se tiver info e se a rodada for relevante (até a atual)
+                                                                                    if (!info || round > (contagemSelecionada?.contagem || 1)) return null;
+
+                                                                                    return (
+                                                                                        <div key={round} className="bg-gray-50 dark:bg-meta-4 rounded-lg p-3 border border-gray-200 dark:border-strokedark">
+                                                                                            <div className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-strokedark pb-2">
+                                                                                                <span className="text-xs font-bold uppercase text-gray-500">
+                                                                                                    {round}ª Contagem
+                                                                                                </span>
+                                                                                                <span className="text-xs font-bold bg-white dark:bg-boxdark px-2 py-0.5 rounded border border-gray-200 dark:border-strokedark">
+                                                                                                    Total: {info.total}
+                                                                                                </span>
+                                                                                            </div>
+
+                                                                                            {info.locais && info.locais.length > 0 ? (
+                                                                                                <ul className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                                                                                                    {info.locais.map((loc: string, i: number) => (
+                                                                                                        <li key={i} className="text-xs flex items-start gap-2 text-gray-600 dark:text-gray-300 bg-white dark:bg-boxdark p-1.5 rounded shadow-sm border border-gray-100 dark:border-strokedark">
+                                                                                                            <FaMapMarkerAlt className="text-blue-500 mt-0.5 shrink-0" size={10} />
+                                                                                                            <span className="leading-tight">{loc}</span>
+                                                                                                        </li>
+                                                                                                    ))}
+                                                                                                </ul>
+                                                                                            ) : (
+                                                                                                <p className="text-xs text-gray-400 italic py-2 text-center">
+                                                                                                    Sem registros.
+                                                                                                </p>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </motion.div>
+                                                                    </td>
+                                                                </motion.tr>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </React.Fragment>
                                                 );
                                             })
                                         )}
@@ -1320,69 +1317,7 @@ export default function Tela() {
                 </div>
             )}
 
-            {/* SUB-MODAL DE DETALHES */}
-            {subModalAberto && itemDetalheSelecionado && (
-                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
-                    <div className="bg-white dark:bg-boxdark rounded-lg shadow-2xl w-full max-w-lg border border-gray-200 dark:border-strokedark flex flex-col max-h-[80vh]">
-                        <div className="p-4 border-b border-gray-100 dark:border-strokedark flex justify-between items-center bg-gray-50 dark:bg-meta-4">
-                            <h4 className="font-bold text-gray-800 dark:text-white">
-                                Detalhes: {itemDetalheSelecionado.cod}
-                            </h4>
-                            <button
-                                onClick={() => setSubModalAberto(false)}
-                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                            >
-                                <FaTimes />
-                            </button>
-                        </div>
 
-                        <div className="p-5 overflow-y-auto space-y-6">
-                            <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                                {itemDetalheSelecionado.desc}
-                            </div>
-
-                            {/* Detalhes R1 e R2 (Dinâmico conforme contagem atual) */}
-                            {Array.from({ length: contagemSelecionada?.contagem || 1 }, (_, i) => i + 1).map(round => {
-                                const info = itemDetalheSelecionado.details?.[`r${round}`];
-                                if (!info) return null;
-
-                                return (
-                                    <div key={round} className="bg-gray-50 dark:bg-black/20 rounded p-3 border border-gray-100 dark:border-strokedark">
-                                        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 flex justify-between">
-                                            <span>{round}ª Contagem</span>
-                                            <span className="text-black dark:text-white bg-gray-200 dark:bg-meta-4 px-2 py-0.5 rounded text-[10px]">
-                                                Total: {info.total}
-                                            </span>
-                                        </div>
-
-                                        {info.locais && info.locais.length > 0 ? (
-                                            <ul className="text-sm space-y-1">
-                                                {info.locais.map((loc: string, i: number) => (
-                                                    <li key={i} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></span>
-                                                        <span>{loc}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <div className="text-xs text-gray-400 italic">Nenhum registro encontrado.</div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="p-4 border-t border-gray-100 dark:border-strokedark flex justify-end">
-                            <button
-                                onClick={() => setSubModalAberto(false)}
-                                className="px-4 py-2 bg-gray-200 dark:bg-meta-4 text-gray-800 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-opacity-80 transition-colors text-sm font-medium"
-                            >
-                                Fechar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
