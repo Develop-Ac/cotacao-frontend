@@ -53,93 +53,101 @@ const fmtDateTime = (iso: string) => {
 
 function PedidoCard({ pedido }: { pedido: PedidoListItem }) {
   return (
-    <div className="bg-white dark:bg-boxdark rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-gray-100 dark:border-strokedark">
-      <div className="bg-gray-50 dark:bg-meta-4 p-4 border-b border-gray-100 dark:border-strokedark flex justify-between items-start">
-        <div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">
-            Pedido de Cotação
+    <div className="flex flex-col h-full bg-white dark:bg-boxdark rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-gray-100 dark:border-strokedark cursor-pointer">
+      <Link
+        href={`/compras/cotacao/pedido/${pedido.id}`}
+        className=""
+      >
+        <div className="flex flex-col h-full">
+          <div className="bg-gray-50 dark:bg-meta-4 p-4 border-b border-gray-100 dark:border-strokedark flex justify-between items-start">
+            <div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">
+              Pedido de Cotação
+            </div>
+            <div className="text-2xl font-bold text-gray-800 dark:text-white">
+              #{pedido.pedido_cotacao}
+            </div>
+            </div>
           </div>
-          <div className="text-2xl font-bold text-gray-800 dark:text-white">
-            #{pedido.pedido_cotacao}
-          </div>
-        </div>
-      </div>
 
-      <div className="p-4 flex-1 flex flex-col gap-3">
-        <div className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
-          <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 dark:text-orange-400 shrink-0">
-            <FaUser size={14} />
-          </div>
-          <span className="font-medium text-sm line-clamp-2 mt-1" title={pedido.for_nome}>
-            {pedido.for_nome}
-          </span>
-        </div>
+          <div className="p-4 flex-1 flex flex-col gap-3">
+            <div className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
+            <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 dark:text-orange-400 shrink-0">
+              <FaUser size={14} />
+            </div>
+            <span className="font-medium text-sm line-clamp-2 mt-1" title={pedido.for_nome}>
+              {pedido.for_nome}
+            </span>
+            </div>
 
-        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 shrink-0">
-            <FaCalendar size={14} />
-          </div>
-          <span className="text-sm">{fmtDateTime(pedido.created_at)}</span>
-        </div>
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 shrink-0">
+              <FaCalendar size={14} />
+            </div>
+            <span className="text-sm">{fmtDateTime(pedido.created_at)}</span>
+            </div>
 
-        <div className="grid grid-cols-2 gap-2 mt-2">
-          <div className="bg-gray-50 dark:bg-meta-4 p-2 rounded-lg">
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
+            <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="bg-gray-50 dark:bg-meta-4 p-2 rounded-lg">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
               <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                 <FaBox size={10} />
               </div>
               Itens
+              </div>
+              <div className="font-semibold text-gray-800 dark:text-white pl-8">{pedido.itens_count}</div>
             </div>
-            <div className="font-semibold text-gray-800 dark:text-white pl-8">{pedido.itens_count}</div>
-          </div>
-          <div className="bg-gray-50 dark:bg-meta-4 p-2 rounded-lg">
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
+            <div className="bg-gray-50 dark:bg-meta-4 p-2 rounded-lg">
+              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
               <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                 <FaBox size={10} />
               </div>
               Qtd. Total
-            </div>
-            <div className="font-semibold text-gray-800 dark:text-white pl-8">
+              </div>
+              <div className="font-semibold text-gray-800 dark:text-white pl-8">
               {Number(pedido.total_qtd).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+              </div>
             </div>
-          </div>
-        </div>
+            </div>
 
-        <div className="mt-1 pt-2 border-t border-gray-100 dark:border-strokedark">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+            <div className="mt-1 pt-2 border-t border-gray-100 dark:border-strokedark">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
               <div className="w-8 h-8 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-500 dark:text-green-400 shrink-0">
                 <FaMoneyBill size={14} />
               </div>
               <span className="text-xs font-semibold uppercase">Total</span>
-            </div>
-            <span className="text-lg font-bold text-green-600 dark:text-green-400">
+              </div>
+              <span className="text-lg font-bold text-green-600 dark:text-green-400">
               {pedido.total_valor_fmt ?? "-"}
-            </span>
+              </span>
+            </div>
+            </div>
           </div>
         </div>
-      </div>
+      </Link>
 
       <div className="p-4 pt-0 mt-auto flex gap-2">
         <a
-          href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=true`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 py-2 px-3 bg-white dark:bg-meta-4 border border-emerald-200 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
-          title="Abrir PDF (com marca)"
+        href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=true`}
+        // href={`http://localhost:8000/compras/pedido/${encodeURIComponent(pedido.id)}?marca=true`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex-1 py-2 px-3 bg-white dark:bg-meta-4 border border-emerald-200 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
+        title="Abrir PDF (com marca)"
         >
-          <FaFilePdf />
-          C/ Marca
+        <FaFilePdf />
+        C/ Marca
         </a>
         <a
-          href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=false`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 py-2 px-3 bg-white dark:bg-meta-4 border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
-          title="Abrir PDF (sem marca)"
+        href={`${comprasUrl(`/pedido/${encodeURIComponent(pedido.id)}`)}?marca=false`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex-1 py-2 px-3 bg-white dark:bg-meta-4 border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-xs"
+        title="Abrir PDF (sem marca)"
         >
-          <FaFilePdf />
-          S/ Marca
+        <FaFilePdf />
+        S/ Marca
         </a>
       </div>
     </div>
@@ -240,6 +248,7 @@ export default function Tela() {
     setLoadingPedidos(true);
     try {
       const res = await fetch(comprasUrl("/pedido"), {
+      // const res = await fetch("http://localhost:8000/compras/pedido", {
         headers: { Accept: "application/json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
