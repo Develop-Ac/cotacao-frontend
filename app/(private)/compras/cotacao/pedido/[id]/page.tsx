@@ -195,11 +195,37 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Média 3M
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Carlos
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                  <input
+                    type="checkbox"
+                    checked={pedidoData.itens.length > 0 && pedidoData.itens.every(item => getCheckboxValue(item.id, 'Carlos', item.carlos || false))}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      pedidoData.itens.forEach(item => {
+                        if (getCheckboxValue(item.id, 'Carlos', item.carlos || false) !== checked) {
+                          updateCheckbox(item.id, 'Carlos', checked);
+                        }
+                      });
+                    }}
+                    className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <div className="text-xs mt-1">Carlos</div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Renato
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                  <input
+                    type="checkbox"
+                    checked={pedidoData.itens.length > 0 && pedidoData.itens.every(item => getCheckboxValue(item.id, 'Renato', item.renato || false))}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      pedidoData.itens.forEach(item => {
+                        if (getCheckboxValue(item.id, 'Renato', item.renato || false) !== checked) {
+                          updateCheckbox(item.id, 'Renato', checked);
+                        }
+                      });
+                    }}
+                    className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <div className="text-xs mt-1">Renato</div>
                 </th>
               </tr>
             </thead>
