@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useMemo } from "react";
 import { serviceUrl } from "@/lib/services";
 import { AnaliseItem, GroupedItem, CalculationDetails } from "@/app/(private)/compras/produtos/PromotionTypes";
