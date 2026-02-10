@@ -9,6 +9,7 @@ export type AnaliseItem = {
     id: number;
     pro_codigo: string;
     pro_descricao: string;
+    pro_referencia?: string;
     sgr_codigo: number;
     sgr_descricao?: string;
     mar_descricao: string;

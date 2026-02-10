@@ -37,6 +37,7 @@ export type AnaliseItem = {
     id: number;
     pro_codigo: string;
     pro_descricao: string;
+    pro_referencia?: string;
     sgr_codigo: number;
     sgr_descricao?: string;
     mar_descricao: string;
@@ -2385,6 +2386,11 @@ export default function AnaliseProdutosPage() {
                                                                     <span className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium group-hover:whitespace-normal group-hover:break-words transition-all duration-300" title={item.pro_descricao}>
                                                                         {item.pro_descricao}
                                                                     </span>
+                                                                    {item.pro_referencia && (
+                                                                        <span className="text-xs text-gray-500 font-normal mt-0.5 block">
+                                                                            ref: {item.pro_referencia}
+                                                                        </span>
+                                                                    )}
                                                                     <span className="text-xs text-gray-400 mt-0.5 uppercase tracking-wide font-medium">
                                                                         {item.mar_descricao}
                                                                     </span>
