@@ -6,7 +6,6 @@ export async function GET(req: NextRequest) {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth_token")?.value;
     if (!token) {
-        console.warn("[AuthMe] Token não encontrado no cookie");
         return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 

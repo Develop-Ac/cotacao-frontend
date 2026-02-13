@@ -36,6 +36,7 @@ export default function ProfileSidebar() {
                             src={user.avatar_url}
                             alt={user.nome || "Avatar"}
                             fill
+                            unoptimized
                             className="object-cover"
                             onError={() => setImgError(true)}
                         />

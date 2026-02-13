@@ -19,6 +19,18 @@ const nextConfig: NextConfig = {
         protocol: 'http',
         hostname: 's3-acesso.acacessorios.local',
       },
+      {
+        protocol: 'http',
+        hostname: 's3-painel.acacessorios.local',
+      },
+      {
+        protocol: 'https',
+        hostname: 's3-acesso.acacessorios.local',
+      },
+      {
+        protocol: 'https',
+        hostname: 's3-painel.acacessorios.local',
+      },
     ],
   },
 };

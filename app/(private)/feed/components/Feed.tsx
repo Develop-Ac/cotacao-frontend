@@ -11,6 +11,7 @@ import { fetchFeedPosts, createPost } from '@/lib/api-feed';
 import { Post as PostType } from '../types';
 import { useToast } from '@/components/Toast';
 import { AbilityContext } from '@/app/components/AbilityProvider';
+import { useUser } from '@/app/context/UserContext';
 
 export default function Feed() {
     const [posts, setPosts] = useState<PostType[]>([]);
@@ -18,8 +19,7 @@ export default function Feed() {
     const [isLoading, setIsLoading] = useState(false);
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
-    const [userName, setUserName] = useState<string>('');
-    const [avatar, setAvatar] = useState<string | null>(null);
+    const { user } = useUser();
     const [imgError, setImgError] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { success, error } = useToast();
@@ -36,21 +36,11 @@ export default function Feed() {
 
     useEffect(() => {
         loadPosts();
-        try {
-            const stored = localStorage.getItem('userData');
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                setUserName(parsed.usuario || 'Usuário');
-                setAvatar(parsed.avatar || null);
-            }
-        } catch (e) {
-            console.error('Error parsing user data', e);
-        }
     }, []);
 
     useEffect(() => {
         setImgError(false);
-    }, [avatar]);
+    }, [user?.avatar_url]);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -106,17 +96,18 @@ export default function Feed() {
                 >
                     <div className="flex gap-4 mb-4">
                         <div className="relative h-12 w-12 rounded-full overflow-hidden shrink-0 bg-gray-200 border border-gray-100 dark:border-gray-800 dark:bg-gray-700">
-                            {avatar && !imgError ? (
+                            {user?.avatar_url && !imgError ? (
                                 <Image
-                                    src={avatar}
-                                    alt={userName || "Avatar"}
+                                    src={user?.avatar_url || ''}
+                                    alt={user?.nome || "Avatar"}
                                     fill
+                                    unoptimized
                                     className="object-cover"
                                     onError={() => setImgError(true)}
                                 />
                             ) : (
-                                <div className="h-full w-full flex items-center justify-center text-lg font-bold text-gray-500 dark:text-white">
-                                    {userName ? userName.charAt(0).toUpperCase() : 'U'}
+                                <div className="h-full w-full bg-blue-600 flex items-center justify-center text-xl font-bold text-white uppercase">
+                                    {(user?.nome || 'U').charAt(0)}
                                 </div>
                             )}
                         </div>
@@ -124,7 +115,7 @@ export default function Feed() {
                             <RichTextEditor
                                 content={content}
                                 onChange={(html) => setContent(html)}
-                                placeholder={`No que você está pensando, ${userName ? userName.split(' ')[0] : 'colega'}?`}
+                                placeholder={`No que você está pensando, ${user?.nome ? user.nome.split(' ')[0] : 'colega'}?`}
                             />
                         </div>
                     </div>

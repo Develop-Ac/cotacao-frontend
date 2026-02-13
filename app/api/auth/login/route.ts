@@ -34,12 +34,7 @@ export async function POST(req: NextRequest) {
         const allowInsecure = process.env.ALLOW_INSECURE_COOKIES === "true" ||
             process.env.NEXT_PUBLIC_ALLOW_INSECURE_COOKIES === "true";
 
-        console.log(`[AuthLogin] NODE_ENV: ${process.env.NODE_ENV}`);
-        console.log(`[AuthLogin] ALLOW_INSECURE (detectado): ${allowInsecure}`);
-
         const isSecure = process.env.NODE_ENV === "production" && !allowInsecure;
-
-        console.log(`[AuthLogin] Definindo cookie auth_token. Secure: ${isSecure}`);
 
         cookieStore.set("auth_token", data.access_token, {
             httpOnly: true,
@@ -47,8 +42,6 @@ export async function POST(req: NextRequest) {
             sameSite: "lax",
             path: "/",
         });
-
-        console.log(`[AuthLogin] Cookie definido com sucesso.`);
 
         // Retorna sucesso mas SEM o token no corpo para o client
         // Opcional: retornar dados de usuário se o backend já devolve

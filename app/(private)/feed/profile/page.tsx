@@ -143,6 +143,7 @@ export default function ProfilePage() {
                                         src={profile.avatar_url}
                                         alt={profile.nome || "Avatar"}
                                         fill
+                                        unoptimized
                                         className="object-cover group-hover:opacity-75 transition-opacity"
                                         onError={() => setImgError(true)}
                                     />
