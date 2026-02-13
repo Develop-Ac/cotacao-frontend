@@ -30,16 +30,22 @@ export async function POST(req: NextRequest) {
         // Define o cookie HttpOnly
         const cookieStore = await cookies();
 
-        // Em ambientes de intranet via HTTP, a flag 'secure' impede o envio do cookie.
-        // Permitimos bypass se NEXT_PUBLIC_ALLOW_INSECURE_COOKIES for 'true'.
+        // LOG DE DEPURAÇÃO: Verificando variáveis de ambiente no runtime
+        console.log(`[AuthLogin] NODE_ENV: ${process.env.NODE_ENV}`);
+        console.log(`[AuthLogin] ALLOW_INSECURE: ${process.env.NEXT_PUBLIC_ALLOW_INSECURE_COOKIES}`);
+
         const isSecure = process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_ALLOW_INSECURE_COOKIES !== "true";
+
+        console.log(`[AuthLogin] Definindo cookie auth_token. Secure: ${isSecure}`);
 
         cookieStore.set("auth_token", data.access_token, {
             httpOnly: true,
             secure: isSecure,
-            sameSite: "lax", // 'lax' é mais compatível com builds de produção em HTTP
+            sameSite: false as any, // Temporariamente desativado para teste de compatibilidade total em intranet
             path: "/",
         });
+
+        console.log(`[AuthLogin] Cookie definido com sucesso.`);
 
         // Retorna sucesso mas SEM o token no corpo para o client
         // Opcional: retornar dados de usuário se o backend já devolve

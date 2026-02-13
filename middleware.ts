@@ -5,6 +5,10 @@ export function middleware(request: NextRequest) {
     const token = request.cookies.get("auth_token")?.value;
     const { pathname } = request.nextUrl;
 
+    if (pathname.startsWith("/api/auth/me")) {
+        console.log(`[Middleware] Acessando /api/auth/me. Token presente: ${!!token}`);
+    }
+
     // Rotas públicas que não precisam de autenticação
     const publicRoutes = ["/login", "/api/auth/login", "/_next", "/static", "/favicon.ico"];
 
