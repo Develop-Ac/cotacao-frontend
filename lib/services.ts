@@ -18,7 +18,7 @@ const FALLBACKS: Record<ServiceKey, string> = {
   expedicao: "http://expedicao-service.acacessorios.local",
   oficina: "http://oficina-service.acacessorios.local",
   sac: "http://sac-service.acacessorios.local",
-  sistema: "http://localhost:8000", // TODO: mudar para sistema-service.acacessorios.local
+  sistema: "http://sistema-service.acacessorios.local",
   metabase: "http://bi.acacessorios.local",
   qualidade: "http://garantia-service.acacessorios.local/api",
   calculadoraSt: "http://calculadora-st-service.acacessorios.local/api",
