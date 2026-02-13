@@ -32,12 +32,10 @@ export default function ProfileSidebar() {
                     className="relative h-20 w-20 mb-4 rounded-full overflow-hidden border-4 border-gray-100 dark:border-gray-800"
                 >
                     {user.avatar_url && !imgError ? (
-                        <Image
+                        <img
                             src={user.avatar_url}
                             alt={user.nome || "Avatar"}
-                            fill
-                            unoptimized
-                            className="object-cover"
+                            className="h-full w-full object-cover"
                             onError={() => setImgError(true)}
                         />
                     ) : (

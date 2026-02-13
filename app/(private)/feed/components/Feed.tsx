@@ -97,12 +97,10 @@ export default function Feed() {
                     <div className="flex gap-4 mb-4">
                         <div className="relative h-12 w-12 rounded-full overflow-hidden shrink-0 bg-gray-200 border border-gray-100 dark:border-gray-800 dark:bg-gray-700">
                             {user?.avatar_url && !imgError ? (
-                                <Image
+                                <img
                                     src={user?.avatar_url || ''}
                                     alt={user?.nome || "Avatar"}
-                                    fill
-                                    unoptimized
-                                    className="object-cover"
+                                    className="h-full w-full object-cover"
                                     onError={() => setImgError(true)}
                                 />
                             ) : (

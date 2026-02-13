@@ -192,12 +192,10 @@ export default function Post({ id, autor, criado_em, conteudo, midias, curtidas,
                     <div className="flex items-center gap-3">
                         <div className="relative h-12 w-12 rounded-full overflow-hidden shrink-0 border border-gray-100 dark:border-gray-800">
                             {autor.avatar_url && !imgError ? (
-                                <Image
+                                <img
                                     src={autor.avatar_url}
                                     alt={autor.nome || "Avatar"}
-                                    fill
-                                    unoptimized
-                                    className="object-cover"
+                                    className="h-full w-full object-cover"
                                     onError={() => setImgError(true)}
                                 />
                             ) : (
@@ -306,11 +304,10 @@ export default function Post({ id, autor, criado_em, conteudo, midias, curtidas,
                                             <div key={comment.id} className="flex gap-3 group">
                                                 <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 border border-gray-100 dark:border-gray-800">
                                                     {comment.autor?.avatar_url ? (
-                                                        <Image
+                                                        <img
                                                             src={comment.autor.avatar_url}
                                                             alt={comment.autor.nome || "Avatar"}
-                                                            fill
-                                                            className="object-cover"
+                                                            className="h-full w-full object-cover"
                                                         />
                                                     ) : (
                                                         <div className="h-full w-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
