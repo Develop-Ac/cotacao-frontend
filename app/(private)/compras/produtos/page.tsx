@@ -2698,7 +2698,8 @@ export default function AnaliseProdutosPage() {
                     return {
                         pro_codigo: i.pro_codigo,
                         pro_descricao: i.pro_descricao,
-                        simulacao
+                        simulacao,
+                        referencia: i.pro_referencia ?? null
                     };
                 })
                 .filter(Boolean) as { pro_codigo: string; pro_descricao: string; simulacao?: string | null }[];

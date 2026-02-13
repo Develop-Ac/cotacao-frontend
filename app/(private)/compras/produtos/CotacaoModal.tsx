@@ -1,12 +1,14 @@
 import React from "react";
 
 import { useState, useEffect } from "react";
+import { serviceUrl } from "@/lib/services";
 
+const baseUrl = serviceUrl("compras");
 
 interface CotacaoModalProps {
   open: boolean;
   onClose: () => void;
-  items: Array<{ pro_codigo: string; pro_descricao: string; simulacao?: string | null }>;
+  items: Array<{ pro_codigo: string; pro_descricao: string; simulacao?: string | null; referencia?: string | null }>;
   coverageDays?: number | "";
 }
 
@@ -23,7 +25,7 @@ const CotacaoModal: React.FC<CotacaoModalProps> = ({ open, onClose, items, cover
 
   useEffect(() => {
     if (open) {
-      fetch("http://localhost:8000/compras/pedidos-cotacao/proximo-indice")
+      fetch(`${baseUrl}/pedidos-cotacao/proximo-indice`)
         .then(res => res.json())
         .then(data => setProximoIndice(data.proximoIndice))
         .catch(() => setProximoIndice(null));
@@ -54,7 +56,7 @@ const CotacaoModal: React.FC<CotacaoModalProps> = ({ open, onClose, items, cover
           PRO_CODIGO: it.pro_codigo,
           PRO_DESCRICAO: it.pro_descricao,
           MAR_DESCRICAO: null,
-          REFERENCIA: null,
+          REFERENCIA: it.referencia || null,
           UNIDADE: null,
           QUANTIDADE: Number(quantidades[it.pro_codigo] || 0),
           QTD_SUGERIDA: qtdSugerida,
