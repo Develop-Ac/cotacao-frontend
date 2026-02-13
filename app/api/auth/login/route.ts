@@ -30,13 +30,15 @@ export async function POST(req: NextRequest) {
         // Define o cookie HttpOnly
         const cookieStore = await cookies();
 
-        // Cookie de Sessão (expira ao fechar navegador) ou defina maxAge
+        // Em ambientes de intranet via HTTP, a flag 'secure' impede o envio do cookie.
+        // Permitimos bypass se NEXT_PUBLIC_ALLOW_INSECURE_COOKIES for 'true'.
+        const isSecure = process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_ALLOW_INSECURE_COOKIES !== "true";
+
         cookieStore.set("auth_token", data.access_token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
+            secure: isSecure,
+            sameSite: "lax", // 'lax' é mais compatível com builds de produção em HTTP
             path: "/",
-            // maxAge: 60 * 60 * 24, // 1 dia - opcional, se quiser persistir
         });
 
         // Retorna sucesso mas SEM o token no corpo para o client
