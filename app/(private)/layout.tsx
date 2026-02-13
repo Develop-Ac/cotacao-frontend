@@ -141,7 +141,7 @@ export default function RootLayout({
           { label: 'Pedido', href: '/compras/cotacao/pedido' },
           { label: 'Kanban', href: '/compras/kanban' },
           { label: 'Calculo do ICMS ST', href: '/compras/notaFiscal/notaFiscal' },
-          { label: 'Análise de Produtos', href: '/compras/produtos' },
+          { label: 'Análise de Produtos', href: '/compras/analise' },
         ];
       case 'Oficina':
         return [{ label: 'Check List', href: '/oficina/checkList' }];
@@ -209,7 +209,7 @@ export default function RootLayout({
     if (target !== "/login" && target !== "/" && !canViewPath(target)) {
       router.replace("/403");
     }
-  }, [pathname, canViewPath, router, isLoadingAbility]);
+  }, [pathname, canViewPath, router, isLoadingAbility, ability]);
 
   return (
     <UserProvider>

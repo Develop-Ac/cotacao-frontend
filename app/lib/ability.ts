@@ -54,6 +54,7 @@ export function buildAbilityFromPermissions(permissoes?: PermissaoLinha[]) {
                 }
                 : { ...p, tela };
             byTela.set(tela, merged);
+
         }
 
 
