@@ -31,11 +31,13 @@ import Select from "@/components/Select";
 import { useToast } from "@/components/Toast";
 import TableSkeleton from "@/components/TableSkeleton";
 import PromotionModal from "./PromotionModal";
+import CotacaoModal from "./CotacaoModal";
 
 export type AnaliseItem = {
     id: number;
     pro_codigo: string;
     pro_descricao: string;
+    pro_referencia?: string;
     sgr_codigo: number;
     sgr_descricao?: string;
     mar_descricao: string;
@@ -277,6 +279,18 @@ const getCalculationDetails = (item: AnaliseItem, coverageDays: number): Calcula
 // Wrapper mantido para compatibilidade onde se espera apenas um número (embora agora a UI use o log completo)
 const calculatePurchaseSuggestion = (item: AnaliseItem, coverageDays: number): number => {
     return getCalculationDetails(item, coverageDays).finalSuggestion;
+};
+
+const calculatePurchaseSuggestionMin = (item: AnaliseItem, coverageDays: number): number => {
+    return getCalculationDetails(item, coverageDays).suggestionMin;
+};
+
+const calculatePurchaseSuggestionGroup = (item: AnaliseItem, coverageDays: number): number | undefined => {
+    return getCalculationDetails(item, coverageDays).group?.groupSuggestionMax;
+};
+
+const calculatePurchaseSuggestionMinGroup = (item: AnaliseItem, coverageDays: number): number | undefined => {
+    return getCalculationDetails(item, coverageDays).group?.groupSuggestionMin;
 };
 
 // Componente Modal de Memória de Cálculo
@@ -1373,6 +1387,8 @@ export default function AnaliseProdutosPage() {
 
     // Selection State
     const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+    // Modal de Cotação
+    const [showCotacaoModal, setShowCotacaoModal] = useState(false);
 
     // Helper to toggle selection
     const toggleSelection = (code: string) => {
@@ -1631,6 +1647,14 @@ export default function AnaliseProdutosPage() {
                             className="px-4 py-2 bg-red-50 text-red-600 rounded-full text-sm font-medium hover:bg-red-100 transition-all flex items-center gap-2"
                         >
                             <FaTimes /> Desvincular
+                        </button>
+
+                        {/* Nova ação: Gerar Cotação */}
+                        <button
+                            onClick={() => setShowCotacaoModal(true)}
+                            className="px-4 py-2 bg-yellow-50 text-yellow-700 rounded-full text-sm font-medium hover:bg-yellow-100 transition-all flex items-center gap-2 border border-yellow-200"
+                        >
+                            <FaFileExcel /> Gerar Cotação
                         </button>
 
                         <div className="w-[1px] h-6 bg-gray-200 dark:bg-strokedark mx-1"></div>
@@ -2362,6 +2386,11 @@ export default function AnaliseProdutosPage() {
                                                                     <span className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium group-hover:whitespace-normal group-hover:break-words transition-all duration-300" title={item.pro_descricao}>
                                                                         {item.pro_descricao}
                                                                     </span>
+                                                                    {item.pro_referencia && (
+                                                                        <span className="text-xs text-gray-500 font-normal mt-0.5 block">
+                                                                            ref: {item.pro_referencia}
+                                                                        </span>
+                                                                    )}
                                                                     <span className="text-xs text-gray-400 mt-0.5 uppercase tracking-wide font-medium">
                                                                         {item.mar_descricao}
                                                                     </span>
@@ -2631,6 +2660,59 @@ export default function AnaliseProdutosPage() {
                 brands={brandOptions.map(o => o.value)}
                 categories={categoryOptions.map(o => o.value)}
             />
-        </div >
+        {/* Modal de Cotação */}
+        {/* Lista de itens para o modal de cotação */}
+        {(() => {
+            const cotacaoItems = Array.from(selectedProducts)
+                .map(code => {
+                    const i = items.find(x => x.pro_codigo === code);
+                    if (!i) return null;
+                    let simulacao = null;
+                    if (typeof coverageDays === "number" && coverageDays > 0) {
+                        if (i.group_id && i.group_count && i.group_count > 1) {
+                            // Sempre buscar o header do grupo para simulação
+                            const groupHeader = items.find(g => g.group_id === i.group_id && typeof g.id === "number" && g.id < 0);
+                            if (groupHeader) {
+                                const min = calculatePurchaseSuggestionMinGroup(groupHeader, coverageDays);
+                                let max = calculatePurchaseSuggestionGroup(groupHeader, coverageDays);
+                                if (typeof max === "number") {
+                                    max = max -1
+                                }
+                                simulacao = `${min !== undefined ? min.toLocaleString("pt-BR") : "-"} - ${max !== undefined ? max.toLocaleString("pt-BR") : "-"}`;
+                            } else {
+                                // fallback: calcula pelo próprio item, mas usando função de grupo
+                                const min = calculatePurchaseSuggestionMinGroup(i, coverageDays);
+                                let max = calculatePurchaseSuggestionGroup(i, coverageDays);
+                                if (typeof max === "number") {
+                                    max = max -1
+                                }
+                                simulacao = `${min !== undefined ? min.toLocaleString("pt-BR") : "-"} - ${max !== undefined ? max.toLocaleString("pt-BR") : "-"}`;
+                            }
+                        } else {
+                            // Item individual
+                            const min = calculatePurchaseSuggestionMin(i, coverageDays);
+                            const max = calculatePurchaseSuggestion(i, coverageDays);
+                            simulacao = `${min !== undefined ? min.toLocaleString("pt-BR") : "-"} - ${max !== undefined ? max.toLocaleString("pt-BR") : "-"}`;
+                        }
+                    }
+                    return {
+                        pro_codigo: i.pro_codigo,
+                        pro_descricao: i.pro_descricao,
+                        simulacao,
+                        referencia: i.pro_referencia ?? null
+                    };
+                })
+                .filter(Boolean) as { pro_codigo: string; pro_descricao: string; simulacao?: string | null }[];
+            return (
+                <CotacaoModal
+                    open={showCotacaoModal}
+                    onClose={() => setShowCotacaoModal(false)}
+                    items={cotacaoItems}
+                    coverageDays={coverageDays}
+                />
+            );
+        })()}
+    </div>
     );
 }
+
