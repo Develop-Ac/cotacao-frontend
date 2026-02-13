@@ -1,6 +1,6 @@
 import { FaChevronDown, FaChevronRight, FaExclamationTriangle, FaInfoCircle, FaLayerGroup } from "react-icons/fa";
 import Loading from "@/components/Loading";
-import { AnaliseItem, GroupedItem, CalculationDetails } from "@/app/(private)/compras/produtos/PromotionTypes";
+import { AnaliseItem, GroupedItem, CalculationDetails } from "@/app/(private)/compras/analise/PromotionTypes";
 
 interface PromotionTableProps {
     loading: boolean;

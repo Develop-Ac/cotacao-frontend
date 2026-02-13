@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { serviceUrl } from "@/lib/services";
-import { AnaliseItem, GroupedItem, CalculationDetails } from "@/app/(private)/compras/produtos/PromotionTypes";
+import { AnaliseItem, GroupedItem, CalculationDetails } from "@/app/(private)/compras/analise/PromotionTypes";
 
 interface UsePromotionLogicProps {
     subgroups: string[];

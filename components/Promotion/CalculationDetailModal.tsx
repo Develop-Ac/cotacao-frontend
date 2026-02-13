@@ -1,5 +1,5 @@
 import { FaBox, FaInfoCircle, FaLayerGroup, FaTimes } from "react-icons/fa";
-import { AnaliseItem, CalculationDetails } from "@/app/(private)/compras/produtos/PromotionTypes";
+import { AnaliseItem, CalculationDetails } from "@/app/(private)/compras/analise/PromotionTypes";
 
 interface CalculationDetailModalProps {
     data: { item: AnaliseItem; log: CalculationDetails } | null;

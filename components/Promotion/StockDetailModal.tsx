@@ -1,5 +1,5 @@
 import { FaLayerGroup, FaTimes } from "react-icons/fa";
-import { AnaliseItem } from "@/app/(private)/compras/produtos/PromotionTypes";
+import { AnaliseItem } from "@/app/(private)/compras/analise/PromotionTypes";
 
 interface StockDetailModalProps {
     data: AnaliseItem | null;
