@@ -10,14 +10,19 @@ import { MdOutlineNotificationsNone, MdPowerSettingsNew, MdMenu, MdChevronRight,
 import { HiOutlineShoppingCart, HiOutlineWrench, HiOutlineCube, HiOutlineTruck, HiOutlineClipboardDocumentCheck, HiOutlineUser, HiOutlineCog } from "react-icons/hi2";
 import Link from "next/link";
 import React, { useState, useEffect, MouseEvent, useContext } from "react";
+import useSWR from "swr";
 
 // ⬇️ Permissão (sem alterar visuais)
-import { AbilityContext } from "../components/AbilityProvider";
+import { AbilityContext, AbilityLoadingContext } from "../components/AbilityProvider";
 import { canOnPathPrefix, normalizePath } from "../lib/ability";
 import SidebarMenuItem from "./components/SidebarMenuItem";
 import ProfileDropdown from "./components/ProfileDropdown";
+import Breadcrumb from "./components/Breadcrumb";
 import { SidebarContext } from "@/components/SidebarContext";
 import { ToastProvider } from "@/components/Toast";
+import { UserProvider } from "../context/UserContext";
+import SplashScreen from "./components/SplashScreen"; // Import SplashScreen
+import LogoutAnimation from "./components/LogoutAnimation";
 
 export default function RootLayout({
   children,
@@ -28,18 +33,56 @@ export default function RootLayout({
   const pathname = usePathname();
   const [userData, setUserData] = useState<any>(null);
 
-  // Ability CASL
-  const ability = useContext(AbilityContext);
+  // Sync with Auth API
+  const { data: authData } = useSWR("/api/auth/me", (url) => fetch(url).then(res => res.json()), {
+    revalidateOnFocus: true,
+  });
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem("userData");
-      if (stored) setUserData(JSON.parse(stored));
-    } catch { /* ignore */ }
+    if (authData?.user) {
+      const updatedUser = {
+        ...authData.user,
+        avatar: authData.user.avatar_url // Map backend key to frontend key
+      };
+      setUserData(updatedUser);
+      window.localStorage.setItem("userData", JSON.stringify(updatedUser));
+    }
+  }, [authData]);
+
+  // Ability CASL
+  const ability = useContext(AbilityContext);
+  const isLoadingAbility = useContext(AbilityLoadingContext);
+
+  useEffect(() => {
+    const loadUserData = () => {
+      try {
+        const stored = window.localStorage.getItem("userData");
+        if (stored) setUserData(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+
+    loadUserData();
+
+    // Listen for local updates
+    window.addEventListener("userDataUpdated", loadUserData);
+    // Listen for updates from other tabs
+    window.addEventListener("storage", loadUserData);
+
+    return () => {
+      window.removeEventListener("userDataUpdated", loadUserData);
+      window.removeEventListener("storage", loadUserData);
+    };
   }, []);
 
   const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile toggle
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop collapse
+
+  // Splash Screen State
+  const [showSplash, setShowSplash] = useState(true);
+  const [mediaReady, setMediaReady] = useState(false); // To ensure fonts/styles load if needed, but mainly for consistent delay
+
+  const isDataReady = !!userData; // Data is considered ready when userData is populated (from SWR or LocalStorage)
+
 
   const [isNavigating, setIsNavigating] = useState(false);
 
@@ -81,18 +124,12 @@ export default function RootLayout({
   }, [userData]);
 
   const canViewPath = React.useCallback((href: string) => {
-    // [FIX] Permitir acesso à nova tela de produtos se tiver acesso ao módulo Compras
-    if (href === '/compras/produtos') {
-      return hasAccessToModule('Compras');
-    }
-
-    if (href === '/estoque/auditoria') {
-      return hasAccessToModule('Estoque');
-    }
+    // Permissão global para perfil (agora via ability.ts, mas garantimos aqui também se necessário)
+    if (href === '/feed/profile') return true;
 
     const target = normalizePath(href);
     return canOnPathPrefix(ability, "read", target); // read herda por prefixo
-  }, [ability, hasAccessToModule]); // Adicionado userData às dependências
+  }, [ability]);
 
   // Submenus completos para cada seção (sem filtro)
   const getSubmenuItems = (section: string) => {
@@ -145,12 +182,6 @@ export default function RootLayout({
 
   function deslogar() {
     setIsLoggingOut(true);
-    setTimeout(() => {
-      window.localStorage.setItem('auth', 'false');
-      window.localStorage.removeItem('userData');
-      setUserData(null);
-      router.replace('/login');
-    }, 1000);
   }
 
   const handleNavigation = async (href: string, event?: MouseEvent<HTMLElement>) => {
@@ -173,181 +204,199 @@ export default function RootLayout({
 
   useEffect(() => {
     const target = normalizePath(pathname);
+    if (isLoadingAbility) return;
+
     if (target !== "/login" && target !== "/" && !canViewPath(target)) {
       router.replace("/403");
     }
-  }, [pathname, canViewPath, router]);
+  }, [pathname, canViewPath, router, isLoadingAbility]);
 
   return (
-    <SidebarContext.Provider value={{ sidebarCollapsed, setSidebarCollapsed, sidebarOpen, setSidebarOpen }}>
-      <ToastProvider>
-        <PrivateRoute>
-          <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
-            {/* Sidebar Start */}
-            <aside
-              className={`fixed left-0 top-0 z-9999 flex h-screen flex-col bg-gray-800 lg:static lg:translate-x-0 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-                } ${sidebarCollapsed ? 'lg:w-[90px] overflow-visible' : 'lg:w-[250px] w-[250px] overflow-y-hidden'}`}
-            >
-              {/* Sidebar Header */}
-              <div className={`flex items-center justify-center gap-2 pt-4 pb-2`}>
-                <Link href="/" className="block w-full">
-                  <div className="relative flex items-center justify-center h-[50px]">
-                    <span className={`logo transition-opacity duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`}>
+    <UserProvider>
+      <SidebarContext.Provider value={{ sidebarCollapsed, setSidebarCollapsed, sidebarOpen, setSidebarOpen }}>
+        <ToastProvider>
+          <PrivateRoute>
+            {showSplash && (
+              <SplashScreen
+                isDataReady={isDataReady}
+                onFinish={() => setShowSplash(false)}
+              />
+            )}
+            <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
+              {/* Sidebar Start */}
+              <aside
+                className={`fixed left-0 top-0 z-9999 flex h-screen flex-col bg-gray-800 lg:static lg:translate-x-0 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                  } ${sidebarCollapsed ? 'lg:w-[90px] overflow-visible' : 'lg:w-[250px] w-[250px] overflow-y-hidden'}`}
+              >
+                {/* Sidebar Header */}
+                <div className={`flex items-center justify-center gap-2 pt-4 pb-2`}>
+                  <Link href="/" className="block w-full">
+                    <div className="relative flex items-center justify-center h-[50px]">
+                      <span className={`logo transition-opacity duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`}>
+                        <Image
+                          src={logoSidebarFull}
+                          alt="Logo"
+                          width={150}
+                          height={50}
+                          className="block"
+                          priority
+                        />
+                      </span>
                       <Image
-                        src={logoSidebarFull}
+                        src={logoSidebarIcon}
                         alt="Logo"
-                        width={150}
+                        width={50}
                         height={50}
-                        className="block"
+                        className={`logo-icon transition-all duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
                         priority
                       />
-                    </span>
-                    <Image
-                      src={logoSidebarIcon}
-                      alt="Logo"
-                      width={50}
-                      height={50}
-                      className={`logo-icon transition-all duration-300 absolute left-1/2 -translate-x-1/2 ${sidebarCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
-                      priority
-                    />
-                  </div>
-                </Link>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="block lg:hidden"
-                >
-                  <MdChevronRight className="rotate-180 text-2xl text-gray-500" />
-                </button>
-              </div>
-
-              <div className={`flex flex-col mt-3 duration-300 ease-linear no-scrollbar ${sidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
-                <nav className="mt-0 py-2 px-4 lg:mt-0 lg:px-6">
-                  <div>
-                    <h3 className={`mb-4 text-xs uppercase leading-[20px] text-gray-400 font-semibold transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}`}>
-                      MENU
-                    </h3>
-
-                    <ul className="flex flex-col gap-4 mb-6">
-                      {/* Menu Items Configuration */}
-                      {[
-                        { id: 'Compras', label: 'Compras', icon: HiOutlineShoppingCart, path: '/compras' },
-                        { id: 'Oficina', label: 'Oficina', icon: HiOutlineWrench, path: '/oficina' },
-                        { id: 'Estoque', label: 'Estoque', icon: HiOutlineCube, path: '/estoque' },
-                        { id: 'Expedição', label: 'Expedição', icon: HiOutlineTruck, path: '/expedicao' }, // Note: id matches hasAccessToModule
-                        { id: 'Qualidade', label: 'Qualidade', icon: HiOutlineClipboardDocumentCheck, path: '/qualidade' },
-                        { id: 'Sac', label: 'Sac', icon: HiOutlineUser, path: '/sac' },
-                        { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/usuario' },
-                      ].map((section) => {
-                        // Special handling for section keys if they differ from ID
-                        const sectionKey = section.id === 'Expedição' ? 'Expedicao' : section.id;
-
-                        if (!hasAccessToModule(section.id) || !hasAnyVisibleInSection(sectionKey)) return null;
-
-                        return (
-                          <SidebarMenuItem
-                            key={section.id}
-                            label={section.label}
-                            icon={section.icon}
-                            isActive={sectionActive[sectionKey.toLowerCase() as keyof typeof sectionActive]}
-                            isCollapsed={sidebarCollapsed}
-                            submenus={getVisibleSubmenuItems(sectionKey)}
-                            onNavigate={handleNavigation}
-                            isPathActive={isPathActive}
-                            pathname={pathname}
-                          />
-                        );
-                      })}
-                    </ul>
-                  </div>
-                </nav>
-              </div>
-            </aside>
-            {/* Sidebar End */}
-
-            {/* Content Area Start */}
-            <div className="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
-              {/* Header Start */}
-              {/* Header Start */}
-              <header className="sticky top-0 z-999 flex w-full border-b border-gray-700 bg-gray-800">
-                <div className="flex grow items-center justify-between px-3 py-3 lg:px-6">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    {/* Hamburger Toggle BTN */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSidebarOpen(!sidebarOpen);
-                      }}
-                      className="z-99999 block rounded-lg border border-gray-700 bg-black p-1.5 shadow-sm lg:hidden"
-                    >
-                      <MdMenu className="text-xl text-white" />
-                    </button>
-
-                    <button
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="z-99999 hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-700 text-white lg:flex"
-                    >
-                      <MdMenu className="text-xl" />
-                    </button>
-                    {/* Hamburger Toggle BTN */}
-                  </div>
-
-                  <div className="flex items-center gap-3 2xsm:gap-7">
-                    <ul className="flex items-center gap-2 2xsm:gap-4">
-                      {/* Notification Menu Area */}
-                      <li className="relative">
-                        <Link
-                          href="#"
-                          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-700 bg-black text-gray-400 hover:text-primary"
-                        >
-                          <MdOutlineNotificationsNone className="text-xl" />
-                        </Link>
-                      </li>
-                      {/* Notification Menu Area */}
-                    </ul>
-
-                    {/* User Area */}
-                    <ProfileDropdown userData={userData} onLogout={deslogar} />
-                    {/* User Area */}
-                  </div>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    className="block lg:hidden"
+                  >
+                    <MdChevronRight className="rotate-180 text-2xl text-gray-500" />
+                  </button>
                 </div>
-              </header>
-              {/* Header End */}
 
-              {/* Main Content Start */}
-              <div className="flex-1 w-full border-l border-gray-700 flex flex-col min-h-0">
-                <main
-                  className={`relative flex-1 ${pathname?.startsWith('/compras/kanban') || pathname?.startsWith('/sac/kanban')
-                    ? 'flex flex-col h-full min-h-0 overflow-hidden'
-                    : 'w-full overflow-y-auto'
-                    }`}
-                >
-                  {children}
-                </main>
-              </div>
-              {/* Main Content End */}
-            </div>
-            {/* Content Area End */}
-          </div>
+                <div className={`flex flex-col mt-3 duration-300 ease-linear no-scrollbar ${sidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
+                  <nav className="mt-0 py-2 px-4 lg:mt-0 lg:px-6">
+                    <div>
+                      <ul className="flex flex-col gap-4 mb-6">
+                        {/* Menu Items Configuration */}
+                        {[
+                          { id: 'Compras', label: 'Compras', icon: HiOutlineShoppingCart, path: '/compras' },
+                          { id: 'Oficina', label: 'Oficina', icon: HiOutlineWrench, path: '/oficina' },
+                          { id: 'Estoque', label: 'Estoque', icon: HiOutlineCube, path: '/estoque' },
+                          { id: 'Expedição', label: 'Expedição', icon: HiOutlineTruck, path: '/expedicao' }, // Note: id matches hasAccessToModule
+                          { id: 'Qualidade', label: 'Qualidade', icon: HiOutlineClipboardDocumentCheck, path: '/qualidade' },
+                          { id: 'Sac', label: 'Sac', icon: HiOutlineUser, path: '/sac' },
+                          { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/usuario' },
+                        ].map((section) => {
+                          // Special handling for section keys if they differ from ID
+                          const sectionKey = section.id === 'Expedição' ? 'Expedicao' : section.id;
 
-          {isNavigating && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm">
-              <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
-                <span className="inline-flex h-6 w-6 border-2 border-[var(--primary-600)] border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
-                <span className="text-gray-700 font-medium">Carregando...</span>
-              </div>
-            </div>
-          )}
+                          if (!hasAnyVisibleInSection(sectionKey)) return null;
 
-          {isLoggingOut && (
-            <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
-              <div className="flex flex-col items-center gap-4">
-                <div className="h-12 w-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-white text-lg font-medium">Saindo...</span>
+                          return (
+                            <SidebarMenuItem
+                              key={section.id}
+                              label={section.label}
+                              icon={section.icon}
+                              isActive={sectionActive[sectionKey.toLowerCase() as keyof typeof sectionActive]}
+                              isCollapsed={sidebarCollapsed}
+                              submenus={getVisibleSubmenuItems(sectionKey)}
+                              onNavigate={handleNavigation}
+                              isPathActive={isPathActive}
+                              pathname={pathname}
+                            />
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </nav>
+                </div>
+              </aside>
+              {/* Sidebar End */}
+
+              {/* Content Area Start */}
+              <div className="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
+                {/* Header Start */}
+                {/* Header Start */}
+                <header className="sticky top-0 z-999 flex w-full border-b border-gray-700 bg-gray-800">
+                  <div className="flex grow items-center justify-between px-3 py-3 lg:px-6">
+                    <div className="flex items-center gap-2 sm:gap-4">
+                      {/* Hamburger Toggle BTN */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSidebarOpen(!sidebarOpen);
+                        }}
+                        className="z-99999 block rounded-lg border border-gray-700 bg-black p-1.5 shadow-sm lg:hidden"
+                      >
+                        <MdMenu className="text-xl text-white" />
+                      </button>
+
+                      <button
+                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                        className="z-99999 hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-700 text-white lg:flex"
+                      >
+                        <MdMenu className="text-xl" />
+                      </button>
+                      {/* Hamburger Toggle BTN */}
+                    </div>
+
+                    {/* Breadcrumb Area */}
+                    <div className="hidden sm:block ml-4 lg:ml-8">
+                      <Breadcrumb />
+                    </div>
+
+                    <div className="flex grow justify-end items-center gap-3 2xsm:gap-7">
+                      <ul className="flex items-center gap-2 2xsm:gap-4">
+                        {/* Notification Menu Area */}
+                        <li className="relative">
+                          <Link
+                            href="#"
+                            className="relative flex h-10 w-10 items-center justify-center rounded-full text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-all duration-200"
+                          >
+                            <MdOutlineNotificationsNone className="text-2xl" />
+                          </Link>
+                        </li>
+                        {/* Notification Menu Area */}
+                      </ul>
+
+                      {/* User Area */}
+                      <ProfileDropdown userData={userData} onLogout={deslogar} />
+                      {/* User Area */}
+                    </div>
+                  </div>
+                </header>
+                {/* Header End */}
+
+                {/* Main Content Start */}
+                <div className="flex-1 w-full border-l border-gray-700 flex flex-col min-h-0">
+                  <main
+                    className={`relative flex-1 ${pathname?.startsWith('/compras/kanban') || pathname?.startsWith('/sac/kanban') || pathname === '/'
+                      ? 'flex flex-col h-full min-h-0 overflow-hidden'
+                      : 'w-full overflow-y-auto'
+                      }`}
+                  >
+                    {children}
+                  </main>
+                </div>
+                {/* Main Content End */}
               </div>
+              {/* Content Area End */}
             </div>
-          )}
-        </PrivateRoute>
-      </ToastProvider>
-    </SidebarContext.Provider >
+
+            {isNavigating && (
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+                  <span className="inline-flex h-6 w-6 border-2 border-[var(--primary-600)] border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
+                  <span className="text-gray-700 font-medium">Carregando...</span>
+                </div>
+              </div>
+            )}
+
+            {isLoggingOut && (
+              <LogoutAnimation
+                onComplete={async () => {
+                  try {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                  } catch (error) {
+                    console.error("Erro ao fazer logout:", error);
+                  }
+                  window.localStorage.setItem('auth', 'false');
+                  window.localStorage.removeItem('userData');
+                  setUserData(null);
+                  router.replace('/login?logout=true');
+                }}
+              />
+            )}
+          </PrivateRoute>
+        </ToastProvider>
+      </SidebarContext.Provider >
+    </UserProvider>
   );
 }

@@ -14,8 +14,13 @@ export default function ProfileDropdown({ userData, onLogout }: ProfileDropdownP
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const trigger = useRef<any>(null);
     const dropdown = useRef<any>(null);
+    const [imgError, setImgError] = useState(false);
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setImgError(false); // Reset error state when userData changes
+    }, [userData?.avatar]);
 
     useEffect(() => {
         const timer = setTimeout(() => setMounted(true), 0);
@@ -65,9 +70,18 @@ export default function ProfileDropdown({ userData, onLogout }: ProfileDropdownP
                     </span>
                 </span>
 
-                <span className="h-11 w-11 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center text-xl font-bold text-white border border-gray-600">
-                    {userData?.usuario?.charAt(0) || 'U'}
-                </span>
+                <div className="h-11 w-11 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center text-xl font-bold text-white border border-gray-600 relative">
+                    {userData?.avatar && !imgError ? (
+                        <img
+                            src={userData.avatar}
+                            alt={userData?.usuario || 'U'}
+                            className="h-full w-full object-cover"
+                            onError={() => setImgError(true)}
+                        />
+                    ) : (
+                        userData?.usuario?.charAt(0) || 'U'
+                    )}
+                </div>
 
                 <MdKeyboardArrowDown className={`hidden text-xl sm:block transition-transform duration-200 text-gray-400 ${dropdownOpen ? 'rotate-180' : ''}`} />
             </Link>
@@ -92,16 +106,16 @@ export default function ProfileDropdown({ userData, onLogout }: ProfileDropdownP
                 </div>
 
                 <ul className="flex flex-col gap-1">
-                    {/* <li>
+                    <li>
                         <Link
-                            href="#"
+                            href="/feed/profile"
                             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                         >
                             <MdOutlinePerson className="text-lg" />
                             Meu Perfil
                         </Link>
                     </li>
-                    <li>
+                    {/* <li>
                         <Link
                             href="#"
                             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"

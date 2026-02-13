@@ -1,10 +1,10 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import logo from "../logo.svg";
 import Image from "next/image";
 import { serviceUrl } from "@/lib/services";
-import { writeUserToLocalStorage } from "../lib/user"; // ✅ importa o writer que dispara o evento
+// import { writeUserToLocalStorage } from "../lib/user"; // Removido na migração v2
 
 
 export default function Login() {
@@ -22,25 +22,25 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const SISTEMA_API = serviceUrl("sistema", "/login");
-      const response = await fetch(SISTEMA_API, {
+      // Chama a nossa rota de API que define o cookie
+      const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ codigo, senha }),
       });
 
       const data = await response.json();
-      console.log("Resposta do login:", data);
 
-      if (data?.success) {
-        // Marcação simples de auth (se você usa em outros pontos)
-        localStorage.setItem("auth", "true");
+      if (response.ok && data.success) {
+        // Sucesso! Cookie já definido.
+        // Opcional: Salvar dados não sensíveis no context se necessário, 
+        // mas a persistência principal agora é o cookie.
 
-        // 🔑 dispara atualização do Ability em TODAS as abas e na MESMA aba
-        writeUserToLocalStorage(data);
+        // Disparar evento apenas para atualizar componentes que ouvem mudanças (se houver)
+        // window.dispatchEvent(new Event("auth:updated")); 
 
         router.push("/");
+        router.refresh(); // Força recarregamento para middleware/server components pegarem o cookie
       } else {
         alert(data?.message || "Login inválido");
       }
@@ -75,6 +75,25 @@ export default function Login() {
   const currentMonthIndex = new Date().getMonth();
   const currentBackgroundImage = `/images/fundo/${backgroundImages[currentMonthIndex]}`;
 
+  /* ------------------- Logout transition logic ------------------- */
+  const [showLogoutFade, setShowLogoutFade] = useState(false);
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+
+  useEffect(() => {
+    // Se veio do logout (?logout=true)
+    if (searchParams && searchParams.get("logout") === "true") {
+      setShowLogoutFade(true);
+      // Remove o param da URL para nao ficar lá pra sempre
+      router.replace("/login");
+
+      // Inicia o fade-out do branco
+      const timer = setTimeout(() => {
+        setShowLogoutFade(false);
+      }, 800); // tempo para o branco sumir
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       {/* Background Image */}
@@ -90,6 +109,16 @@ export default function Login() {
         {/* Overlay for better readability if needed */}
         <div className="absolute inset-0 bg-black/10" />
       </div>
+
+      {/* 
+        Overlay branco de transição (Logout -> Login).
+        Ele começa com opacity-100 (tudo branco) e faz transition para opacity-0.
+        Pointer-events-none para não bloquear cliques quando estiver transparente.
+      */}
+      <div
+        className={`fixed inset-0 z-[99999] bg-white pointer-events-none transition-opacity duration-1000 ease-out ${showLogoutFade ? "opacity-100" : "opacity-0"
+          }`}
+      />
 
       <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
         <div className="flex flex-col items-center mb-8">

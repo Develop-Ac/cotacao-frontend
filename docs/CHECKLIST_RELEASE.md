@@ -24,7 +24,7 @@ Se algum item for "NÃO", registrar o motivo e o plano de correção/rollback.
 ---
 
 ## 2) Configuração de Ambiente (.env)
-- [ ] **CRÍTICO:** `NEXT_PUBLIC_DEV_AUTH_BYPASS` está **REMOVIDO** ou `false` no ambiente de destino (Staging/Prod)
+- [ ] **CRÍTICO:** Verificar se variáveis de ambiente de produção estão corretas
 - [ ] Variáveis de serviço (`NEXT_PUBLIC_FEED_SERVICE_BASE`, etc.) apontam para as URLs corretas do ambiente
 - [ ] `package-lock.json` atualizado e commitado
 - [ ] Nenhuma dependência nova adicionada sem análise de licença/segurança

@@ -10,9 +10,11 @@ export default function Login() {
   const PERMISSOES_SETORES: Record<string, Array<{ modulo: string; telas: string[] }>> = {
     Estoque: [
       { modulo: "Estoque", telas: ["/estoque/contagem", "/estoque/auditoria"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     Oficina: [
       { modulo: "Oficina", telas: ["/oficina/checkList"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     Compras: [
       {
@@ -25,6 +27,7 @@ export default function Login() {
           "/compras/analise"
         ]
       },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     Admin: [
       { modulo: "Estoque", telas: ["/estoque/contagem", "/estoque/auditoria"] },
@@ -44,24 +47,30 @@ export default function Login() {
       { modulo: "Atacado", telas: [] },
       { modulo: "Varejo", telas: [] },
       { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     Sac: [
       { modulo: "Sac", telas: ["/sac/kanban"] },
       { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     Qualidade: [
       { modulo: "Sac", telas: ["/sac/kanban"] },
       { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
       { modulo: "Compras", telas: ["/compras/kanban"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     Atacado: [
       { modulo: "Sac", telas: ["/sac/kanban"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     Varejo: [
       { modulo: "Sac", telas: ["/sac/kanban"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
     "Expedição": [
       { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
+      { modulo: "Feed", telas: ["/feed"] },
     ],
   };
 
@@ -69,19 +78,6 @@ export default function Login() {
   const [modalPermissoesAberto, setModalPermissoesAberto] = useState(false);
   const [permissoes, setPermissoes] = useState<Record<string, Record<string, boolean>>>({});
   const [modulosTelas, setModulosTelas] = useState<Array<{ modulo: string; telas: string[] }>>([]);
-
-  // Abre o modal ao selecionar setor
-  const handleSetorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const novoSetor = e.target.value;
-    setSetor(novoSetor);
-    if (novoSetor && PERMISSOES_SETORES[novoSetor]) {
-      setModulosTelas(PERMISSOES_SETORES[novoSetor]);
-      setModalPermissoesAberto(true);
-    } else {
-      setModulosTelas([]);
-      setModalPermissoesAberto(false);
-    }
-  };
 
   // Permissões possíveis
   const TIPOS_PERMISSAO = ["visualizar", "editar", "criar", "excluir"];
@@ -100,6 +96,7 @@ export default function Login() {
   const [usuarioEditandoId, setUsuarioEditandoId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
+  const [perfilAcesso, setPerfilAcesso] = useState("");
   const [setor, setSetor] = useState("");
   const [senha, setSenha] = useState("");
 
@@ -124,7 +121,8 @@ export default function Login() {
     id: string;
     nome: string;
     codigo?: string;
-    setor: string;
+    perfil_acesso: string;
+    setor?: string;
     senha?: string;
   };
 
@@ -166,32 +164,32 @@ export default function Login() {
 
       if (usuarioId) {
         // === EDITAR USUÁRIO ===
-        // 1. Atualiza dados básicos (via PUT se existir endpoint, senão via POST que atua como upsert ou similar?)
-        // O endpoint POST /usuarios geralmente cria. Vamos assumir que precisamos de um PUT /usuarios/:id ou que o POST resolve.
-        // Dado que não vi um PUT /usuarios no backend (vi apenas permissoes), vou assumir que a edição de DADOS DO USUÁRIO
-        // pode não estar 100% implementada ou usa o POST.
-        // Vendo o código original, parece que só havia POST. Vou tentar usar o mesmo endpoint POST para "upsert" se o backend suportar,
-        // ou, idealmente, se eu tivesse criado o PUT. Como não criei task para PUT de usuário, vou focar nas PERMISSÕES.
-        // Mas espere, se eu mudar o nome/setor, preciso salvar.
-        // Vou assumir que o sistema aceita POST para edição se mandar ID? Não, o prisma gera ID novo no create.
-        // **DECISÃO PROVISÓRIA**: Vou usar POST para criar e vou adicionar um TODO para implementar PUT de usuário se falhar.
-        // Mas para não quebrar, vou assumir criação de um NOVO se não for edição.
-        // Se for edição, vou tentar fazer um PATCH/PUT simulado ou apenas atualizar permissões se o backend não suportar update de usuário.
-        // *Revisão rápida*: O usuário pediu "incluir a opção de editar os acessos". O foco é ACESSO.
-        // Então, para DADOS BÁSICOS, se não houver endpoint, eu mantenho como está (ou seja, talvez não edite dados básicos, só permissões).
-        // Mas vou tentar um PUT para ver se cola.
+        const response = await fetch(`${SISTEMA_API}/usuarios/${usuarioId}`, {
+          method: "PATCH",
+          headers: { "Accept": "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome,
+            codigo,
+            perfil_acesso: perfilAcesso,
+            setor,
+            ...(senha ? { senha } : {}) // Só envia senha se preenchida
+          }),
+        });
 
-        // NOTA: O backend não foi inspecionado profundamente para 'usuarios' controller, apenas 'permissoes'.
-        // Supondo que exista ou que eu possa só atualizar permissões.
-
-        // Se houver endpoint de update de usuario:
-        // await fetch(`${SISTEMA_API}/usuarios/${usuarioId}`, { method: 'PUT', ... });
+        if (!response.ok) {
+          let msg = `Erro HTTP: ${response.status}`;
+          try {
+            const errJson = await response.json();
+            if (errJson?.message) msg = errJson.message;
+          } catch { }
+          throw new Error(msg);
+        }
       } else {
         // === CRIAR USUÁRIO ===
         const response = await fetch(`${SISTEMA_API}/usuarios`, {
           method: "POST",
           headers: { "Accept": "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({ nome, codigo, setor, senha }),
+          body: JSON.stringify({ nome, codigo, perfil_acesso: perfilAcesso, setor, senha }),
         });
 
         if (!response.ok) {
@@ -231,7 +229,7 @@ export default function Login() {
           visualizar: !!tipos["visualizar"],
           editar: !!tipos["editar"],
           criar: !!tipos["criar"],
-          deletar: !!tipos["deletar"],
+          deletar: !!tipos["excluir"],
         };
 
         // Lógica de Permissões:
@@ -256,7 +254,7 @@ export default function Login() {
       await Promise.all(permissoesRequests);
 
       // Limpar form
-      setNome(""); setCodigo(""); setSetor(""); setSenha("");
+      setNome(""); setCodigo(""); setPerfilAcesso(""); setSetor(""); setSenha("");
       setUsuarioEditandoId(null);
       setPermissoesOriginais({});
       setFormularioAberto(false);
@@ -273,12 +271,13 @@ export default function Login() {
     setUsuarioEditandoId(usuario.id);
     setNome(usuario.nome);
     setCodigo(usuario.codigo || "");
-    setSetor(usuario.setor);
+    setPerfilAcesso(usuario.perfil_acesso);
+    setSetor(usuario.setor || "");
     setSenha(""); // Não preenche senha por segurança
 
     // Configura telas baseadas no setor
-    if (usuario.setor && PERMISSOES_SETORES[usuario.setor]) {
-      setModulosTelas(PERMISSOES_SETORES[usuario.setor]);
+    if (usuario.perfil_acesso && PERMISSOES_SETORES[usuario.perfil_acesso]) {
+      setModulosTelas(PERMISSOES_SETORES[usuario.perfil_acesso]);
     } else {
       setModulosTelas([]);
     }
@@ -359,7 +358,7 @@ export default function Login() {
                 title="Novo"
                 onClick={() => {
                   setUsuarioEditandoId(null);
-                  setNome(""); setCodigo(""); setSetor(""); setSenha("");
+                  setNome(""); setCodigo(""); setPerfilAcesso(""); setSetor(""); setSenha("");
                   setPermissoes({});
                   setPermissoesOriginais({});
                   setFormularioAberto(!formularioAberto);
@@ -411,27 +410,57 @@ export default function Login() {
                       className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <div>
-                    <label htmlFor="setor" className="block font-medium">Setor</label>
-                    <select
-                      id="setor"
-                      value={setor}
-                      onChange={handleSetorChange}
-                      className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Selecione um setor</option>
-                      <option value="Estoque">Estoque</option>
-                      <option value="Oficina">Oficina</option>
-                      <option value="Compras">Compras</option>
-                      <option value="Administrativo">Administrativo</option>
-                      <option value="Admin">Admin</option>
-                      <option value="Sac">Sac</option>
-                      <option value="Qualidade">Qualidade</option>
-                      <option value="Atacado">Atacado</option>
-                      <option value="Varejo">Varejo</option>
-                      <option value="TI">TI</option>
-                      <option value="Expedição">Expedição</option>
-                    </select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex-1">
+                      <label htmlFor="perfil_acesso" className="block font-medium">Perfil de Acesso</label>
+                      <div className="flex gap-2">
+                        <select
+                          id="perfil_acesso"
+                          value={perfilAcesso}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPerfilAcesso(val);
+                            if (val && PERMISSOES_SETORES[val]) {
+                              setModulosTelas(PERMISSOES_SETORES[val]);
+                            } else {
+                              setModulosTelas([]);
+                            }
+                          }}
+                          className="flex-1 h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Selecione um perfil</option>
+                          {Object.keys(PERMISSOES_SETORES).map(p => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (perfilAcesso && PERMISSOES_SETORES[perfilAcesso]) {
+                              setModulosTelas(PERMISSOES_SETORES[perfilAcesso]);
+                              setModalPermissoesAberto(true);
+                            } else {
+                              alert("Selecione um perfil de acesso primeiro.");
+                            }
+                          }}
+                          className="h-12 px-4 inline-flex items-center justify-center gap-2 rounded bg-blue-100 text-blue-700 font-medium hover:bg-blue-200"
+                          title="Listar Acessos"
+                        >
+                          <FaListUl />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <label htmlFor="setor" className="block font-medium">Setor</label>
+                      <input
+                        type="text"
+                        id="setor"
+                        placeholder="Setor (ex: Vendas, Financeiro)"
+                        value={setor}
+                        onChange={e => setSetor(e.target.value)}
+                        className="w-full h-12 border border-gray-300 rounded px-3 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
                   {/* Modal de Permissões - fora do select para overlay funcionar corretamente */}
                   {modalPermissoesAberto && (
@@ -560,6 +589,7 @@ export default function Login() {
                       </th>
                       <th className="p-2 text-start">Nome</th>
                       <th className="p-2 text-start">Código</th>
+                      <th className="p-2 text-start">Perfil de Acesso</th>
                       <th className="p-2 text-start">Setor</th>
                       <th className="p-2 text-center" style={{ width: "100px" }}>Ações</th>
                     </tr>
@@ -573,7 +603,8 @@ export default function Login() {
                           </td>
                           <td className="p-4">{usuario.nome}</td>
                           <td className="p-4">{usuario.codigo || "-"}</td>
-                          <td className="p-4">{usuario.setor}</td>
+                          <td className="p-4">{usuario.perfil_acesso}</td>
+                          <td className="p-4">{usuario.setor || "-"}</td>
                           <td className="p-4 text-center">
                             <button
                               className="mx-1 h-10 w-10 inline-flex items-center justify-center rounded"

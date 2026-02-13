@@ -9,7 +9,8 @@ type ServiceKey =
   | "qualidade"
   | "calculadoraSt"
   | "atendimentoLog"
-  | "analiseEstoque";
+  | "analiseEstoque"
+  | "feed";
 
 const FALLBACKS: Record<ServiceKey, string> = {
   compras: "http://compras-service.acacessorios.local",
@@ -17,12 +18,13 @@ const FALLBACKS: Record<ServiceKey, string> = {
   expedicao: "http://expedicao-service.acacessorios.local",
   oficina: "http://oficina-service.acacessorios.local",
   sac: "http://sac-service.acacessorios.local",
-  sistema: "http://sistema-service.acacessorios.local",
+  sistema: "http://localhost:8000", // TODO: mudar para sistema-service.acacessorios.local
   metabase: "http://bi.acacessorios.local",
   qualidade: "http://garantia-service.acacessorios.local/api",
   calculadoraSt: "http://calculadora-st-service.acacessorios.local/api",
   atendimentoLog: "http://atendimento-log.acacessorios.com.br",
   analiseEstoque: "http://analise-estoque-service.acacessorios.local",
+  feed: "http://feed-service.acacessorios.local",
 };
 
 const envNames: Record<ServiceKey, string> = {
@@ -37,6 +39,7 @@ const envNames: Record<ServiceKey, string> = {
   calculadoraSt: "NEXT_PUBLIC_CALCULADORA_ST_BASE",
   atendimentoLog: "NEXT_PUBLIC_ATENDIMENTO_LOG_URL",
   analiseEstoque: "NEXT_PUBLIC_ANALISE_ESTOQUE_BASE",
+  feed: "NEXT_PUBLIC_FEED_SERVICE_BASE",
 };
 
 const sanitize = (value?: string | null) => value?.trim().replace(/\/+$/, "");
