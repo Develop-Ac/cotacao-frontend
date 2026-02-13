@@ -70,7 +70,7 @@ const CotacaoModal: React.FC<CotacaoModalProps> = ({ open, onClose, items, cover
         itens: itensCotacao,
       };
 
-      const res = await fetch("http://localhost:8000/compras/pedidos-cotacao", {
+      const res = await fetch(`${baseUrl}/compras/pedidos-cotacao`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(payload),
