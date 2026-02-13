@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 export async function POST() {
     const cookieStore = await cookies();
 
-    const isSecure = process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_ALLOW_INSECURE_COOKIES !== "true";
+    const allowInsecure = process.env.ALLOW_INSECURE_COOKIES === "true" ||
+        process.env.NEXT_PUBLIC_ALLOW_INSECURE_COOKIES === "true";
+    const isSecure = process.env.NODE_ENV === "production" && !allowInsecure;
 
     // Remove o cookie definindo uma data de expiração no passado
     cookieStore.set("auth_token", "", {
