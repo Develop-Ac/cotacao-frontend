@@ -25,7 +25,7 @@ const CotacaoModal: React.FC<CotacaoModalProps> = ({ open, onClose, items, cover
 
   useEffect(() => {
     if (open) {
-      fetch(`${baseUrl}/pedidos-cotacao/proximo-indice`)
+      fetch(`${baseUrl}/compras/pedidos-cotacao/proximo-indice`)
         .then(res => res.json())
         .then(data => setProximoIndice(data.proximoIndice))
         .catch(() => setProximoIndice(null));
