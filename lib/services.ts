@@ -12,21 +12,6 @@ type ServiceKey =
   | "analiseEstoque"
   | "feed";
 
-const FALLBACKS: Record<ServiceKey, string> = {
-  compras: "http://compras-service.acacessorios.local",
-  estoque: "http://estoque-service.acacessorios.local/",
-  expedicao: "http://expedicao-service.acacessorios.local",
-  oficina: "http://oficina-service.acacessorios.local",
-  sac: "http://sac-service.acacessorios.local",
-  sistema: "http://sistema-service.acacessorios.local",
-  metabase: "http://bi.acacessorios.local",
-  qualidade: "http://garantia-service.acacessorios.local/api",
-  calculadoraSt: "http://calculadora-st-service.acacessorios.local/api",
-  atendimentoLog: "http://atendimento-log.acacessorios.com.br",
-  analiseEstoque: "http://analise-estoque-service.acacessorios.local",
-  feed: "http://feed-service.acacessorios.local",
-};
-
 const envNames: Record<ServiceKey, string> = {
   compras: "NEXT_PUBLIC_COMPRAS_SERVICE_BASE",
   estoque: "NEXT_PUBLIC_ESTOQUE_SERVICE_BASE",
@@ -47,7 +32,7 @@ const sanitize = (value?: string | null) => value?.trim().replace(/\/+$/, "");
 export const getServiceBase = (service: ServiceKey) => {
   const envName = envNames[service];
   const envValue = process.env[envName];
-  return sanitize(envValue) || FALLBACKS[service];
+  return sanitize(envValue) || "";
 };
 
 const join = (base: string, path?: string) => {

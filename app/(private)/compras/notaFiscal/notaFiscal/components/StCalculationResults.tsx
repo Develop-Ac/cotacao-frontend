@@ -363,14 +363,14 @@ export default function StCalculationResults({ results, originalItems, selectedI
 }
 
 function StatusBadge({ status }: { status: string }) {
-    if (status === 'Guia Complementar') {
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Guia Compl.</span>;
+    if (status.includes('Guia Complementar') || status.includes('Guia Compl.')) {
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{status}</span>;
     }
-    if (status === 'Pago a Maior') {
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Pago a Maior</span>;
+    if (status.includes('Pago a Maior') || status.includes('Pago Maior')) {
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">{status}</span>;
     }
-    if (status === 'OK') {
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 flex items-center justify-center gap-1"><FaCheckCircle /> OK</span>;
+    if (status.includes('OK')) {
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 flex items-center justify-center gap-1"><FaCheckCircle /> {status}</span>;
     }
     return <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">{status}</span>;
 }
