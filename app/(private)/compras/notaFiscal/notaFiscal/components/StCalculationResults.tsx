@@ -4,15 +4,21 @@ import { serviceUrl } from "@/lib/services";
 import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
 import { useMemo, useState, useEffect } from "react";
 import { FaExclamationTriangle, FaCheckCircle, FaMoneyBillWave, FaCalculator, FaArrowLeft, FaFilePdf, FaFileArchive, FaCheckSquare, FaSquare } from "react-icons/fa";
+import ConfirmationModal from "@/components/ConfirmationModal";
+import { useToast } from "@/components/Toast";
 
 type Props = {
     results: StCalculationResult[];
     originalItems: NotaFiscalRow[];
     selectedInvoices: Set<string>;
     onBack: () => void;
+    onSuccess: () => void;
 };
 
-export default function StCalculationResults({ results, originalItems, selectedInvoices, onBack }: Props) {
+export default function StCalculationResults({ results, originalItems, selectedInvoices, onBack, onSuccess }: Props) {
+    const { success, error } = useToast();
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     // Selection state: Set of indices
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
@@ -122,9 +128,12 @@ export default function StCalculationResults({ results, originalItems, selectedI
         return { totalComplementar, totalDestacado, qtdDivergencia, count: activeResults.length, activeResults };
     }, [results, selectedIndices]);
 
-    const handleSaveStatus = async () => {
-        if (!confirm("Deseja salvar o status dessas notas no sistema?")) return;
+    const handleSaveClick = () => {
+        setConfirmModalOpen(true);
+    };
 
+    const handleConfirmSave = async () => {
+        setIsSaving(true);
         // Group ALL items by Chave NFe (not just active ones)
         const allItemsByInvoice: Record<string, StCalculationResult[]> = {};
         results.forEach(r => {
@@ -149,12 +158,17 @@ export default function StCalculationResults({ results, originalItems, selectedI
             const hasCalculatedItems = activeItemsForInvoice.some(i => i.mvaRef > 0 || (i.matchType && i.matchType !== 'Não Encontrado'));
 
             if (activeItemsForInvoice.length > 0 && hasCalculatedItems) {
-                const needsPayment = activeItemsForInvoice.some(i => i.diferenca > 0.05);
-                if (needsPayment) {
+                const needsPayment = activeItemsForInvoice.some(i => i.diferenca > 0.05); // Check logic still valid? Or just NET?
+                // Actually the logic for status string might depend on individual items, but amount depends on NET.
+                // Re-using "needsPayment" logic based on individual items might vary from NET sum logic.
+                // But let's stick to the NET logic requested in previous step for value.
+
+                // Sum NET differences (positive + negative)
+                const netVal = activeItemsForInvoice.reduce((acc, curr) => acc + curr.diferenca, 0);
+                totalValue = Math.max(0, netVal);
+
+                if (totalValue > 0.05) {
                     status = 'Tem Guia Complementar';
-                    // Sum NET differences (positive + negative)
-                    const netVal = activeItemsForInvoice.reduce((acc, curr) => acc + curr.diferenca, 0);
-                    totalValue = Math.max(0, netVal);
                 } else {
                     status = 'Sem Guia - Verificado';
                 }
@@ -175,14 +189,17 @@ export default function StCalculationResults({ results, originalItems, selectedI
             });
 
             if (res.ok) {
-                alert("Status salvo com sucesso!");
-                onBack();
+                success("Status salvo com sucesso!");
+                setConfirmModalOpen(false);
+                onSuccess(); // Refresh list
             } else {
-                alert("Erro ao salvar status.");
+                error("Erro ao salvar status.");
             }
         } catch (e) {
             console.error(e);
-            alert("Erro de conexão ao salvar.");
+            error("Erro de conexão ao salvar.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -191,6 +208,17 @@ export default function StCalculationResults({ results, originalItems, selectedI
 
     return (
         <div className="mt-4 bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-stroke dark:border-strokedark animate-fade-in-up">
+            <ConfirmationModal
+                isOpen={confirmModalOpen}
+                title="Salvar Status"
+                message="Deseja salvar o status dessas notas no sistema?"
+                onConfirm={handleConfirmSave}
+                onCancel={() => setConfirmModalOpen(false)}
+                isLoading={isSaving}
+                confirmText="Salvar"
+                cancelText="Cancelar"
+            />
+
             <div className="flex items-center justify-between mb-6">
                 <button
                     onClick={onBack}
@@ -204,7 +232,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
                         Análise ICMS ST ({metrics.count} itens)
                     </h3>
                     <button
-                        onClick={handleSaveStatus}
+                        onClick={handleSaveClick}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition-colors text-sm font-semibold flex items-center gap-2"
                     >
                         <FaCheckCircle /> Salvar Status

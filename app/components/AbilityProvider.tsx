@@ -36,6 +36,8 @@ export function AbilityProvider({ children }: { children: React.ReactNode }) {
     // but for now we let it render with empty permissions until loaded
 
     return (
-        <AbilityContext.Provider value={ability}>{children}</AbilityContext.Provider>
+        <AbilityLoadingContext.Provider value={isLoading}>
+            <AbilityContext.Provider value={ability}>{children}</AbilityContext.Provider>
+        </AbilityLoadingContext.Provider>
     );
 }

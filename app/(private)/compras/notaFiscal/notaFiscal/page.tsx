@@ -501,7 +501,16 @@ export default function NotaFiscalList() {
           )}
 
           {viewState === 'RESULTS' && results && (
-            <StCalculationResults results={results} originalItems={items} selectedInvoices={selectedChaves} onBack={handleBackToList} />
+            <StCalculationResults
+              results={results}
+              originalItems={items}
+              selectedInvoices={selectedChaves}
+              onBack={handleBackToList}
+              onSuccess={() => {
+                handleBackToList();
+                fetchAll();
+              }}
+            />
           )}
         </div>
       </div>

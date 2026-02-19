@@ -81,7 +81,7 @@ export default function RootLayout({
   const [showSplash, setShowSplash] = useState(true);
   const [mediaReady, setMediaReady] = useState(false); // To ensure fonts/styles load if needed, but mainly for consistent delay
 
-  const isDataReady = !!userData; // Data is considered ready when userData is populated (from SWR or LocalStorage)
+  const isDataReady = !!userData && !isLoadingAbility; // Data is considered ready when userData is populated (from SWR or LocalStorage) AND ability is loaded
 
 
   const [isNavigating, setIsNavigating] = useState(false);
