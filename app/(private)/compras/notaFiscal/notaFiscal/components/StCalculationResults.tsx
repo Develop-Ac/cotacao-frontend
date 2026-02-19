@@ -113,9 +113,8 @@ export default function StCalculationResults({ results, originalItems, selectedI
         // Filter only selected items for metrics
         const activeResults = results.filter((_, i) => selectedIndices.has(i));
 
-        const totalComplementar = activeResults
-            .filter(r => r.diferenca > 0)
-            .reduce((acc, curr) => acc + curr.diferenca, 0);
+        const netSum = activeResults.reduce((acc, curr) => acc + curr.diferenca, 0);
+        const totalComplementar = Math.max(0, netSum);
 
         const totalDestacado = activeResults.reduce((acc, curr) => acc + curr.stDestacado, 0);
         const qtdDivergencia = activeResults.filter(r => r.status === 'Guia Complementar').length;
@@ -153,8 +152,9 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 const needsPayment = activeItemsForInvoice.some(i => i.diferenca > 0.05);
                 if (needsPayment) {
                     status = 'Tem Guia Complementar';
-                    // Sum only positive differences
-                    totalValue = activeItemsForInvoice.reduce((acc, curr) => acc + (curr.diferenca > 0 ? curr.diferenca : 0), 0);
+                    // Sum NET differences (positive + negative)
+                    const netVal = activeItemsForInvoice.reduce((acc, curr) => acc + curr.diferenca, 0);
+                    totalValue = Math.max(0, netVal);
                 } else {
                     status = 'Sem Guia - Verificado';
                 }
