@@ -34,7 +34,7 @@ export default function RootLayout({
   const [userData, setUserData] = useState<any>(null);
 
   // Sync with Auth API
-  const { data: authData } = useSWR("/api/auth/me", (url) => fetch(url).then(res => res.json()), {
+  const { data: authData, isLoading: isAuthLoading } = useSWR("/api/auth/me", (url) => fetch(url).then(res => res.json()), {
     revalidateOnFocus: true,
   });
 
@@ -81,7 +81,8 @@ export default function RootLayout({
   const [showSplash, setShowSplash] = useState(true);
   const [mediaReady, setMediaReady] = useState(false); // To ensure fonts/styles load if needed, but mainly for consistent delay
 
-  const isDataReady = !!userData && !isLoadingAbility; // Data is considered ready when userData is populated (from SWR or LocalStorage) AND ability is loaded
+  // Dados prontos apenas quando: userData existe, ability carregado E o SWR de auth finalizou
+  const isDataReady = !!userData && !isLoadingAbility && !isAuthLoading;
 
 
   const [isNavigating, setIsNavigating] = useState(false);
@@ -204,12 +205,16 @@ export default function RootLayout({
 
   useEffect(() => {
     const target = normalizePath(pathname);
-    if (isLoadingAbility) return;
+    // Aguardar carregamento completo do ability E do SWR de autenticação
+    // antes de verificar permissões, evitando redirects indevidos no reload.
+    // ability.rules.length === 0 indica que as permissões ainda não chegaram.
+    if (isLoadingAbility || isAuthLoading) return;
+    if (ability.rules.length === 0) return; // Permissões ainda não carregadas
 
     if (target !== "/login" && target !== "/" && !canViewPath(target)) {
       router.replace("/403");
     }
-  }, [pathname, canViewPath, router, isLoadingAbility, ability]);
+  }, [pathname, canViewPath, router, isLoadingAbility, isAuthLoading, ability]);
 
   return (
     <UserProvider>
