@@ -250,11 +250,19 @@ export default function NotaFiscalList() {
     }
   };
 
-  const handleConfirmUnmatched = (selectedIndices: Set<number>) => {
+  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL'>) => {
     if (!tempResults) return;
 
-    const selectedUnmatched = tempResults.unmatched.filter((_, idx) => selectedIndices.has(idx));
-    const finalResults = [...tempResults.matched, ...selectedUnmatched];
+    const finalizedUnmatched = tempResults.unmatched.reduce((acc, item, idx) => {
+      if (selectedIndices.has(idx)) {
+        acc.push({ ...item, impostoEscolhido: taxTypes[idx] });
+      }
+      return acc;
+    }, [] as StCalculationResult[]);
+
+    const finalizedMatched = tempResults.matched.map(item => ({ ...item, impostoEscolhido: 'ST' as const }));
+
+    const finalResults = [...finalizedMatched, ...finalizedUnmatched];
 
     setResults(finalResults);
     setViewState('RESULTS');
@@ -410,7 +418,8 @@ export default function NotaFiscalList() {
                       <th className="w-[300px] py-3 px-4 text-xs font-medium text-black dark:text-white">Emitente</th>
                       <th className="w-[100px] py-3 px-4 text-xs font-medium text-black dark:text-white">Data</th>
                       <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Situação</th>
-                      <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Operação</th>
+                      <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Op. Fiscal</th>
+                      <th className="w-[100px] py-3 px-4 text-xs font-medium text-black dark:text-white text-center">Tipo Imposto</th>
                       <th className="py-3 px-4 text-xs font-medium text-black dark:text-white text-center">Ações</th>
                     </tr>
                   </thead>
@@ -465,6 +474,18 @@ export default function NotaFiscalList() {
                             <span className={`inline-flex items-center justify-center px-2 py-1 min-w-[100px] rounded-md text-xs font-semibold border ${row.TIPO_OPERACAO === 0 ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'}`}>
                               {row.TIPO_OPERACAO_DESC}
                             </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {row.TIPO_IMPOSTO ? (
+                              <span className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-bold border 
+                                  ${row.TIPO_IMPOSTO.includes('DIFAL') && row.TIPO_IMPOSTO.includes('ST') ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                  row.TIPO_IMPOSTO.includes('DIFAL') ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                    'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                                {row.TIPO_IMPOSTO}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-center flex justify-center gap-2">
                             <button onClick={() => handleDownloadPdf(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400" title="Baixar PDF DANFE"><FaFilePdf className="w-5 h-5" /></button>

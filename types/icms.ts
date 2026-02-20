@@ -10,6 +10,7 @@ export type NotaFiscalRow = {
     STATUS_ERP?: 'PENDENTE' | 'LANCADA';
     XML_COMPLETO?: string; // Optional, might be fetched separately
     VALOR_TOTAL?: number;
+    TIPO_IMPOSTO?: string;
 };
 
 export type StCalculationResult = {
@@ -29,8 +30,10 @@ export type StCalculationResult = {
     creditoOrigem: number;
     stDestacado: number;
     stCalculado: number;
+    vlDifal?: number;
     diferenca: number;
     status: 'Guia Complementar' | 'Pago a Maior' | 'OK' | 'NCM s/ Ref' | 'Erro';
+    impostoEscolhido?: 'ST' | 'DIFAL';
 };
 
 export type InvoicePaymentStatus = {
