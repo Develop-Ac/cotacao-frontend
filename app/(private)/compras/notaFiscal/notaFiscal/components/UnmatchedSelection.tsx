@@ -11,8 +11,26 @@ type Props = {
 };
 
 export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel }: Props) {
-    const [selected, setSelected] = useState<Set<number>>(new Set());
-    const [taxTypes, setTaxTypes] = useState<Record<number, 'ST' | 'DIFAL'>>({});
+    const [selected, setSelected] = useState<Set<number>>(() => {
+        const init = new Set<number>();
+        unmatchedItems.forEach((item, idx) => {
+            if (item.matchType && item.matchType !== 'Não Encontrado') {
+                init.add(idx);
+            }
+        });
+        return init;
+    });
+
+    const [taxTypes, setTaxTypes] = useState<Record<number, 'ST' | 'DIFAL'>>(() => {
+        const initTaxes: Record<number, 'ST' | 'DIFAL'> = {};
+        unmatchedItems.forEach((item, idx) => {
+            if (item.matchType && item.matchType !== 'Não Encontrado') {
+                initTaxes[idx] = 'ST';
+            }
+        });
+        return initTaxes;
+    });
+
     const [headerTaxType, setHeaderTaxType] = useState<'ST' | 'DIFAL' | ''>('');
 
     const toggle = (idx: number) => {
@@ -92,15 +110,15 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
 
     return (
         <div className="bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-stroke dark:border-strokedark animate-fade-in-up mt-4">
-            <div className="flex items-center gap-3 mb-4 text-orange-600 dark:text-orange-400">
+            <div className="flex items-center gap-3 mb-4 text-primary dark:text-blue-400">
                 <FaExclamationTriangle size={24} />
-                <h3 className="text-lg font-bold">Pré-Análise: Seleção de Imposto</h3>
+                <h3 className="text-lg font-bold">Pré-Análise: Seleção de Impostos da NFe</h3>
             </div>
 
             <p className="mb-6 text-gray-600 dark:text-gray-300">
-                Os produtos abaixo não possuem vínculo MVA automático ou podem ser cabíveis de DIFAL.
-                Selecione os que deseja <b>incluir no relatório</b> e especifique obrigatoriamente
-                se o imposto a ser recolhido é <b>ICMS ST</b> ou <b>DIFAL</b>.
+                Abaixo estão todos os produtos da nota. Itens com vínculo de MVA já vêm selecionados como <b>ICMS ST</b>.
+                Para produtos de uso e consumo, você pode trocar livremente a opção para <b>DIFAL</b>.
+                Itens sem MVA vêm desmarcados, selecione-os e escolha a tributação obrigatoriamente caso deseje calculá-los.
             </p>
 
             <div className="max-w-full overflow-x-auto border border-stroke dark:border-strokedark rounded-lg mb-6 shadow-sm">
@@ -145,7 +163,12 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
                                     </td>
                                     <td className="px-4 py-3 align-middle">
                                         <div className="font-medium text-black dark:text-white line-clamp-2" title={row.produto}>{row.produto}</div>
-                                        <div className="text-xs text-gray-500 mt-1">Cód: {row.codProd} | NCM: {row.ncmNota}</div>
+                                        <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                                            <span>Cód: {row.codProd}</span> | <span>NCM: {row.ncmNota}</span>
+                                            {row.matchType && row.matchType !== 'Não Encontrado' && (
+                                                <> | <span className="text-blue-600 font-semibold text-[10px] bg-blue-50 px-1 rounded border border-blue-200">MVA Ref: {row.mvaRef}%</span></>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3 text-right font-mono align-middle font-medium">
                                         {row.vlProduto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

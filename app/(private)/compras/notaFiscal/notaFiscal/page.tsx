@@ -230,17 +230,9 @@ export default function NotaFiscalList() {
 
       const allData: StCalculationResult[] = await res.json();
 
-      // Ensure we trim to avoid whitespace issues
-      const matched = allData.filter(r => r.matchType && r.matchType !== 'Não Encontrado');
-      const unmatched = allData.filter(r => !r.matchType || r.matchType === 'Não Encontrado');
-
-      if (unmatched.length > 0) {
-        setTempResults({ matched, unmatched });
-        setViewState('UNMATCHED_SELECTION');
-      } else {
-        setResults(matched);
-        setViewState('RESULTS');
-      }
+      // We no longer bypass items that matched. EVERY item goes to selection.
+      setTempResults({ matched: [], unmatched: allData });
+      setViewState('UNMATCHED_SELECTION');
 
     } catch (e) {
       console.error(e);
@@ -253,18 +245,15 @@ export default function NotaFiscalList() {
   const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL'>) => {
     if (!tempResults) return;
 
-    const finalizedUnmatched = tempResults.unmatched.reduce((acc, item, idx) => {
+    // tempResults.unmatched arrays holds ALL items now (we passed allData into it)
+    const finalized = tempResults.unmatched.reduce((acc, item, idx) => {
       if (selectedIndices.has(idx)) {
         acc.push({ ...item, impostoEscolhido: taxTypes[idx] });
       }
       return acc;
     }, [] as StCalculationResult[]);
 
-    const finalizedMatched = tempResults.matched.map(item => ({ ...item, impostoEscolhido: 'ST' as const }));
-
-    const finalResults = [...finalizedMatched, ...finalizedUnmatched];
-
-    setResults(finalResults);
+    setResults(finalized);
     setViewState('RESULTS');
   };
 
