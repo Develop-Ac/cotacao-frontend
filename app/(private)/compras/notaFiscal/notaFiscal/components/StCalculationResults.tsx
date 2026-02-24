@@ -202,6 +202,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
             return {
                 chaveNfe: chave,
                 observacoes: status,
+                usuario: usuarioId,
                 valor: Number(totalValue.toFixed(2))
             };
         });
