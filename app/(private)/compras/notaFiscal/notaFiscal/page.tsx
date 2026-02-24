@@ -230,17 +230,9 @@ export default function NotaFiscalList() {
 
       const allData: StCalculationResult[] = await res.json();
 
-      // Ensure we trim to avoid whitespace issues
-      const matched = allData.filter(r => r.matchType && r.matchType !== 'Não Encontrado');
-      const unmatched = allData.filter(r => !r.matchType || r.matchType === 'Não Encontrado');
-
-      if (unmatched.length > 0) {
-        setTempResults({ matched, unmatched });
-        setViewState('UNMATCHED_SELECTION');
-      } else {
-        setResults(matched);
-        setViewState('RESULTS');
-      }
+      // We no longer bypass items that matched. EVERY item goes to selection.
+      setTempResults({ matched: [], unmatched: allData });
+      setViewState('UNMATCHED_SELECTION');
 
     } catch (e) {
       console.error(e);
@@ -250,13 +242,18 @@ export default function NotaFiscalList() {
     }
   };
 
-  const handleConfirmUnmatched = (selectedIndices: Set<number>) => {
+  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL'>) => {
     if (!tempResults) return;
 
-    const selectedUnmatched = tempResults.unmatched.filter((_, idx) => selectedIndices.has(idx));
-    const finalResults = [...tempResults.matched, ...selectedUnmatched];
+    // tempResults.unmatched arrays holds ALL items now (we passed allData into it)
+    const finalized = tempResults.unmatched.reduce((acc, item, idx) => {
+      if (selectedIndices.has(idx)) {
+        acc.push({ ...item, impostoEscolhido: taxTypes[idx] });
+      }
+      return acc;
+    }, [] as StCalculationResult[]);
 
-    setResults(finalResults);
+    setResults(finalized);
     setViewState('RESULTS');
   };
 
@@ -410,7 +407,8 @@ export default function NotaFiscalList() {
                       <th className="w-[300px] py-3 px-4 text-xs font-medium text-black dark:text-white">Emitente</th>
                       <th className="w-[100px] py-3 px-4 text-xs font-medium text-black dark:text-white">Data</th>
                       <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Situação</th>
-                      <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Operação</th>
+                      <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Op. Fiscal</th>
+                      <th className="w-[100px] py-3 px-4 text-xs font-medium text-black dark:text-white text-center">Tipo Imposto</th>
                       <th className="py-3 px-4 text-xs font-medium text-black dark:text-white text-center">Ações</th>
                     </tr>
                   </thead>
@@ -466,6 +464,18 @@ export default function NotaFiscalList() {
                               {row.TIPO_OPERACAO_DESC}
                             </span>
                           </td>
+                          <td className="py-3 px-4 text-center">
+                            {row.TIPO_IMPOSTO ? (
+                              <span className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-bold border 
+                                  ${row.TIPO_IMPOSTO.includes('DIFAL') && row.TIPO_IMPOSTO.includes('ST') ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                  row.TIPO_IMPOSTO.includes('DIFAL') ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                    'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                                {row.TIPO_IMPOSTO}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
                           <td className="py-3 px-4 text-center flex justify-center gap-2">
                             <button onClick={() => handleDownloadPdf(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400" title="Baixar PDF DANFE"><FaFilePdf className="w-5 h-5" /></button>
                           </td>
@@ -501,7 +511,16 @@ export default function NotaFiscalList() {
           )}
 
           {viewState === 'RESULTS' && results && (
-            <StCalculationResults results={results} originalItems={items} selectedInvoices={selectedChaves} onBack={handleBackToList} />
+            <StCalculationResults
+              results={results}
+              originalItems={items}
+              selectedInvoices={selectedChaves}
+              onBack={handleBackToList}
+              onSuccess={() => {
+                handleBackToList();
+                fetchAll();
+              }}
+            />
           )}
         </div>
       </div>

@@ -4,15 +4,21 @@ import { serviceUrl } from "@/lib/services";
 import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
 import { useMemo, useState, useEffect } from "react";
 import { FaExclamationTriangle, FaCheckCircle, FaMoneyBillWave, FaCalculator, FaArrowLeft, FaFilePdf, FaFileArchive, FaCheckSquare, FaSquare } from "react-icons/fa";
+import ConfirmationModal from "@/components/ConfirmationModal";
+import { useToast } from "@/components/Toast";
 
 type Props = {
     results: StCalculationResult[];
     originalItems: NotaFiscalRow[];
     selectedInvoices: Set<string>;
     onBack: () => void;
+    onSuccess: () => void;
 };
 
-export default function StCalculationResults({ results, originalItems, selectedInvoices, onBack }: Props) {
+export default function StCalculationResults({ results, originalItems, selectedInvoices, onBack, onSuccess }: Props) {
+    const { success, error } = useToast();
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     // Selection state: Set of indices
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
@@ -113,19 +119,27 @@ export default function StCalculationResults({ results, originalItems, selectedI
         // Filter only selected items for metrics
         const activeResults = results.filter((_, i) => selectedIndices.has(i));
 
-        const totalComplementar = activeResults
-            .filter(r => r.diferenca > 0)
-            .reduce((acc, curr) => acc + curr.diferenca, 0);
+        const stResults = activeResults.filter(r => r.impostoEscolhido === 'ST');
+        const difalResults = activeResults.filter(r => r.impostoEscolhido === 'DIFAL');
 
-        const totalDestacado = activeResults.reduce((acc, curr) => acc + curr.stDestacado, 0);
+        const netStSum = stResults.reduce((acc, curr) => acc + curr.diferenca, 0);
+        const totalStComplementar = Math.max(0, netStSum);
+
+        const totalDifal = difalResults.reduce((acc, curr) => acc + (curr.vlDifal || 0), 0);
+
+        const totalDestacado = stResults.reduce((acc, curr) => acc + curr.stDestacado, 0);
         const qtdDivergencia = activeResults.filter(r => r.status === 'Guia Complementar').length;
 
-        return { totalComplementar, totalDestacado, qtdDivergencia, count: activeResults.length, activeResults };
+        // The total value requested by the user interface might be the sum, but let's keep it separate for UI 
+        return { totalStComplementar, totalDifal, totalDestacado, qtdDivergencia, count: activeResults.length, activeResults };
     }, [results, selectedIndices]);
 
-    const handleSaveStatus = async () => {
-        if (!confirm("Deseja salvar o status dessas notas no sistema?")) return;
+    const handleSaveClick = () => {
+        setConfirmModalOpen(true);
+    };
 
+    const handleConfirmSave = async () => {
+        setIsSaving(true);
         // Group ALL items by Chave NFe (not just active ones)
         const allItemsByInvoice: Record<string, StCalculationResult[]> = {};
         results.forEach(r => {
@@ -146,18 +160,32 @@ export default function StCalculationResults({ results, originalItems, selectedI
             // Logic:
             let status = 'Tributado - Verificado';
             let totalValue = 0;
+            let tipoImposto = '';
 
             const hasCalculatedItems = activeItemsForInvoice.some(i => i.mvaRef > 0 || (i.matchType && i.matchType !== 'Não Encontrado'));
 
             if (activeItemsForInvoice.length > 0 && hasCalculatedItems) {
-                const needsPayment = activeItemsForInvoice.some(i => i.diferenca > 0.05);
-                if (needsPayment) {
+                // Sum NET ST differences (positive + negative)
+                const stItems = activeItemsForInvoice.filter(i => i.impostoEscolhido === 'ST');
+                const netStVal = stItems.reduce((acc, curr) => acc + curr.diferenca, 0);
+                const stTotal = Math.max(0, netStVal);
+
+                // Sum DIFAL differences
+                const difalItems = activeItemsForInvoice.filter(i => i.impostoEscolhido === 'DIFAL');
+                const difalTotal = difalItems.reduce((acc, curr) => acc + (curr.vlDifal || 0), 0);
+
+                totalValue = stTotal + difalTotal;
+
+                if (totalValue > 0.05) {
                     status = 'Tem Guia Complementar';
-                    // Sum only positive differences
-                    totalValue = activeItemsForInvoice.reduce((acc, curr) => acc + (curr.diferenca > 0 ? curr.diferenca : 0), 0);
                 } else {
                     status = 'Sem Guia - Verificado';
                 }
+
+                const tiposArr = [];
+                if (stItems.length > 0) tiposArr.push('ICMS ST');
+                if (difalItems.length > 0) tiposArr.push('DIFAL');
+                tipoImposto = tiposArr.join('/');
             }
 
             const usuarioId = (() => {
@@ -174,7 +202,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
             return {
                 chaveNfe: chave,
                 observacoes: status,
-                usuario: usuarioId,
                 valor: Number(totalValue.toFixed(2))
             };
         });
@@ -187,14 +214,17 @@ export default function StCalculationResults({ results, originalItems, selectedI
             });
 
             if (res.ok) {
-                alert("Status salvo com sucesso!");
-                onBack();
+                success("Status salvo com sucesso!");
+                setConfirmModalOpen(false);
+                onSuccess(); // Refresh list
             } else {
-                alert("Erro ao salvar status.");
+                error("Erro ao salvar status.");
             }
         } catch (e) {
             console.error(e);
-            alert("Erro de conexão ao salvar.");
+            error("Erro de conexão ao salvar.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -203,6 +233,17 @@ export default function StCalculationResults({ results, originalItems, selectedI
 
     return (
         <div className="mt-4 bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-stroke dark:border-strokedark animate-fade-in-up">
+            <ConfirmationModal
+                isOpen={confirmModalOpen}
+                title="Salvar Status"
+                message="Deseja salvar o status dessas notas no sistema?"
+                onConfirm={handleConfirmSave}
+                onCancel={() => setConfirmModalOpen(false)}
+                isLoading={isSaving}
+                confirmText="Salvar"
+                cancelText="Cancelar"
+            />
+
             <div className="flex items-center justify-between mb-6">
                 <button
                     onClick={onBack}
@@ -216,7 +257,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
                         Análise ICMS ST ({metrics.count} itens)
                     </h3>
                     <button
-                        onClick={handleSaveStatus}
+                        onClick={handleSaveClick}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition-colors text-sm font-semibold flex items-center gap-2"
                     >
                         <FaCheckCircle /> Salvar Status
@@ -225,14 +266,24 @@ export default function StCalculationResults({ results, originalItems, selectedI
             </div>
 
             {/* Metrics Dashboard */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div className="p-4 rounded-lg bg-red-50 border border-red-100 dark:bg-red-900/20 dark:border-red-800">
                     <div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-1">
                         <FaMoneyBillWave />
-                        <span className="font-semibold text-sm">Total a Recolher (Guia)</span>
+                        <span className="font-semibold text-sm">ICMS ST a Recolher</span>
                     </div>
                     <div className="text-2xl font-bold text-red-700 dark:text-red-300">
-                        {formatCurrency(metrics.totalComplementar)}
+                        {formatCurrency(metrics.totalStComplementar)}
+                    </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-purple-50 border border-purple-100 dark:bg-purple-900/20 dark:border-purple-800">
+                    <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-1">
+                        <FaMoneyBillWave />
+                        <span className="font-semibold text-sm">DIFAL a Recolher</span>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                        {formatCurrency(metrics.totalDifal)}
                     </div>
                 </div>
 
@@ -268,17 +319,21 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                 </button>
                             </th>
                             <th className="px-4 py-3">Produto</th>
+                            <th className="px-4 py-3 text-center">Imposto</th>
                             <th className="px-4 py-3">NCM / MVA</th>
                             <th className="px-4 py-3 text-right">Valor Prod.</th>
                             <th className="px-4 py-3 text-right">ST Destacado</th>
-                            <th className="px-4 py-3 text-right">ST Calc. (Ref)</th>
-                            <th className="px-4 py-3 text-right">Diferença</th>
+                            <th className="px-4 py-3 text-right">Calc. (Ref)</th>
+                            <th className="px-4 py-3 text-right">A Recolher</th>
                             <th className="px-4 py-3 text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-stroke dark:divide-strokedark">
                         {results.map((row, idx) => {
                             const isSelected = selectedIndices.has(idx);
+                            const isDifal = row.impostoEscolhido === 'DIFAL';
+                            const valorARecolher = isDifal ? (row.vlDifal || 0) : row.diferenca;
+
                             return (
                                 <tr key={idx} className={`hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors ${isSelected ? '' : 'opacity-50 grayscale'}`}>
                                     <td className="px-4 py-3 text-center">
@@ -290,11 +345,20 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                         <div className="font-medium text-black dark:text-white">{row.produto}</div>
                                         <div className="text-xs text-gray-500">{row.codProd}</div>
                                     </td>
+                                    <td className="px-4 py-3 text-center font-bold">
+                                        {isDifal ? (
+                                            <span className="text-purple-600">DIFAL</span>
+                                        ) : (
+                                            <span className="text-blue-600">ICMS ST</span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3">
                                         <div className="text-xs">NCM: {row.ncmNota}</div>
-                                        <div className="text-xs">
-                                            MVA Nota: {row.mvaNota}% | Ref: {row.mvaRef}%
-                                        </div>
+                                        {!isDifal && ( // Só exibe MVA se for ST, DIFAL não usa MVA para comparar
+                                            <div className="text-xs">
+                                                MVA Nota: {row.mvaNota}% | Ref: {row.mvaRef}%
+                                            </div>
+                                        )}
                                         <div className={`text-[10px] px-1.5 py-0.5 rounded inline-block mt-1 ${row.matchType === 'Exato' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                                             }`}>
                                             Match: {row.matchType}
@@ -304,17 +368,22 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                         {formatCurrency(row.vlProduto)}
                                     </td>
                                     <td className="px-4 py-3 text-right font-mono text-gray-600 dark:text-gray-400">
-                                        {formatCurrency(row.stDestacado)}
+                                        {!isDifal ? formatCurrency(row.stDestacado) : '-'}
                                     </td>
                                     <td className="px-4 py-3 text-right font-mono text-blue-600 dark:text-blue-400">
-                                        {formatCurrency(row.stCalculado)}
+                                        {!isDifal ? formatCurrency(row.stCalculado) : '-'}
                                     </td>
-                                    <td className={`px-4 py-3 text-right font-mono font-bold ${row.diferenca > 0.05 ? 'text-red-600' : row.diferenca < -0.05 ? 'text-green-600' : 'text-gray-400'
+                                    <td className={`px-4 py-3 text-right font-mono font-bold ${valorARecolher > 0.05 ? 'text-red-600' : valorARecolher < -0.05 ? 'text-green-600' : 'text-gray-400'
                                         }`}>
-                                        {formatCurrency(row.diferenca)}
+                                        {formatCurrency(valorARecolher)}
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        <StatusBadge status={row.status} />
+                                        {isDifal ? (
+                                            valorARecolher > 0 ? <span className="px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">DIFAL a Recolher</span>
+                                                : <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">OK</span>
+                                        ) : (
+                                            <StatusBadge status={row.status} />
+                                        )}
                                     </td>
                                 </tr>
                             );
@@ -375,14 +444,14 @@ export default function StCalculationResults({ results, originalItems, selectedI
 }
 
 function StatusBadge({ status }: { status: string }) {
-    if (status === 'Guia Complementar') {
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Guia Compl.</span>;
+    if (status.includes('Guia Complementar') || status.includes('Guia Compl.')) {
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{status}</span>;
     }
-    if (status === 'Pago a Maior') {
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Pago a Maior</span>;
+    if (status.includes('Pago a Maior') || status.includes('Pago Maior')) {
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">{status}</span>;
     }
-    if (status === 'OK') {
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 flex items-center justify-center gap-1"><FaCheckCircle /> OK</span>;
+    if (status.includes('OK')) {
+        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 flex items-center justify-center gap-1"><FaCheckCircle /> {status}</span>;
     }
     return <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">{status}</span>;
 }

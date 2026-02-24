@@ -17,9 +17,10 @@ const fetcher = (url: string) => fetch(url).then((res) => {
 
 export function AbilityProvider({ children }: { children: React.ReactNode }) {
     // Use SWR to handle auth state automatically
-    const { data, error, isLoading } = useSWR("/api/auth/me", fetcher, {
-        refreshInterval: 0, // Don't poll aggressively
+    const { data, error, isLoading, isValidating } = useSWR("/api/auth/me", fetcher, {
+        refreshInterval: 0,
         revalidateOnFocus: true,
+        revalidateOnMount: true, // Garante revalidação mesmo com cache de erro (ex: 401 antes do login)
         shouldRetryOnError: false
     });
 
@@ -36,6 +37,9 @@ export function AbilityProvider({ children }: { children: React.ReactNode }) {
     // but for now we let it render with empty permissions until loaded
 
     return (
-        <AbilityContext.Provider value={ability}>{children}</AbilityContext.Provider>
+        // isLoading: carga inicial | isValidating: revalidação após erro em cache (ex: 401 pré-login)
+        <AbilityLoadingContext.Provider value={isLoading || isValidating}>
+            <AbilityContext.Provider value={ability}>{children}</AbilityContext.Provider>
+        </AbilityLoadingContext.Provider>
     );
 }
