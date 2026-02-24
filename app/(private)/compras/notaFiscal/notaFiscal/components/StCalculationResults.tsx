@@ -160,9 +160,21 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 }
             }
 
+            const usuarioId = (() => {
+                try {
+                const userData = localStorage.getItem("userData");
+                if (!userData) return null;
+                const parsed = JSON.parse(userData);
+                return parsed?.id ?? null;
+                } catch {
+                return null;
+                }
+            })();
+
             return {
                 chaveNfe: chave,
                 observacoes: status,
+                usuario: usuarioId,
                 valor: Number(totalValue.toFixed(2))
             };
         });

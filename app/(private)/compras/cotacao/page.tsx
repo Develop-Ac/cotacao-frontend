@@ -308,9 +308,21 @@ export default function Tela() {
     if (!itensCotacao.length) return setMsgCot("Busque o pedido antes de criar a cotação.");
     setPostingCot(true);
     try {
+      const usuarioId = (() => {
+        try {
+          const userData = localStorage.getItem("userData");
+          if (!userData) return null;
+          const parsed = JSON.parse(userData);
+          return parsed?.id ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
       const payload = {
         empresa: 3,
         pedido_cotacao: Number(p),
+        usuario: usuarioId,
         itens: itensCotacao.map((it) => ({
           PEDIDO_COTACAO: Number(it.PEDIDO_COTACAO),
           EMISSAO: it.EMISSAO ?? null,
@@ -523,11 +535,23 @@ export default function Tela() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const novo: FornecedorResp = await res.json();
 
+      const usuarioId = (() => {
+        try {
+          const userData = localStorage.getItem("userData");
+          if (!userData) return null;
+          const parsed = JSON.parse(userData);
+          return parsed?.id ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
       const postBody = {
         pedido_cotacao: pedidoSelecionado,
         for_codigo: novo.FOR_CODIGO,
         for_nome: novo.FOR_NOME,
         cpf_cnpj: novo.CPF_CNPJ ?? null,
+        usuario: usuarioId,
         itens: [],
       };
       const post = await fetch(comprasPath("/fornecedor"), {

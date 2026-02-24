@@ -716,7 +716,7 @@ export default function ComparativoPage() {
     quantidade: number;
   };
 
-  const buildSavePayload = (): { pedido_cotacao: number; itens: SaveItem[] } | null => {
+  const buildSavePayload = (): { pedido_cotacao: number; itens: SaveItem[], usuario: string | null } | null => {
     if (!pedidoCarregado) return null;
 
     const itens: SaveItem[] = [];
@@ -747,7 +747,18 @@ export default function ComparativoPage() {
       });
     }
 
-    return { pedido_cotacao: pedidoCarregado, itens };
+      const usuarioId = (() => {
+        try {
+          const userData = localStorage.getItem("userData");
+          if (!userData) return null;
+          const parsed = JSON.parse(userData);
+          return parsed?.id ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
+    return { pedido_cotacao: pedidoCarregado, itens, usuario: usuarioId };
   };
 
   const [saving, setSaving] = useState(false);
