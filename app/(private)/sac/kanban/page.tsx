@@ -840,7 +840,10 @@ export default function Page() {
         await fetch(`${KANBAN_URL}/kanban`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedTask)
+          body: JSON.stringify({
+            ...updatedTask,
+            data: new Date().toISOString() // ISO-8601 DateTime completo
+          })
         });
       } catch { }
     }
