@@ -485,9 +485,10 @@ export default function Page() {
 
     const updatedTask = {
       ...task,
+      data: new Date().toISOString().slice(0, 10),
       etapa: to,
       solucao: "",
-      dataSolucao: ""
+      dataSolucao: task.due
     };
 
     setBoard(prev => {
