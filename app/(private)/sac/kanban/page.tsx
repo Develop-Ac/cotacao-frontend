@@ -816,6 +816,8 @@ export default function Page() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newTask)
         });
+
+        console.log("Tarefa criada:", newTask);
       } catch { }
     } else {
       // Edição
