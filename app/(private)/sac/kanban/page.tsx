@@ -731,7 +731,7 @@ export default function Page() {
         title: t.title || "",
         desc: t.desc || "",
         due: t.due || "",
-        data: t.data || "",
+        data: new Date().toISOString().slice(0, 10),
         venda: t.venda || "",
         cliente: t.cliente || "",
         itemReclamado: t.itemReclamado || "",
