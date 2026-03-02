@@ -814,10 +814,16 @@ export default function Page() {
         await fetch(`${KANBAN_URL}/kanban`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newTask)
+          body: JSON.stringify({
+            ...newTask,
+            data: new Date().toISOString().slice(0, 10) // Garante data atual se não preenchida
+          })
         });
 
-        console.log("Tarefa criada:", newTask);
+        console.log("Tarefa criada:", {
+            ...newTask,
+            data: new Date().toISOString().slice(0, 10) // Garante data atual se não preenchida
+          });
       } catch { }
     } else {
       // Edição
