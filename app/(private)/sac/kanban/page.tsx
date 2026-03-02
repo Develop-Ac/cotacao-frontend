@@ -816,13 +816,13 @@ export default function Page() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...newTask,
-            data: new Date().toISOString().slice(0, 10) // Garante data atual se não preenchida
+            data: new Date().toISOString() // ISO-8601 DateTime completo
           })
         });
 
         console.log("Tarefa criada:", {
             ...newTask,
-            data: new Date().toISOString().slice(0, 10) // Garante data atual se não preenchida
+            data: new Date().toISOString() // Garante data atual se não preenchida
           });
       } catch { }
     } else {
