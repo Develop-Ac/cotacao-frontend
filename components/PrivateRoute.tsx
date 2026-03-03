@@ -15,9 +15,20 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
   const router = useRouter();
 
   // Usa o mesmo SWR cache do AbilityProvider (chave idêntica = cache compartilhado)
-  const { data, isLoading } = useSWR('/api/auth/me', (url: string) =>
-    fetch(url).then(res => res.json())
-  );
+  const { data, isLoading } = useSWR('/api/auth/me', async (url: string) => {
+    try {
+      const res = await fetch(url);
+      return await res.json();
+    } catch (error) {
+      // Limpa os cookies ao capturar erro
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date(0).toUTCString() + ";path=/");
+      });
+      throw error;
+    }
+  });
 
   // Enquanto carrega, não faz nada (evita redirect prematuro)
   if (isLoading) return <>{children}</>;
@@ -30,3 +41,5 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
 
   return <>{children}</>;
 }
+
+
