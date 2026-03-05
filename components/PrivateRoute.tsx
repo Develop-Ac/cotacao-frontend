@@ -21,9 +21,11 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
       if (res.status === 401) { console.warn('Usuário não autenticado (401). Limpando cookies.');
         // Limpa os cookies ao receber 401
         document.cookie.split(";").forEach((c) => {
-          document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, "=;expires=" + new Date(0).toUTCString() + ";path=/");
+          const eqPos = c.indexOf("=");
+          const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+          if (name) {
+            document.cookie = `${name}=;expires=${new Date(0).toUTCString()};path=/`;
+          }
         });
       }
       return await res.json();
