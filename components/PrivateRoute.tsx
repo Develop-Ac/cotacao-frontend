@@ -18,6 +18,14 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
   const { data, isLoading } = useSWR('/api/auth/me', async (url: string) => {
     try {
       const res = await fetch(url);
+      if (res.status === 401) {
+        // Limpa os cookies ao receber 401
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date(0).toUTCString() + ";path=/");
+        });
+      }
       return await res.json();
     } catch (error) {console.error('Erro ao verificar autenticação:', error);
       // Limpa os cookies ao capturar erro
