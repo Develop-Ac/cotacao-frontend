@@ -18,7 +18,7 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
   const { data, isLoading } = useSWR('/api/auth/me', async (url: string) => {
     try {
       const res = await fetch(url);
-      if (res.status === 401) {
+      if (res.status === 401) { console.warn('Usuário não autenticado (401). Limpando cookies.');
         // Limpa os cookies ao receber 401
         document.cookie.split(";").forEach((c) => {
           document.cookie = c
