@@ -19,7 +19,7 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
     try {
       const res = await fetch(url);
       return await res.json();
-    } catch (error) {
+    } catch (error) {console.error('Erro ao verificar autenticação:', error);
       // Limpa os cookies ao capturar erro
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
