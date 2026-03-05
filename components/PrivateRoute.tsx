@@ -21,13 +21,10 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
       if (res.status === 401) { console.warn('Usuário não autenticado (401). Limpando cookies.');
         // Limpa os cookies ao receber 401
         // Limpa todos os cookies do domínio atual
-        document.cookie.split(";").forEach((c) => {
-          const eqPos = c.indexOf("=");
-          const name = eqPos > -1 ? c.substring(0, eqPos).trim() : c.trim();
-          if (name) {
-            document.cookie = `${name}=;expires=${new Date(0).toUTCString()};path=/;domain=intranet.acacessorios.local`;
-          }
-        });
+        // Limpa apenas o cookie 'auth_token' e define seu valor como vazio
+        document.cookie = `auth_token=;expires=${new Date(0).toUTCString()};path=/;domain=intranet.acacessorios.local`;
+        document.cookie = `auth_token=;expires=${new Date(0).toUTCString()};path=/`;
+        console.warn('Cookies limpos após 401.');
       }
       return await res.json();
     } catch (error) {console.error('Erro ao verificar autenticação:', error);
