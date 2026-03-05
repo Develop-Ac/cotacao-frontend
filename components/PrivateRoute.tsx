@@ -20,11 +20,12 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
       const res = await fetch(url);
       if (res.status === 401) { console.warn('Usuário não autenticado (401). Limpando cookies.');
         // Limpa os cookies ao receber 401
+        // Limpa todos os cookies do domínio atual
         document.cookie.split(";").forEach((c) => {
           const eqPos = c.indexOf("=");
-          const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+          const name = eqPos > -1 ? c.substring(0, eqPos).trim() : c.trim();
           if (name) {
-            document.cookie = `${name}=;expires=${new Date(0).toUTCString()};path=/`;
+            document.cookie = `${name}=;expires=${new Date(0).toUTCString()};path=/;domain=intranet.acacessorios.local`;
           }
         });
       }
