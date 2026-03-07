@@ -95,7 +95,6 @@ function PedidoCard({
           `${comprasPath("/fornecedor")}?pedido_cotacao=${encodeURIComponent(String(pedido.pedido_cotacao))}`,
           { headers: { Accept: "application/json" } }
         );
-        console.log(`${comprasPath("/fornecedor")}?pedido_cotacao=${encodeURIComponent(String(pedido.pedido_cotacao))}`);
         if (res.ok) {
           const data = await res.json();
           if (mounted) {
@@ -382,10 +381,9 @@ export default function Tela() {
     setMsgPedidos(null);
     setLoadingPedidos(true);
     try {
-      const res = await fetch(
-        `${comprasPath("/pedidos-cotacao")}?page=${page}&pageSize=${pageSize}`,
-        { headers: { Accept: "application/json" } }
-      );
+      const url = `${comprasPath("/pedidos-cotacao")}?page=${page}&pageSize=${pageSize}`;
+      console.log(`🔍 Carregando pedidos: ${url}`);
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
