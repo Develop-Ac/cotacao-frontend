@@ -503,7 +503,7 @@ export default function Tela() {
     setItensVisualizacao([]);
     setLoadingItens(true);
     try {
-      const url = `${comprasPath(`/openquery/pedido/${encodeURIComponent(String(pedidoDaLinha))}`)}?empresa=${empresa}`;
+      const url = `${comprasPath(`/pedidos-cotacao/${encodeURIComponent(String(pedidoDaLinha))}`)}/itens?empresa=${empresa}`;
       console.log(`🔍 Carregando itens para visualização: ${url}`);
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
