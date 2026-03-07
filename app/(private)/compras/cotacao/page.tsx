@@ -95,6 +95,7 @@ function PedidoCard({
           `${comprasPath("/fornecedor")}?pedido_cotacao=${encodeURIComponent(String(pedido.pedido_cotacao))}`,
           { headers: { Accept: "application/json" } }
         );
+        console.log(`${comprasPath("/fornecedor")}?pedido_cotacao=${encodeURIComponent(String(pedido.pedido_cotacao))}`);
         if (res.ok) {
           const data = await res.json();
           if (mounted) {
