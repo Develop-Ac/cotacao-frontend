@@ -505,6 +505,7 @@ export default function Tela() {
     setLoadingItens(true);
     try {
       const url = `${comprasPath(`/openquery/pedido/${encodeURIComponent(String(pedidoDaLinha))}`)}?empresa=${empresa}`;
+      console.log(`🔍 Carregando itens para visualização: ${url}`);
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
