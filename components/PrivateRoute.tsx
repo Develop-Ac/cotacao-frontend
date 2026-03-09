@@ -23,8 +23,7 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
         // Limpa todos os cookies do domínio atual
         // Limpa apenas o cookie 'auth_token' e define seu valor como vazio
         // Remove o cookie 'auth_token' para o domínio atual e para o domínio específico
-        document.cookie = "auth_token=; value=; Max-Age=0; path=/";
-        document.cookie = "auth_token=; value=; Max-Age=0; path=/; domain=intranet.acacessorios.local";
+        await fetch("/api/auth/logout", { method: "POST" })
         console.warn('Cookies limpos após 401.');
       }
       return await res.json();
