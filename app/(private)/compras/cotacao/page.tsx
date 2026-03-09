@@ -915,6 +915,7 @@ export default function Tela() {
                         <th className="px-4 py-3">Nome</th>
                         <th className="px-4 py-3">CPF/CNPJ</th>
                         <th className="px-4 py-3 text-right">Link de Acesso</th>
+                        <th className="px-4 py-3 text-right">Excluir</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stroke dark:divide-strokedark">
@@ -950,6 +951,14 @@ export default function Tela() {
                                   {copiedId === f.for_codigo ? <FaCheck size={12} /> : <FaCopy size={12} />}
                                 </button>
                               </div>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={async () => {
+                                  await fetch(comprasPath(`/fornecedor/${f.for_codigo}/${pedidoSelecionado}`), { method: "DELETE" });
+                                  await carregarFornecedoresSalvos(pedidoSelecionado!);
+                                }}
+                              />
                             </td>
                           </tr>
                         ))
