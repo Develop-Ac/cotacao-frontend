@@ -958,7 +958,9 @@ export default function Tela() {
                                   await fetch(comprasPath(`/fornecedor/${f.for_codigo}/${pedidoSelecionado}`), { method: "DELETE" });
                                   await carregarFornecedoresSalvos(pedidoSelecionado!);
                                 }}
-                              />
+                              >
+                                Excluir
+                              </button>
                             </td>
                           </tr>
                         ))
