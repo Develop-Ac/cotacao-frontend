@@ -955,7 +955,7 @@ export default function Tela() {
                             <td className="px-4 py-3 text-right">
                               <button
                                 onClick={async () => {
-                                  await fetch(comprasPath(`/fornecedor/${f.for_codigo}/${pedidoSelecionado}`), { method: "DELETE" });
+                                  await fetch(comprasPath(`/fornecedor/${pedidoSelecionado}/${f.for_codigo}`), { method: "DELETE" });
                                   await carregarFornecedoresSalvos(pedidoSelecionado!);
                                 }}
                               >
