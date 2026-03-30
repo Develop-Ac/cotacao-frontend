@@ -208,14 +208,9 @@ export default function StCalculationResults({ results, originalItems, selectedI
             return {
                 chaveNfe: chave,
                 observacoes: status,
-<<<<<<< HEAD
                 valor: Number(totalValue.toFixed(2)),
                 tipo_imposto: tipoImposto,
                 usuario: user?.nome || 'Sistema'
-=======
-                usuario: usuarioId,
-                valor: Number(totalValue.toFixed(2))
->>>>>>> 70ed8654c35913ccc16426510cfcc22050dfa1ae
             };
         });
 
