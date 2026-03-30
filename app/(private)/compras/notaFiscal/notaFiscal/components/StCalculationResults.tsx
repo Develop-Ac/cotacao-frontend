@@ -6,6 +6,7 @@ import { useMemo, useState, useEffect } from "react";
 import { FaExclamationTriangle, FaCheckCircle, FaMoneyBillWave, FaCalculator, FaArrowLeft, FaFilePdf, FaFileArchive, FaCheckSquare, FaSquare } from "react-icons/fa";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useToast } from "@/components/Toast";
+import { getUserProfile, UserProfile } from "@/lib/user-service";
 
 type Props = {
     results: StCalculationResult[];
@@ -19,6 +20,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
     const { success, error } = useToast();
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [user, setUser] = useState<UserProfile | null>(null);
     // Selection state: Set of indices
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
@@ -29,6 +31,10 @@ export default function StCalculationResults({ results, originalItems, selectedI
     const activeOriginalItems = useMemo(() => {
         return originalItems.filter(i => selectedInvoices.has(i.CHAVE_NFE));
     }, [originalItems, selectedInvoices]);
+
+    useEffect(() => {
+        getUserProfile().then(setUser).catch(console.error);
+    }, []);
 
     useEffect(() => {
         // If single invoice selected and active, fetch PDF preview automatically
@@ -192,7 +198,8 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 chaveNfe: chave,
                 observacoes: status,
                 valor: Number(totalValue.toFixed(2)),
-                tipo_imposto: tipoImposto
+                tipo_imposto: tipoImposto,
+                usuario: user?.nome || 'Sistema'
             };
         });
 
