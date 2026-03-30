@@ -364,6 +364,16 @@ export default function Tela() {
 
         try {
             if (contagem1) {
+                const usuarioId = (() => {
+                    try {
+                    const userData = localStorage.getItem("userData");
+                    if (!userData) return null;
+                    const parsed = JSON.parse(userData);
+                    return parsed?.id ?? null;
+                    } catch {
+                    return null;
+                    }
+                })();
                 const usuario1 = usuarios.find((u) => u.id === contagem1);
                 const payload1 = {
                     contagem: 1,
@@ -371,6 +381,7 @@ export default function Tela() {
                     contagem_cuid: contagem_cuid,
                     piso: piso ? String(piso) : undefined,
                     produtos: produtosSelecionados,
+                    usuario: usuarioId,
                     tipo: tipoContagem,
                 };
 

@@ -34,9 +34,29 @@ export default function RootLayout({
   const [userData, setUserData] = useState<any>(null);
 
   // Sync with Auth API
-  const { data: authData, isLoading: isAuthLoading, isValidating: isAuthValidating } = useSWR("/api/auth/me", (url) => fetch(url).then(res => res.json()), {
-    revalidateOnFocus: true,
-  });
+  const { data: authData, isLoading: isAuthLoading, isValidating: isAuthValidating } = useSWR(
+    "/api/auth/me",
+    async (url: string) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Auth fetch failed");
+        return await res.json();
+      } catch (error) {
+        // Limpa cookies ao erro
+        if (typeof document !== "undefined") {
+          document.cookie.split(";").forEach((c) => {
+            const eqPos = c.indexOf("=");
+            const name = eqPos > -1 ? c.substr(0, eqPos) : c;
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+          });
+        }
+        throw error;
+      }
+    },
+    {
+      revalidateOnFocus: true,
+    }
+  );
 
   useEffect(() => {
     if (authData?.user) {

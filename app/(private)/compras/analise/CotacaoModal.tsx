@@ -64,9 +64,21 @@ const CotacaoModal: React.FC<CotacaoModalProps> = ({ open, onClose, items, cover
         };
       });
 
+      const usuarioId = (() => {
+        try {
+          const userData = localStorage.getItem("userData");
+          if (!userData) return null;
+          const parsed = JSON.parse(userData);
+          return parsed?.id ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
       const payload = {
         empresa: 3,
         pedido_cotacao: proximoIndice,
+        usuario: usuarioId,
         itens: itensCotacao,
       };
 

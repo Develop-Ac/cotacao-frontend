@@ -194,12 +194,28 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 tipoImposto = tiposArr.join('/');
             }
 
+            const usuarioId = (() => {
+                try {
+                const userData = localStorage.getItem("userData");
+                if (!userData) return null;
+                const parsed = JSON.parse(userData);
+                return parsed?.id ?? null;
+                } catch {
+                return null;
+                }
+            })();
+
             return {
                 chaveNfe: chave,
                 observacoes: status,
+<<<<<<< HEAD
                 valor: Number(totalValue.toFixed(2)),
                 tipo_imposto: tipoImposto,
                 usuario: user?.nome || 'Sistema'
+=======
+                usuario: usuarioId,
+                valor: Number(totalValue.toFixed(2))
+>>>>>>> 70ed8654c35913ccc16426510cfcc22050dfa1ae
             };
         });
 

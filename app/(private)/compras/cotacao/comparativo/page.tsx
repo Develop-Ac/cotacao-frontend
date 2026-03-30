@@ -716,7 +716,7 @@ export default function ComparativoPage() {
     quantidade: number;
   };
 
-  const buildSavePayload = (): { pedido_cotacao: number; itens: SaveItem[] } | null => {
+  const buildSavePayload = (): { pedido_cotacao: number; itens: SaveItem[], usuario: string | null } | null => {
     if (!pedidoCarregado) return null;
 
     const itens: SaveItem[] = [];
@@ -747,7 +747,18 @@ export default function ComparativoPage() {
       });
     }
 
-    return { pedido_cotacao: pedidoCarregado, itens };
+      const usuarioId = (() => {
+        try {
+          const userData = localStorage.getItem("userData");
+          if (!userData) return null;
+          const parsed = JSON.parse(userData);
+          return parsed?.id ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
+    return { pedido_cotacao: pedidoCarregado, itens, usuario: usuarioId };
   };
 
   const [saving, setSaving] = useState(false);
@@ -789,7 +800,7 @@ export default function ComparativoPage() {
   };
 
   return (
-    <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
+    <div className="mx-auto p-4 md:p-6 2xl:p-10 space-y-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold text-black dark:text-white">

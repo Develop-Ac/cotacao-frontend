@@ -308,9 +308,21 @@ export default function Tela() {
     if (!itensCotacao.length) return setMsgCot("Busque o pedido antes de criar a cotação.");
     setPostingCot(true);
     try {
+      const usuarioId = (() => {
+        try {
+          const userData = localStorage.getItem("userData");
+          if (!userData) return null;
+          const parsed = JSON.parse(userData);
+          return parsed?.id ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
       const payload = {
         empresa: 3,
         pedido_cotacao: Number(p),
+        usuario: usuarioId,
         itens: itensCotacao.map((it) => ({
           PEDIDO_COTACAO: Number(it.PEDIDO_COTACAO),
           EMISSAO: it.EMISSAO ?? null,
@@ -369,10 +381,9 @@ export default function Tela() {
     setMsgPedidos(null);
     setLoadingPedidos(true);
     try {
-      const res = await fetch(
-        `${comprasPath("/pedidos-cotacao")}?page=${page}&pageSize=${pageSize}`,
-        { headers: { Accept: "application/json" } }
-      );
+      const url = `${comprasPath("/pedidos-cotacao")}?page=${page}&pageSize=${pageSize}`;
+      console.log(`🔍 Carregando pedidos: ${url}`);
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -492,7 +503,8 @@ export default function Tela() {
     setItensVisualizacao([]);
     setLoadingItens(true);
     try {
-      const url = `${comprasPath(`/openquery/pedido/${encodeURIComponent(String(pedidoDaLinha))}`)}?empresa=${empresa}`;
+      const url = `${comprasPath(`/pedidos-cotacao/${encodeURIComponent(String(pedidoDaLinha))}`)}/itens?empresa=${empresa}`;
+      console.log(`🔍 Carregando itens para visualização: ${url}`);
       const res = await fetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -523,11 +535,23 @@ export default function Tela() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const novo: FornecedorResp = await res.json();
 
+      const usuarioId = (() => {
+        try {
+          const userData = localStorage.getItem("userData");
+          if (!userData) return null;
+          const parsed = JSON.parse(userData);
+          return parsed?.id ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
       const postBody = {
         pedido_cotacao: pedidoSelecionado,
         for_codigo: novo.FOR_CODIGO,
         for_nome: novo.FOR_NOME,
         cpf_cnpj: novo.CPF_CNPJ ?? null,
+        usuario: usuarioId,
         itens: [],
       };
       const post = await fetch(comprasPath("/fornecedor"), {
@@ -891,6 +915,7 @@ export default function Tela() {
                         <th className="px-4 py-3">Nome</th>
                         <th className="px-4 py-3">CPF/CNPJ</th>
                         <th className="px-4 py-3 text-right">Link de Acesso</th>
+                        <th className="px-4 py-3 text-right">Excluir</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stroke dark:divide-strokedark">
@@ -926,6 +951,16 @@ export default function Tela() {
                                   {copiedId === f.for_codigo ? <FaCheck size={12} /> : <FaCopy size={12} />}
                                 </button>
                               </div>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={async () => {
+                                  await fetch(comprasPath(`/fornecedor/${pedidoSelecionado}/${f.for_codigo}`), { method: "DELETE" });
+                                  await carregarFornecedoresSalvos(pedidoSelecionado!);
+                                }}
+                              >
+                                Excluir
+                              </button>
                             </td>
                           </tr>
                         ))

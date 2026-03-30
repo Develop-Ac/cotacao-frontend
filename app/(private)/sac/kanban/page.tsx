@@ -485,9 +485,10 @@ export default function Page() {
 
     const updatedTask = {
       ...task,
+      data: new Date().toISOString().slice(0, 10),
       etapa: to,
       solucao: "",
-      dataSolucao: ""
+      dataSolucao: task.due
     };
 
     setBoard(prev => {
@@ -730,7 +731,7 @@ export default function Page() {
         title: t.title || "",
         desc: t.desc || "",
         due: t.due || "",
-        data: t.data || "",
+        data: new Date().toISOString(),
         venda: t.venda || "",
         cliente: t.cliente || "",
         itemReclamado: t.itemReclamado || "",
@@ -813,8 +814,16 @@ export default function Page() {
         await fetch(`${KANBAN_URL}/kanban`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newTask)
+          body: JSON.stringify({
+            ...newTask,
+            data: new Date().toISOString() // ISO-8601 DateTime completo
+          })
         });
+
+        console.log("Tarefa criada:", {
+            ...newTask,
+            data: new Date().toISOString() // Garante data atual se não preenchida
+          });
       } catch { }
     } else {
       // Edição
@@ -831,7 +840,10 @@ export default function Page() {
         await fetch(`${KANBAN_URL}/kanban`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedTask)
+          body: JSON.stringify({
+            ...updatedTask,
+            data: new Date().toISOString() // ISO-8601 DateTime completo
+          })
         });
       } catch { }
     }
