@@ -6,7 +6,7 @@ import { FaCheckSquare, FaSquare, FaExclamationTriangle, FaArrowRight } from "re
 
 type Props = {
     unmatchedItems: StCalculationResult[];
-    onConfirm: (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL'>) => void;
+    onConfirm: (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>) => void;
     onCancel: () => void;
 };
 
@@ -21,8 +21,8 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
         return init;
     });
 
-    const [taxTypes, setTaxTypes] = useState<Record<number, 'ST' | 'DIFAL'>>(() => {
-        const initTaxes: Record<number, 'ST' | 'DIFAL'> = {};
+    const [taxTypes, setTaxTypes] = useState<Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>>(() => {
+        const initTaxes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'> = {};
         unmatchedItems.forEach((item, idx) => {
             if (item.matchType && item.matchType !== 'Não Encontrado') {
                 initTaxes[idx] = 'ST';
@@ -31,21 +31,19 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
         return initTaxes;
     });
 
-    const [headerTaxType, setHeaderTaxType] = useState<'ST' | 'DIFAL' | ''>('');
+    const [headerTaxType, setHeaderTaxType] = useState<'ST' | 'DIFAL' | 'TRIBUTADA' | ''>('');
 
     const toggle = (idx: number) => {
         const next = new Set(selected);
         if (next.has(idx)) {
             next.delete(idx);
-            // Optionally remove from taxTypes if unselected
             const nextTaxes = { ...taxTypes };
             delete nextTaxes[idx];
             setTaxTypes(nextTaxes);
         } else {
             next.add(idx);
-            // If header has a type selected, apply it automatically when checking
             if (headerTaxType) {
-                setTaxTypes(prev => ({ ...prev, [idx]: headerTaxType }));
+                setTaxTypes(prev => ({ ...prev, [idx]: headerTaxType as 'ST' | 'DIFAL' | 'TRIBUTADA' }));
             }
         }
         setSelected(next);
@@ -70,24 +68,22 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
     };
 
     const handleHeaderTaxChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const val = e.target.value as 'ST' | 'DIFAL' | '';
+        const val = e.target.value as 'ST' | 'DIFAL' | 'TRIBUTADA' | '';
         setHeaderTaxType(val);
 
         if (val) {
-            // Apply to all currently selected
             const nextTaxes = { ...taxTypes };
             selected.forEach(idx => {
-                nextTaxes[idx] = val;
+                nextTaxes[idx] = val as 'ST' | 'DIFAL' | 'TRIBUTADA';
             });
             setTaxTypes(nextTaxes);
         }
     };
 
     const handleRowTaxChange = (idx: number, e: React.ChangeEvent<HTMLSelectElement>) => {
-        const val = e.target.value as 'ST' | 'DIFAL' | '';
+        const val = e.target.value as 'ST' | 'DIFAL' | 'TRIBUTADA' | '';
         if (val) {
-            setTaxTypes(prev => ({ ...prev, [idx]: val }));
-            // Select the row automatically if tax type is chosen
+            setTaxTypes(prev => ({ ...prev, [idx]: val as 'ST' | 'DIFAL' | 'TRIBUTADA' }));
             if (!selected.has(idx)) {
                 setSelected(prev => new Set(prev).add(idx));
             }
@@ -143,6 +139,7 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
                                         <option value="">-- Aplicar a todos --</option>
                                         <option value="ST">ICMS ST</option>
                                         <option value="DIFAL">DIFAL</option>
+                                        <option value="TRIBUTADA">Tributada</option>
                                     </select>
                                 </div>
                             </th>
@@ -182,6 +179,7 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
                                             <option value="">Selecione...</option>
                                             <option value="ST">ICMS ST</option>
                                             <option value="DIFAL">DIFAL</option>
+                                            <option value="TRIBUTADA">Tributada</option>
                                         </select>
                                         {hasError && (
                                             <span className="text-[10px] text-red-500 font-medium block mt-1">

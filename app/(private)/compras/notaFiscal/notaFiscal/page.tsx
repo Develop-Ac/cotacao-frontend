@@ -169,9 +169,10 @@ export default function NotaFiscalList() {
     }
 
     if (filterEmitente) {
+      const queryDigits = filterEmitente.replace(/\D/g, '');
       filtered = filtered.filter(i =>
         i.NOME_EMITENTE?.toLowerCase().includes(filterEmitente.toLowerCase()) ||
-        i.CPF_CNPJ_EMITENTE?.replace(/\D/g, '').includes(filterEmitente.replace(/\D/g, ''))
+        (queryDigits.length > 0 && i.CPF_CNPJ_EMITENTE?.replace(/\D/g, '').includes(queryDigits))
       );
     }
 
@@ -180,6 +181,7 @@ export default function NotaFiscalList() {
         const ip = i.TIPO_IMPOSTO || "";
         if (filterImposto === 'ST' && !ip.includes('ST')) return false;
         if (filterImposto === 'DIFAL' && !ip.includes('DIFAL')) return false;
+        if (filterImposto === 'TRIBUTADA' && !ip.includes('Tributada')) return false;
         if (filterImposto === 'NENHUM' && ip !== "") return false;
         return true;
       });
@@ -335,7 +337,7 @@ export default function NotaFiscalList() {
     }
   };
 
-  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL'>) => {
+  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>) => {
     if (!tempResults) return;
 
     // tempResults.unmatched arrays holds ALL items now (we passed allData into it)
@@ -493,6 +495,7 @@ export default function NotaFiscalList() {
                     <option value="">Filtro Imposto: Todos</option>
                     <option value="ST">Somente ICMS ST</option>
                     <option value="DIFAL">Somente DIFAL</option>
+                    <option value="TRIBUTADA">Tributada</option>
                     <option value="NENHUM">Não Selecionado / Sem Imposto</option>
                   </select>
                 </div>
@@ -619,7 +622,8 @@ export default function NotaFiscalList() {
                             <td className="py-3 px-4 text-center align-top pt-4">
                               {row.TIPO_IMPOSTO ? (
                                 <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold border 
-                                  ${row.TIPO_IMPOSTO.includes('DIFAL') && row.TIPO_IMPOSTO.includes('ST') ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/50 dark:text-purple-300' :
+                                  ${row.TIPO_IMPOSTO === 'Tributada' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-300' :
+                                    row.TIPO_IMPOSTO.includes('DIFAL') && row.TIPO_IMPOSTO.includes('ST') ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/50 dark:text-purple-300' :
                                     row.TIPO_IMPOSTO.includes('DIFAL') ? 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/50 dark:text-orange-300' :
                                       'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300'}`}>
                                   {row.TIPO_IMPOSTO}

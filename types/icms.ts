@@ -33,7 +33,7 @@ export type StCalculationResult = {
     vlDifal?: number;
     diferenca: number;
     status: 'Guia Complementar' | 'Pago a Maior' | 'OK' | 'NCM s/ Ref' | 'Erro';
-    impostoEscolhido?: 'ST' | 'DIFAL';
+    impostoEscolhido?: 'ST' | 'DIFAL' | 'TRIBUTADA';
 };
 
 export type InvoicePaymentStatus = {
