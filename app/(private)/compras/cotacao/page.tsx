@@ -1203,7 +1203,7 @@ export default function Tela() {
                 </div>
                 <div className="flex gap-2 items-center">
                   <button
-                    onClick={() => setAddItemModalOpen(true)}
+                    onClick={() => { setAddItemModalOpen(true); setModalProdutosOpen(false); }}
                     className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white hover:bg-opacity-90 transition-all duration-200 text-sm font-medium"
                     title="Adicionar Item"
                   >
