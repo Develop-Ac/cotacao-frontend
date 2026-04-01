@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   FaSync,
@@ -6,7 +6,9 @@ import {
   FaFilePdf,
   FaCalculator,
   FaCheckSquare,
-  FaSquare
+  FaSquare,
+  FaSearch,
+  FaFilter
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { serviceUrl } from "@/lib/services";
@@ -49,6 +51,11 @@ export default function NotaFiscalList() {
   const [showLaunched, setShowLaunched] = useState(false);
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
+  // New Filters
+  const [filterNumero, setFilterNumero] = useState("");
+  const [filterEmitente, setFilterEmitente] = useState("");
+  const [filterImposto, setFilterImposto] = useState("");
+
   // Dropdown PageSize
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
   const pageSizeRef = useRef<HTMLDivElement | null>(null);
@@ -79,7 +86,13 @@ export default function NotaFiscalList() {
 
   // ---------- CARREGAMENTO ----------
   const fetchAll = useCallback(async () => {
-    if (dataSource === 'UPLOAD') return; // Don't fetch if in upload mode
+    if (dataSource === 'UPLOAD') {
+      fetch(`${SERVICE_URL}/icms/payment-status`)
+        .then(r => r.json())
+        .then(map => setStatusMap(map))
+        .catch(console.error);
+      return;
+    }
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -136,7 +149,7 @@ export default function NotaFiscalList() {
 
   // paginação no front
   const filteredItems = useMemo(() => {
-    return items.filter(i => {
+    let filtered = items.filter(i => {
       // Filter by Launched Status
       if (!showLaunched && i.STATUS_ERP === 'LANCADA') return false;
 
@@ -147,7 +160,35 @@ export default function NotaFiscalList() {
       if (dateRange.end && d > new Date(dateRange.end)) return false;
       return true;
     });
-  }, [items, showLaunched, dateRange]);
+
+    if (filterNumero) {
+      filtered = filtered.filter(i => {
+        const num = i.CHAVE_NFE ? i.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "";
+        return i.CHAVE_NFE.includes(filterNumero) || num.includes(filterNumero);
+      });
+    }
+
+    if (filterEmitente) {
+      const queryDigits = filterEmitente.replace(/\D/g, '');
+      filtered = filtered.filter(i =>
+        i.NOME_EMITENTE?.toLowerCase().includes(filterEmitente.toLowerCase()) ||
+        (queryDigits.length > 0 && i.CPF_CNPJ_EMITENTE?.replace(/\D/g, '').includes(queryDigits))
+      );
+    }
+
+    if (filterImposto) {
+      filtered = filtered.filter(i => {
+        const ip = i.TIPO_IMPOSTO || "";
+        if (filterImposto === 'ST' && !ip.includes('ST')) return false;
+        if (filterImposto === 'DIFAL' && !ip.includes('DIFAL')) return false;
+        if (filterImposto === 'TRIBUTADA' && !ip.includes('Tributada')) return false;
+        if (filterImposto === 'NENHUM' && ip !== "") return false;
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto]);
 
   const total = filteredItems.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -195,16 +236,70 @@ export default function NotaFiscalList() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     setLoading(true);
-    // Placeholder logic for now
-    // In real impl, we would read files, parse XML, and populate 'items'
-    // simulating the structure from DB.
-    setTimeout(() => {
-      setItems([]); // Clear DB items
-      // Parse logic here...
-      alert("Mock: Arquivos carregados logicamente (Feature em dev)");
+    setDataSource('UPLOAD');
+    try {
+      const loadedItems: NotaFiscalRow[] = [];
+
+      for (const file of Array.from(e.target.files)) {
+        let xmlText: string;
+        try {
+          xmlText = await file.text();
+        } catch {
+          console.error(`Erro ao ler arquivo: ${file.name}`);
+          continue;
+        }
+
+        // Extract chave_nfe (44 digits) from infNFe Id attribute
+        const idMatch = xmlText.match(/infNFe[^>]+Id="NFe(\d{44})"/);
+        if (!idMatch) {
+          console.warn(`Arquivo ${file.name} não contém chave NF-e válida.`);
+          continue;
+        }
+        const chave = idMatch[1];
+
+        // Extract emitente block, then xNome and CNPJ within it
+        const emitBlock = xmlText.match(/<emit>([\s\S]*?)<\/emit>/);
+        const emitente = emitBlock?.[1].match(/<xNome>([^<]+)<\/xNome>/)?.[1] ?? 'Desconhecido';
+        const cnpj = emitBlock?.[1].match(/<CNPJ>(\d+)<\/CNPJ>/)?.[1] ?? '';
+
+        // Extract data emissao (NF-e 3.x uses dEmi, 4.0 uses dhEmi)
+        const dataEmissao =
+          xmlText.match(/<dhEmi>([^<]+)<\/dhEmi>/)?.[1] ??
+          xmlText.match(/<dEmi>([^<]+)<\/dEmi>/)?.[1] ??
+          new Date().toISOString();
+
+        // Extract valor total da NF-e
+        const valorTotal = parseFloat(xmlText.match(/<vNF>([\d.]+)<\/vNF>/)?.[1] ?? '0');
+
+        loadedItems.push({
+          EMPRESA: 0,
+          CHAVE_NFE: chave,
+          NOME_EMITENTE: emitente,
+          CPF_CNPJ_EMITENTE: cnpj,
+          RG_IE_EMITENTE: '',
+          DATA_EMISSAO: dataEmissao,
+          TIPO_OPERACAO: 0,
+          TIPO_OPERACAO_DESC: 'ENTRADA PRÓPRIA',
+          STATUS_ERP: 'PENDENTE',
+          XML_COMPLETO: xmlText,
+          VALOR_TOTAL: valorTotal,
+        });
+      }
+
+      if (loadedItems.length === 0) {
+        alert('Nenhum arquivo XML com chave NF-e válida encontrado.');
+        setDataSource('DATABASE');
+      } else {
+        setItems(loadedItems);
+        setSelectedChaves(new Set());
+      }
+    } catch (err) {
+      console.error('Erro ao carregar arquivos XML:', err);
+      alert('Erro ao carregar os arquivos XML.');
+    } finally {
       setLoading(false);
-      setDataSource('UPLOAD');
-    }, 1000);
+      e.target.value = '';
+    }
   };
 
   // --- CALCULATION LOGIC ---
@@ -242,7 +337,7 @@ export default function NotaFiscalList() {
     }
   };
 
-  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL'>) => {
+  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>) => {
     if (!tempResults) return;
 
     // tempResults.unmatched arrays holds ALL items now (we passed allData into it)
@@ -359,147 +454,228 @@ export default function NotaFiscalList() {
       <div id="list">
         <div className="w-full">
           {viewState === 'LIST' && (
-            <div className="bg-white dark:bg-boxdark rounded-xl shadow-lg p-6 border border-stroke dark:border-strokedark">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-sm text-gray-600">
-                  {dataSource === 'DATABASE' ? 'Notas Recentes (Entrada Própria)' : 'Arquivos Carregados'}
-                </div>
-                <div className="relative" ref={pageSizeRef}>
-                  <button
-                    className="h-10 border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white flex items-center gap-2"
-                    onClick={() => setPageSizeOpen((v) => !v)}
-                  >
-                    <span className="mr-1">{pageSize} itens</span>
-                    <FaCaretDown />
-                  </button>
-                  {pageSizeOpen && (
-                    <div className="absolute right-0 mt-2 w-28 bg-white border rounded shadow z-10" role="listbox" tabIndex={-1}>
-                      {pageSizes.map((n) => (
-                        <button
-                          key={n}
-                          className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${pageSize === n ? "bg-gray-50 font-semibold" : ""}`}
-                          onClick={() => {
-                            setPageSize(n as 10 | 20 | 50);
-                            setPage(1);
-                            setPageSizeOpen(false);
-                          }}
-                        >
-                          {n}
-                        </button>
-                      ))}
+            <>
+              {/* FILTERS BAR */}
+              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-4 mb-6 border border-gray-100 dark:border-strokedark flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                  {/* Search Nota */}
+                  <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                    <div className="pl-3 pr-2 text-gray-400">
+                      <FaSearch size={14} />
                     </div>
-                  )}
+                    <input
+                      type="text"
+                      placeholder="Nº da Nota ou Chave..."
+                      value={filterNumero}
+                      onChange={(e) => setFilterNumero(e.target.value)}
+                      className="w-full h-full bg-transparent outline-none text-sm text-black dark:text-white placeholder:text-gray-400 min-w-0"
+                    />
+                  </div>
+
+                  {/* Search Emitente */}
+                  <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                    <div className="pl-3 pr-2 text-gray-400">
+                      <FaSearch size={14} />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Emitente ou CNPJ..."
+                      value={filterEmitente}
+                      onChange={(e) => setFilterEmitente(e.target.value)}
+                      className="w-full h-full bg-transparent outline-none text-sm text-black dark:text-white placeholder:text-gray-400 min-w-0"
+                    />
+                  </div>
+
+                  {/* Filter Imposto */}
+                  <select
+                    value={filterImposto}
+                    onChange={(e) => setFilterImposto(e.target.value)}
+                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                  >
+                    <option value="">Filtro Imposto: Todos</option>
+                    <option value="ST">Somente ICMS ST</option>
+                    <option value="DIFAL">Somente DIFAL</option>
+                    <option value="TRIBUTADA">Tributada</option>
+                    <option value="NENHUM">Não Selecionado / Sem Imposto</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="max-w-full overflow-x-auto border border-stroke dark:border-strokedark rounded-lg">
-                <table className="w-full table-auto">
-                  <thead>
-                    <tr className="bg-gray-50 text-left dark:bg-meta-4">
-                      <th className="py-3 px-4 w-[50px] text-center">
-                        <button onClick={toggleSelectAll} className="text-gray-600 dark:text-gray-300 hover:text-blue-600">
-                          {isAllSelected ? <FaCheckSquare /> : <FaSquare />}
-                        </button>
-                      </th>
-                      <th className="min-w-[140px] py-3 px-4 text-xs font-medium text-black dark:text-white">Status</th>
-                      <th className="min-w-[100px] py-3 px-4 text-xs font-medium text-black dark:text-white text-right">Valor Guia</th>
-                      <th className="w-[140px] py-3 px-4 text-xs font-medium text-black dark:text-white whitespace-nowrap">Chave NFe</th>
-                      <th className="w-[300px] py-3 px-4 text-xs font-medium text-black dark:text-white">Emitente</th>
-                      <th className="w-[100px] py-3 px-4 text-xs font-medium text-black dark:text-white">Data</th>
-                      <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Situação</th>
-                      <th className="w-[90px] py-3 px-4 text-xs font-medium text-black dark:text-white">Op. Fiscal</th>
-                      <th className="w-[100px] py-3 px-4 text-xs font-medium text-black dark:text-white text-center">Tipo Imposto</th>
-                      <th className="py-3 px-4 text-xs font-medium text-black dark:text-white text-center">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paged.map((row, idx) => {
-                      const isSelected = selectedChaves.has(row.CHAVE_NFE);
-                      return (
-                        <tr key={row.CHAVE_NFE ?? idx} className={`border-b border-stroke dark:border-strokedark transition-colors ${isSelected ? 'bg-blue-50 dark:bg-opacity-10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}>
-                          <td className="py-3 px-4 text-center">
-                            <button onClick={() => toggleSelect(row.CHAVE_NFE)} className={`transition-colors ${isSelected ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                              {isSelected ? <FaCheckSquare /> : <FaSquare />}
-                            </button>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {statusMap[row.CHAVE_NFE] ? (
-                              <span title={statusMap[row.CHAVE_NFE].status} className={`inline-block px-2 py-1 text-xs rounded-full cursor-help 
-                                        ${statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? 'bg-red-100 text-red-700' :
-                                  statusMap[row.CHAVE_NFE].status.includes('Tributado') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
-                                {statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? '⚠️ Tem Guia' :
-                                  statusMap[row.CHAVE_NFE].status.includes('Tributado') ? '⚪ Tributado' : '⚪ Verificado'}
+              <div className="bg-white dark:bg-boxdark rounded-xl shadow-md border border-gray-100 dark:border-strokedark">
+                <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-strokedark bg-gray-50/50 dark:bg-meta-4/20 rounded-t-xl">
+                  <div className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                    {dataSource === 'DATABASE' ? 'Notas Recentes (Entrada Própria)' : 'Arquivos Carregados'}
+                  </div>
+                  <div className="relative" ref={pageSizeRef}>
+                    <button
+                      className="h-10 border border-gray-300 dark:border-form-strokedark rounded-lg px-3 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-form-input text-black dark:text-white flex items-center gap-2"
+                      onClick={() => setPageSizeOpen((v) => !v)}
+                    >
+                      <span className="mr-1">{pageSize} itens</span>
+                      <FaCaretDown />
+                    </button>
+                    {pageSizeOpen && (
+                      <div className="absolute right-0 mt-2 w-28 bg-white border rounded shadow z-10" role="listbox" tabIndex={-1}>
+                        {pageSizes.map((n) => (
+                          <button
+                            key={n}
+                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${pageSize === n ? "bg-gray-50 font-semibold" : ""}`}
+                            onClick={() => {
+                              setPageSize(n as 10 | 20 | 50);
+                              setPage(1);
+                              setPageSizeOpen(false);
+                            }}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="max-w-full overflow-x-auto">
+                  <table className="text-left border-collapse table-fixed min-w-full">
+                    <thead className="sticky top-[0px] z-20 shadow-sm bg-gray-50 dark:bg-meta-4 text-gray-600 dark:text-gray-300 text-xs uppercase font-semibold">
+                      <tr>
+                        <th className="py-4 px-4 w-[50px] text-center border-b border-gray-200 dark:border-strokedark">
+                          <button onClick={toggleSelectAll} className="text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">
+                            {isAllSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
+                          </button>
+                        </th>
+                        <th className="w-[140px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Status Cálculo</th>
+                        <th className="w-[120px] py-4 px-4 text-right border-b border-gray-200 dark:border-strokedark">Valor Guia</th>
+                        <th className="w-[200px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Nota Fiscal / Chave</th>
+                        <th className="w-[300px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Emitente</th>
+                        <th className="w-[100px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Data</th>
+                        <th className="w-[110px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Situação</th>
+                        <th className="w-[130px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Op. Fiscal</th>
+                        <th className="w-[120px] py-4 px-4 border-b border-gray-200 dark:border-strokedark text-center">Tipo Imposto</th>
+                        <th className="w-[80px] py-4 px-4 border-b border-gray-200 dark:border-strokedark text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-strokedark text-sm">
+                      {paged.map((row, idx) => {
+                        const isSelected = selectedChaves.has(row.CHAVE_NFE);
+                        const numNota = row.CHAVE_NFE ? row.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "N/A";
+
+                        return (
+                          <tr key={row.CHAVE_NFE ?? idx} className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}>
+                            <td className="py-3 px-4 text-center align-top pt-4">
+                              <button onClick={() => toggleSelect(row.CHAVE_NFE)} className={`transition-colors ${isSelected ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
+                                {isSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
+                              </button>
+                            </td>
+                            <td className="py-3 px-4 align-top pt-4">
+                              <div className="flex flex-col gap-1.5 items-start">
+                                {statusMap[row.CHAVE_NFE] ? (
+                                  <span title={statusMap[row.CHAVE_NFE].status} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border cursor-help 
+                                            ${statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30' :
+                                      statusMap[row.CHAVE_NFE].status.includes('Tributado') ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30' : 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/10'}`}>
+                                    {statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? <><div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>Tem Guia</> :
+                                      statusMap[row.CHAVE_NFE].status.includes('Tributado') ? <><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>Tributado</> : <><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>Verificado</>}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">Pendente</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right align-top pt-4">
+                              <div className="flex flex-col items-end">
+                                {statusMap[row.CHAVE_NFE] && statusMap[row.CHAVE_NFE].valor > 0 ? (
+                                  <span className="text-sm font-mono text-red-600 dark:text-red-400 font-bold">
+                                    R$ {statusMap[row.CHAVE_NFE].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm text-gray-400 font-medium">-</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 align-top pt-4">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm font-bold text-black dark:text-white flex items-center gap-1">
+                                  Nº {numNota}
+                                </span>
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono tracking-wider" title={row.CHAVE_NFE}>
+                                  {row.CHAVE_NFE.substring(0, 4)} {row.CHAVE_NFE.substring(4, 20)}...
+                                </span>
+                                {row.VALOR_TOTAL ? <span className="text-xs text-green-600 dark:text-green-400 font-semibold mt-0.5">Vlr NFe: R$ {row.VALOR_TOTAL.toFixed(2)}</span> : null}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 align-top pt-4 text-sm">
+                              <p className="font-semibold text-gray-800 dark:text-gray-200 leading-tight">{row.NOME_EMITENTE}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">{row.CPF_CNPJ_EMITENTE}</p>
+                            </td>
+                            <td className="py-3 px-4 align-top pt-4">
+                              <p className="text-sm text-gray-800 dark:text-gray-200 font-medium">{fmtDate(row.DATA_EMISSAO)}</p>
+                            </td>
+                            <td className="py-3 px-4 align-top pt-4">
+                              <span className={`inline-flex items-center justify-center px-2.5 py-1 min-w-[80px] rounded-full text-[10px] font-bold uppercase tracking-wide border ${row.STATUS_ERP === 'LANCADA' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
+                                {row.STATUS_ERP === 'LANCADA' ? 'LANÇADA' : 'PENDENTE'}
                               </span>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            {statusMap[row.CHAVE_NFE] && statusMap[row.CHAVE_NFE].valor > 0 ? (
-                              <span className="text-xs font-mono text-red-600 font-bold">
-                                R$ {statusMap[row.CHAVE_NFE].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-3 px-4 align-top pt-4">
+                              <span className={`inline-flex items-center justify-center px-2.5 py-1 min-w-[100px] rounded-full text-[10px] font-bold uppercase tracking-wide border ${row.TIPO_OPERACAO === 0 ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400' : 'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400'}`} title={row.TIPO_OPERACAO_DESC}>
+                                {row.TIPO_OPERACAO === 0 ? 'Saída' : 'Entrada'}
                               </span>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <h5 className="text-xs font-medium text-black dark:text-white font-mono whitespace-nowrap">{row.CHAVE_NFE}</h5>
-                            {row.VALOR_TOTAL ? <div className="text-xs text-green-600 mt-1">R$ {row.VALOR_TOTAL.toFixed(2)}</div> : null}
-                          </td>
-                          <td className="py-3 px-4">
-                            <p className="text-xs text-black dark:text-white font-semibold whitespace-normal leading-tight">{row.NOME_EMITENTE}</p>
-                            <p className="text-xs text-gray-500">{row.CPF_CNPJ_EMITENTE}</p>
-                          </td>
-                          <td className="py-3 px-4">
-                            <p className="text-xs text-black dark:text-white">{fmtDate(row.DATA_EMISSAO)}</p>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`inline-flex items-center justify-center px-2 py-1 min-w-[80px] rounded-md text-xs font-semibold border ${row.STATUS_ERP === 'LANCADA' ? 'bg-purple-600/10 text-purple-600 border-purple-600/20' : 'bg-yellow-600/10 text-yellow-600 border-yellow-600/20'}`}>
-                              {row.STATUS_ERP === 'LANCADA' ? 'LANÇADA' : 'PENDENTE'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`inline-flex items-center justify-center px-2 py-1 min-w-[100px] rounded-md text-xs font-semibold border ${row.TIPO_OPERACAO === 0 ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'}`}>
-                              {row.TIPO_OPERACAO_DESC}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {row.TIPO_IMPOSTO ? (
-                              <span className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-bold border 
-                                  ${row.TIPO_IMPOSTO.includes('DIFAL') && row.TIPO_IMPOSTO.includes('ST') ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                                  row.TIPO_IMPOSTO.includes('DIFAL') ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                                    'bg-blue-100 text-blue-700 border-blue-200'}`}>
-                                {row.TIPO_IMPOSTO}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-center flex justify-center gap-2">
-                            <button onClick={() => handleDownloadPdf(row)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400" title="Baixar PDF DANFE"><FaFilePdf className="w-5 h-5" /></button>
+                            </td>
+                            <td className="py-3 px-4 text-center align-top pt-4">
+                              {row.TIPO_IMPOSTO ? (
+                                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold border 
+                                  ${row.TIPO_IMPOSTO === 'Tributada' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-300' :
+                                    row.TIPO_IMPOSTO.includes('DIFAL') && row.TIPO_IMPOSTO.includes('ST') ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/50 dark:text-purple-300' :
+                                    row.TIPO_IMPOSTO.includes('DIFAL') ? 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/50 dark:text-orange-300' :
+                                      'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300'}`}>
+                                  {row.TIPO_IMPOSTO}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-center align-top pt-4">
+                              <div className="flex justify-center">
+                                <button onClick={() => handleDownloadPdf(row)} className="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Baixar PDF DANFE"><FaFilePdf className="w-5 h-5" /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {!loading && paged.length === 0 && (
+                        <tr>
+                          <td colSpan={10} className="py-12 px-4 text-center text-gray-500">
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="bg-gray-100 dark:bg-meta-4/50 p-4 rounded-full mb-3">
+                                <FaSearch size={24} className="text-gray-400" />
+                              </div>
+                              <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">Nenhum registro encontrado</p>
+                              <p className="text-sm text-gray-500 max-w-xs mx-auto mt-1">
+                                Tente ajustar seus filtros de busca ou recarregar os dados.
+                              </p>
+                            </div>
                           </td>
                         </tr>
-                      );
-                    })}
-                    {!loading && paged.length === 0 && (
-                      <tr><td colSpan={9} className="py-5 px-4 text-center text-gray-500">Nenhum registro encontrado.</td></tr>
-                    )}
-                    {loading && (
-                      <tr><td colSpan={9} className="py-5 px-4 text-center text-gray-500">Carregando...</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {/* Pagination Controls */}
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-gray-600">Total: <b>{total}</b> · Página <b>{page}</b> de <b>{totalPages}</b></div>
-                <div className="flex gap-2">
-                  <button className="px-3 py-1.5 border hover:bg-gray-50 rounded" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>Anterior</button>
-                  <button className="px-3 py-1.5 border hover:bg-gray-50 rounded" onClick={() => setPage(p => (p < totalPages ? p + 1 : p))} disabled={page >= totalPages}>Próxima</button>
+                      )}
+                      {loading && (
+                        <tr><td colSpan={10} className="py-10 px-4 text-center text-gray-500">
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <FaSync className="animate-spin text-primary" size={24} />
+                            <p>Carregando notas fiscais...</p>
+                          </div>
+                        </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between p-4 border-t border-gray-100 dark:border-strokedark bg-gray-50/30 dark:bg-meta-4/10 rounded-b-xl">
+                  <div className="text-sm text-gray-600">Total: <b>{total}</b> · Página <b>{page}</b> de <b>{totalPages}</b></div>
+                  <div className="flex gap-2">
+                    <button className="px-3 py-1.5 border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 rounded-lg disabled:opacity-50 text-sm font-medium transition-colors" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>Anterior</button>
+                    <button className="px-3 py-1.5 border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 rounded-lg disabled:opacity-50 text-sm font-medium transition-colors" onClick={() => setPage(p => (p < totalPages ? p + 1 : p))} disabled={page >= totalPages}>Próxima</button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {viewState === 'UNMATCHED_SELECTION' && tempResults && (

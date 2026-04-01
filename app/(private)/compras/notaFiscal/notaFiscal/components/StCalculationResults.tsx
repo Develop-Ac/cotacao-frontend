@@ -6,6 +6,7 @@ import { useMemo, useState, useEffect } from "react";
 import { FaExclamationTriangle, FaCheckCircle, FaMoneyBillWave, FaCalculator, FaArrowLeft, FaFilePdf, FaFileArchive, FaCheckSquare, FaSquare } from "react-icons/fa";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useToast } from "@/components/Toast";
+import { getUserProfile, UserProfile } from "@/lib/user-service";
 
 type Props = {
     results: StCalculationResult[];
@@ -19,6 +20,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
     const { success, error } = useToast();
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [user, setUser] = useState<UserProfile | null>(null);
     // Selection state: Set of indices
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
@@ -29,6 +31,10 @@ export default function StCalculationResults({ results, originalItems, selectedI
     const activeOriginalItems = useMemo(() => {
         return originalItems.filter(i => selectedInvoices.has(i.CHAVE_NFE));
     }, [originalItems, selectedInvoices]);
+
+    useEffect(() => {
+        getUserProfile().then(setUser).catch(console.error);
+    }, []);
 
     useEffect(() => {
         // If single invoice selected and active, fetch PDF preview automatically
@@ -116,7 +122,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
     };
 
     const metrics = useMemo(() => {
-        // Filter only selected items for metrics
         const activeResults = results.filter((_, i) => selectedIndices.has(i));
 
         const stResults = activeResults.filter(r => r.impostoEscolhido === 'ST');
@@ -130,7 +135,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
         const totalDestacado = stResults.reduce((acc, curr) => acc + curr.stDestacado, 0);
         const qtdDivergencia = activeResults.filter(r => r.status === 'Guia Complementar').length;
 
-        // The total value requested by the user interface might be the sum, but let's keep it separate for UI 
         return { totalStComplementar, totalDifal, totalDestacado, qtdDivergencia, count: activeResults.length, activeResults };
     }, [results, selectedIndices]);
 
@@ -151,28 +155,31 @@ export default function StCalculationResults({ results, originalItems, selectedI
         const payload = Array.from(selectedInvoices).map(chave => {
             const invoiceItems = allItemsByInvoice[chave] || [];
 
-            // Check which items of this invoice are selected/active
             const activeItemsForInvoice = invoiceItems.filter(item => {
                 const idx = results.indexOf(item);
                 return selectedIndices.has(idx);
             });
 
-            // Logic:
             let status = 'Tributado - Verificado';
             let totalValue = 0;
             let tipoImposto = '';
 
             const hasCalculatedItems = activeItemsForInvoice.some(i => i.mvaRef > 0 || (i.matchType && i.matchType !== 'Não Encontrado'));
+            const allTributada = activeItemsForInvoice.length > 0 && activeItemsForInvoice.every(i => i.impostoEscolhido === 'TRIBUTADA');
 
-            if (activeItemsForInvoice.length > 0 && hasCalculatedItems) {
-                // Sum NET ST differences (positive + negative)
+            if (allTributada) {
+                status = 'Sem Guia - Verificado';
+                totalValue = 0;
+                tipoImposto = 'Tributada';
+            } else if (activeItemsForInvoice.length > 0 && hasCalculatedItems) {
                 const stItems = activeItemsForInvoice.filter(i => i.impostoEscolhido === 'ST');
                 const netStVal = stItems.reduce((acc, curr) => acc + curr.diferenca, 0);
                 const stTotal = Math.max(0, netStVal);
 
-                // Sum DIFAL differences
                 const difalItems = activeItemsForInvoice.filter(i => i.impostoEscolhido === 'DIFAL');
                 const difalTotal = difalItems.reduce((acc, curr) => acc + (curr.vlDifal || 0), 0);
+
+                const tributadaItems = activeItemsForInvoice.filter(i => i.impostoEscolhido === 'TRIBUTADA');
 
                 totalValue = stTotal + difalTotal;
 
@@ -185,6 +192,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 const tiposArr = [];
                 if (stItems.length > 0) tiposArr.push('ICMS ST');
                 if (difalItems.length > 0) tiposArr.push('DIFAL');
+                if (tributadaItems.length > 0) tiposArr.push('Tributada');
                 tipoImposto = tiposArr.join('/');
             }
 
@@ -202,8 +210,9 @@ export default function StCalculationResults({ results, originalItems, selectedI
             return {
                 chaveNfe: chave,
                 observacoes: status,
-                usuario: usuarioId,
-                valor: Number(totalValue.toFixed(2))
+                valor: Number(totalValue.toFixed(2)),
+                tipo_imposto: tipoImposto,
+                usuario: user?.nome || 'Sistema'
             };
         });
 
@@ -333,8 +342,8 @@ export default function StCalculationResults({ results, originalItems, selectedI
                         {results.map((row, idx) => {
                             const isSelected = selectedIndices.has(idx);
                             const isDifal = row.impostoEscolhido === 'DIFAL';
-                            const valorARecolher = isDifal ? (row.vlDifal || 0) : row.diferenca;
-
+                            const isTributada = row.impostoEscolhido === 'TRIBUTADA';
+                            const valorARecolher = isTributada ? 0 : isDifal ? (row.vlDifal || 0) : row.diferenca;
                             return (
                                 <tr key={idx} className={`hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors ${isSelected ? '' : 'opacity-50 grayscale'}`}>
                                     <td className="px-4 py-3 text-center">
@@ -347,7 +356,9 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                         <div className="text-xs text-gray-500">{row.codProd}</div>
                                     </td>
                                     <td className="px-4 py-3 text-center font-bold">
-                                        {isDifal ? (
+                                        {row.impostoEscolhido === 'TRIBUTADA' ? (
+                                            <span className="text-green-600">Tributada</span>
+                                        ) : isDifal ? (
                                             <span className="text-purple-600">DIFAL</span>
                                         ) : (
                                             <span className="text-blue-600">ICMS ST</span>
@@ -355,7 +366,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="text-xs">NCM: {row.ncmNota}</div>
-                                        {!isDifal && ( // Só exibe MVA se for ST, DIFAL não usa MVA para comparar
+                                        {(!isDifal && !isTributada) && (
                                             <div className="text-xs">
                                                 MVA Nota: {row.mvaNota}% | Ref: {row.mvaRef}%
                                             </div>
@@ -369,17 +380,19 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                         {formatCurrency(row.vlProduto)}
                                     </td>
                                     <td className="px-4 py-3 text-right font-mono text-gray-600 dark:text-gray-400">
-                                        {!isDifal ? formatCurrency(row.stDestacado) : '-'}
+                                        {(!isDifal && !isTributada) ? formatCurrency(row.stDestacado) : '-'}
                                     </td>
                                     <td className="px-4 py-3 text-right font-mono text-blue-600 dark:text-blue-400">
-                                        {!isDifal ? formatCurrency(row.stCalculado) : '-'}
+                                        {(!isDifal && !isTributada) ? formatCurrency(row.stCalculado) : '-'}
                                     </td>
                                     <td className={`px-4 py-3 text-right font-mono font-bold ${valorARecolher > 0.05 ? 'text-red-600' : valorARecolher < -0.05 ? 'text-green-600' : 'text-gray-400'
                                         }`}>
                                         {formatCurrency(valorARecolher)}
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        {isDifal ? (
+                                        {isTributada ? (
+                                            <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Tributada</span>
+                                        ) : isDifal ? (
                                             valorARecolher > 0 ? <span className="px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">DIFAL a Recolher</span>
                                                 : <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">OK</span>
                                         ) : (
