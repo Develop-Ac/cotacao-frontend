@@ -469,6 +469,12 @@ export default function Tela() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const [modalProdutosOpen, setModalProdutosOpen] = useState(false);
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  // Estados do modal de adicionar item
+  const [novoCodigoProduto, setNovoCodigoProduto] = useState("");
+  const [novaQuantidade, setNovaQuantidade] = useState("");
+  const [addItemMsg, setAddItemMsg] = useState<string | null>(null);
+  const [addItemLoading, setAddItemLoading] = useState(false);
   const [itensVisualizacao, setItensVisualizacao] = useState<CotacaoItem[]>([]);
   const [loadingItens, setLoadingItens] = useState(false);
 
@@ -603,6 +609,86 @@ export default function Tela() {
   if (loadingPedidos && pedidos.length === 0) {
     return <Loading />;
   }
+
+  // Modal Adicionar Item (recebe estados por props)
+  const AddItemModal = ({
+    open,
+    onClose,
+    codigoProduto,
+    setCodigoProduto,
+    quantidade,
+    setQuantidade,
+    msg,
+    setMsg,
+    loading,
+    onAdd
+  }: {
+    open: boolean;
+    onClose: () => void;
+    codigoProduto: string;
+    setCodigoProduto: (v: string) => void;
+    quantidade: string;
+    setQuantidade: (v: string) => void;
+    msg: string | null;
+    setMsg: (v: string | null) => void;
+    loading: boolean;
+    onAdd: () => void | Promise<void>;
+  }) => (
+    open ? (
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-stroke dark:border-strokedark">
+          <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4">
+            <h3 className="text-lg font-bold text-black dark:text-white">Adicionar Item à Cotação</h3>
+            <button
+              onClick={() => {
+                onClose();
+                setCodigoProduto("");
+                setQuantidade("");
+                setMsg(null);
+              }}
+              className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-200 transition-colors"
+            >
+              <FaTimes size={20} />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código do Produto</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Ex: 5678"
+                value={codigoProduto}
+                onChange={e => setCodigoProduto(e.target.value.replace(/[^\d]/g, ""))}
+                className="w-full h-10 px-3 border border-gray-300 dark:border-form-strokedark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-form-input text-black dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantidade</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Ex: 10"
+                value={quantidade}
+                onChange={e => setQuantidade(e.target.value.replace(/[^\d]/g, ""))}
+                className="w-full h-10 px-3 border border-gray-300 dark:border-form-strokedark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-form-input text-black dark:text-white"
+              />
+            </div>
+            {msg && (
+              <div className={`p-3 rounded-lg text-sm mb-2 ${msg.includes("sucesso") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg}</div>
+            )}
+            <button
+              onClick={onAdd}
+              disabled={loading || !codigoProduto || !quantidade}
+              className="w-full py-2 bg-primary text-white rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50"
+            >
+              {loading ? "Adicionando..." : "Adicionar Item"}
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null
+  );
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
@@ -983,6 +1069,129 @@ export default function Tela() {
         )
       }
 
+      {addItemModalOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-stroke dark:border-strokedark">
+            <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4">
+              <h3 className="text-lg font-bold text-black dark:text-white">Adicionar Item à Cotação</h3>
+              <button
+                onClick={() => {
+                  setAddItemModalOpen(false);
+                  setNovoCodigoProduto("");
+                  setNovaQuantidade("");
+                  setAddItemMsg(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-200 transition-colors"
+              >
+                <FaTimes size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Código do Produto</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Ex: 5678"
+                  value={novoCodigoProduto}
+                  onChange={e => setNovoCodigoProduto(e.target.value.replace(/[^\d]/g, ""))}
+                  className="w-full h-10 px-3 border border-gray-300 dark:border-form-strokedark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-form-input text-black dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantidade</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Ex: 10"
+                  value={novaQuantidade}
+                  onChange={e => setNovaQuantidade(e.target.value.replace(/[^\d]/g, ""))}
+                  className="w-full h-10 px-3 border border-gray-300 dark:border-form-strokedark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-form-input text-black dark:text-white"
+                />
+              </div>
+              {addItemMsg && (
+                <div className={`p-3 rounded-lg text-sm mb-2 ${addItemMsg.includes("sucesso") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{addItemMsg}</div>
+              )}
+              <button
+                onClick={async () => {}}
+                disabled={addItemLoading || !novoCodigoProduto || !novaQuantidade}
+                className="w-full py-2 bg-primary text-white rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50"
+              >
+                {addItemLoading ? "Adicionando..." : "Adicionar Item"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Adicionar Item */}
+      <AddItemModal
+        open={addItemModalOpen}
+        onClose={() => setAddItemModalOpen(false)}
+        codigoProduto={novoCodigoProduto}
+        setCodigoProduto={setNovoCodigoProduto}
+        quantidade={novaQuantidade}
+        setQuantidade={setNovaQuantidade}
+        msg={addItemMsg}
+        setMsg={setAddItemMsg}
+        loading={addItemLoading}
+        onAdd={async () => {
+          setAddItemMsg(null);
+          if (!pedidoSelecionado) {
+            setAddItemMsg("Pedido não selecionado.");
+            return;
+          }
+          if (!novoCodigoProduto || !novaQuantidade) {
+            setAddItemMsg("Preencha todos os campos.");
+            return;
+          }
+          setAddItemLoading(true);
+          try {
+            const payload = {
+              cotacao: pedidoSelecionado,
+              pro_codigo: Number(novoCodigoProduto),
+              quantidade: Number(novaQuantidade)
+            };
+            const res = await fetch(`${comprasPath("/pedidos-cotacao")}/item`, {
+              method: "POST",
+              headers: { "Accept": "application/json", "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+              let msg = `HTTP ${res.status}`;
+              try {
+                const err = await res.json();
+                if (err?.message) msg = err.message;
+              } catch {}
+              throw new Error(msg);
+            }
+            setAddItemMsg("Item adicionado com sucesso.");
+            setNovoCodigoProduto("");
+            setNovaQuantidade("");
+            // Atualizar lista de itens visualizados
+            if (pedidoSelecionado) {
+              setLoadingItens(true);
+              try {
+                const url = `${comprasPath(`/pedidos-cotacao/${encodeURIComponent(String(pedidoSelecionado))}`)}/itens?empresa=3`;
+                const resItens = await fetch(url, { headers: { Accept: "application/json" } });
+                if (resItens.ok) {
+                  const data = await resItens.json();
+                  setItensVisualizacao(Array.isArray(data?.itens) ? data.itens : []);
+                }
+              } catch {}
+              setLoadingItens(false);
+            }
+            setTimeout(() => {
+              setAddItemMsg(null);
+              setAddItemModalOpen(false);
+            }, 1200);
+          } catch (e: any) {
+            setAddItemMsg(`Erro ao adicionar item: ${e?.message || "desconhecido"}`);
+          } finally {
+            setAddItemLoading(false);
+          }
+        }}
+      />
       {
         modalProdutosOpen && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -992,12 +1201,21 @@ export default function Tela() {
                   <h3 className="text-lg font-bold text-black dark:text-white">Produtos da Cotação</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Pedido #{pedidoSelecionado}</p>
                 </div>
-                <button
-                  onClick={() => setModalProdutosOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-200 transition-colors"
-                >
-                  <FaTimes size={20} />
-                </button>
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={() => setAddItemModalOpen(true)}
+                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white hover:bg-opacity-90 transition-all duration-200 text-sm font-medium"
+                    title="Adicionar Item"
+                  >
+                    <FaPlusSquare size={16} /> Adicionar Item
+                  </button>
+                  <button
+                    onClick={() => setModalProdutosOpen(false)}
+                    className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-200 transition-colors"
+                  >
+                    <FaTimes size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="p-6 overflow-y-auto">
