@@ -465,6 +465,8 @@ export default function ComparativoPage() {
 
       const dataSync: any[] = await res.json();
 
+      console.log("Resposta da sincronização bruta:", dataSync);
+
       if (!Array.isArray(dataSync) || dataSync.length === 0) {
         setFornecedores([]);
         setPedidoCarregado(Number(p));
