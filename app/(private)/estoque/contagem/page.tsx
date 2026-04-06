@@ -105,6 +105,11 @@ function ContagemCard({
     onEdit: (c: ContagemListaItem) => void;
     onDelete: (id: string) => void;
 }) {
+    const grupoNaoIniciado =
+        contagem.grupo_iniciado === false ||
+        contagem.grupo_iniciado === undefined ||
+        contagem.grupo_iniciado === null;
+
     const getStatus = () => {
         if (contagem.liberado_contagem) {
             return { label: "Em Andamento", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" };
@@ -204,7 +209,7 @@ function ContagemCard({
                     <FaClipboardList />
                     Listar Produtos
                 </button>
-                {contagem.contagem === 1 && !contagem.grupo_iniciado && (
+                {grupoNaoIniciado && (
                     <>
                         <button
                             onClick={() => onEdit(contagem)}
