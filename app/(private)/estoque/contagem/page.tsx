@@ -14,6 +14,7 @@ import {
     FaMapMarkerAlt,
     FaTrash,
     FaChevronDown,
+    FaEdit,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import React, { useEffect, useState, useCallback } from "react";
@@ -96,10 +97,12 @@ type Usuario = {
 function ContagemCard({
     contagem,
     onOpenLogs,
+    onEdit,
     onDelete,
 }: {
     contagem: ContagemListaItem;
     onOpenLogs: (c: ContagemListaItem) => void;
+    onEdit: (c: ContagemListaItem) => void;
     onDelete: (id: string) => void;
 }) {
     const getStatus = () => {
@@ -202,14 +205,24 @@ function ContagemCard({
                     Listar Produtos
                 </button>
                 {contagem.contagem === 1 && !contagem.grupo_iniciado && (
-                    <button
-                        onClick={() => onDelete(contagem.id)}
-                        className="w-full mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:border-red-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-sm py-2 px-4"
-                        title="Excluir Contagem"
-                    >
-                        <FaTrash size={14} />
-                        Excluir
-                    </button>
+                    <>
+                        <button
+                            onClick={() => onEdit(contagem)}
+                            className="w-full mt-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 hover:border-amber-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-sm py-2 px-4"
+                            title="Alterar Contagem"
+                        >
+                            <FaEdit size={14} />
+                            Alterar
+                        </button>
+                        <button
+                            onClick={() => onDelete(contagem.id)}
+                            className="w-full mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:border-red-300 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 text-sm py-2 px-4"
+                            title="Excluir Contagem"
+                        >
+                            <FaTrash size={14} />
+                            Excluir
+                        </button>
+                    </>
                 )}
             </div>
         </div >
@@ -249,6 +262,24 @@ export default function Tela() {
     const [loadingUsuarios, setLoadingUsuarios] = useState(false);
     const [tipoContagem, setTipoContagem] = useState(1); // 1 = Diária, 2 = Avulsa
     const [step, setStep] = useState(1);
+
+    const resetWizardParaNovaContagem = () => {
+        setStep(1);
+        setItensSelecionados(new Set());
+        setContagem1("");
+        setContagem2("");
+        setContagem3("");
+    };
+
+    const abrirFormularioNovaContagem = () => {
+        setFormularioAberto((aberto) => {
+            const proximo = !aberto;
+            if (proximo) {
+                resetWizardParaNovaContagem();
+            }
+            return proximo;
+        });
+    };
 
     const buscarCotacao = async () => {
         setMsgCot(null);
@@ -438,6 +469,7 @@ export default function Tela() {
             }
 
             console.log("Contagens salvas com sucesso!");
+            resetWizardParaNovaContagem();
             setFormularioAberto(false);
             carregarContagensLista();
         } catch (error) {
@@ -524,6 +556,15 @@ export default function Tela() {
     const [logsGroupData, setLogsGroupData] = useState<Record<number, any>>({});
     const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
     const [loadingLogs, setLoadingLogs] = useState(false);
+
+    // ===== Estados do modal de edição =====
+    const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+    const [contagemEditando, setContagemEditando] = useState<ContagemListaItem | null>(null);
+    const [editPiso, setEditPiso] = useState("");
+    const [editContagem1, setEditContagem1] = useState("");
+    const [editContagem2, setEditContagem2] = useState("");
+    const [editContagem3, setEditContagem3] = useState("");
+    const [loadingSalvarEdicao, setLoadingSalvarEdicao] = useState(false);
 
     const carregarContagensLista = useCallback(async () => {
         setMsgContagensLista(null);
@@ -711,6 +752,71 @@ export default function Tela() {
         XLSX.writeFile(wb, `logs-contagem-${contagemSelecionada?.contagem}.xlsx`);
     };
 
+    const abrirModalEdicao = async (contagem: ContagemListaItem) => {
+        try {
+            const res = await fetch(
+                estoqueUrl(`/estoque/contagem/grupo/${contagem.contagem_cuid}`),
+                { headers: { Accept: "application/json" } }
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const grupo = await res.json();
+            const listaGrupo = Array.isArray(grupo) ? grupo : [];
+
+            const c1 = listaGrupo.find((c: any) => Number(c.contagem) === 1);
+            const c2 = listaGrupo.find((c: any) => Number(c.contagem) === 2);
+            const c3 = listaGrupo.find((c: any) => Number(c.contagem) === 3);
+
+            setContagemEditando(contagem);
+            setEditPiso(String(c1?.piso ?? c2?.piso ?? c3?.piso ?? contagem.piso ?? ""));
+            setEditContagem1(String(c1?.colaborador ?? c1?.usuario?.id ?? ""));
+            setEditContagem2(String(c2?.colaborador ?? c2?.usuario?.id ?? ""));
+            setEditContagem3(String(c3?.colaborador ?? c3?.usuario?.id ?? ""));
+            setModalEdicaoAberto(true);
+        } catch (e: any) {
+            alert(e?.message || "Erro ao abrir edição da contagem");
+        }
+    };
+
+    const salvarEdicaoContagem = async () => {
+        if (!contagemEditando) return;
+
+        setLoadingSalvarEdicao(true);
+        try {
+            const payload = {
+                piso: editPiso,
+                contagem1UsuarioId: editContagem1 || undefined,
+                contagem2UsuarioId: editContagem2 || undefined,
+                contagem3UsuarioId: editContagem3 || undefined,
+            };
+
+            const res = await fetch(
+                estoqueUrl(`/estoque/contagem/grupo/${contagemEditando.contagem_cuid}`),
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                }
+            );
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data?.message || `HTTP ${res.status}`);
+            }
+
+            setModalEdicaoAberto(false);
+            setContagemEditando(null);
+            carregarContagensLista();
+        } catch (e: any) {
+            alert(e?.message || "Erro ao salvar edição da contagem");
+        } finally {
+            setLoadingSalvarEdicao(false);
+        }
+    };
+
     const handleDeleteContagem = async (id: string) => {
         if (!confirm("Tem certeza que deseja excluir esta contagem?")) return;
         try {
@@ -749,7 +855,7 @@ export default function Tela() {
 
                 <div className="flex gap-3">
                     <button
-                        onClick={() => setFormularioAberto((v) => !v)}
+                        onClick={abrirFormularioNovaContagem}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-sm transition-all duration-300 ease-in-out active:scale-95 ${formularioAberto
                             ? "bg-gray-800 text-white hover:bg-gray-900"
                             : "bg-primary text-white hover:bg-opacity-90"
@@ -1080,6 +1186,7 @@ export default function Tela() {
                                 key={idx}
                                 contagem={item}
                                 onOpenLogs={abrirModalLogs}
+                                onEdit={abrirModalEdicao}
                                 onDelete={handleDeleteContagem}
                             />
                         ))}
@@ -1142,6 +1249,87 @@ export default function Tela() {
                     </div>
                 )}
             </div>
+
+            {/* MODAL DE EDICAO */}
+            {modalEdicaoAberto && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl border border-stroke dark:border-strokedark">
+                        <div className="p-6 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-black dark:text-white">Alterar Contagem</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Edite piso e equipe do grupo selecionado.</p>
+                            </div>
+                            <button
+                                onClick={() => setModalEdicaoAberto(false)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-meta-4 transition-colors"
+                            >
+                                <FaTimes size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Piso</label>
+                                <input
+                                    type="text"
+                                    value={editPiso}
+                                    onChange={(e) => setEditPiso(e.target.value)}
+                                    className="h-11 w-full border border-gray-300 dark:border-strokedark rounded-lg px-3 focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-form-input"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold mb-1">1a Contagem</label>
+                                <Select
+                                    options={usuarios.map((u) => ({ label: u.nome, value: u.id }))}
+                                    value={editContagem1}
+                                    onChange={(val) => setEditContagem1(String(val))}
+                                    placeholder="Responsavel pela 1a contagem"
+                                    className="w-full"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold mb-1">2a Contagem</label>
+                                <Select
+                                    options={usuarios.map((u) => ({ label: u.nome, value: u.id }))}
+                                    value={editContagem2}
+                                    onChange={(val) => setEditContagem2(String(val))}
+                                    placeholder="Responsavel pela 2a contagem"
+                                    className="w-full"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold mb-1">3a Contagem</label>
+                                <Select
+                                    options={usuarios.map((u) => ({ label: u.nome, value: u.id }))}
+                                    value={editContagem3}
+                                    onChange={(val) => setEditContagem3(String(val))}
+                                    placeholder="Responsavel pela 3a contagem"
+                                    className="w-full"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-stroke dark:border-strokedark bg-gray-50 dark:bg-meta-4 rounded-b-xl flex justify-end gap-3">
+                            <button
+                                onClick={() => setModalEdicaoAberto(false)}
+                                className="px-6 py-2.5 rounded-lg border border-gray-300 hover:bg-white transition-colors text-gray-700 font-medium"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={salvarEdicaoContagem}
+                                disabled={loadingSalvarEdicao || !editContagem1}
+                                className="px-6 py-2.5 rounded-lg bg-primary text-white font-semibold hover:bg-opacity-90 transition-all disabled:opacity-50"
+                            >
+                                {loadingSalvarEdicao ? "Salvando..." : "Salvar Alteracoes"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL DE LOGS */}
             {modalLogsAberto && (
