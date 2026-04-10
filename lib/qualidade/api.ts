@@ -460,6 +460,15 @@ export const QualidadeApi = {
       .filter(Boolean) as FornecedorConfig[];
   },
 
+  async buscarFornecedorErp(erpFornecedorId: number): Promise<{ erpFornecedorId: number; nomeFornecedor: string }> {
+    const res = await apiFetch(`/fornecedores/erp/${erpFornecedorId}`);
+    const data = await res.json();
+    return {
+      erpFornecedorId: toNumber(data?.erp_fornecedor_id ?? erpFornecedorId) ?? erpFornecedorId,
+      nomeFornecedor: String(data?.nome_fornecedor ?? ""),
+    };
+  },
+
   async criarConfigFornecedor(payload: FornecedorConfigPayload, formulario?: File) {
     const form = new FormData();
     appendIfValue(form, "erp_fornecedor_id", payload.erpFornecedorId);

@@ -17,6 +17,7 @@ type FormMode = "create" | "edit" | "copy";
 
 interface FormState {
   erpFornecedorId: string;
+  nomeFornecedor: string;
   processoTipo: ProcessoTipo;
   portalLink: string;
   instrucoes: string;
@@ -34,6 +35,7 @@ const PROCESSO_OPTIONS: Array<{ value: ProcessoTipo; label: string }> = [
 
 const emptyForm: FormState = {
   erpFornecedorId: "",
+  nomeFornecedor: "",
   processoTipo: "portal",
   portalLink: "",
   instrucoes: "",
@@ -44,6 +46,7 @@ const emptyForm: FormState = {
 
 const toFormState = (item: FornecedorConfig): FormState => ({
   erpFornecedorId: item.erpFornecedorId > 0 ? String(item.erpFornecedorId) : "",
+  nomeFornecedor: item.nomeFornecedor ?? "",
   processoTipo: (item.processoTipo as ProcessoTipo) ?? "portal",
   portalLink: item.portalLink ?? "",
   instrucoes: item.instrucoes ?? "",
@@ -66,6 +69,7 @@ export default function FornecedoresConfigPage() {
   const [copySourceId, setCopySourceId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [buscandoFornecedor, setBuscandoFornecedor] = useState(false);
 
   const carregar = useCallback(async () => {
     setRefreshing(true);
@@ -84,6 +88,38 @@ export default function FornecedoresConfigPage() {
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+
+    const codigo = form.erpFornecedorId.trim();
+    if (!codigo) {
+      setForm((prev) => ({ ...prev, nomeFornecedor: "" }));
+      return;
+    }
+
+    const parsed = Number(codigo);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      setForm((prev) => ({ ...prev, nomeFornecedor: "" }));
+      return;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setBuscandoFornecedor(true);
+        const fornecedor = await QualidadeApi.buscarFornecedorErp(parsed);
+        setForm((prev) => ({ ...prev, nomeFornecedor: fornecedor.nomeFornecedor }));
+      } catch {
+        setForm((prev) => ({ ...prev, nomeFornecedor: "Fornecedor nao encontrado" }));
+      } finally {
+        setBuscandoFornecedor(false);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [form.erpFornecedorId, modalOpen]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -230,14 +266,30 @@ export default function FornecedoresConfigPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">ERP fornecedor id</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Cod do Fornecedor</span>
             <input
-              type="number"
-              min={1}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={form.erpFornecedorId}
-              onChange={(event) => setForm((prev) => ({ ...prev, erpFornecedorId: event.target.value }))}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  erpFornecedorId: event.target.value.replace(/\D+/g, ""),
+                }))
+              }
               placeholder="Ex.: 1234"
-              className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Nome do Fornecedor</span>
+            <input
+              type="text"
+              value={buscandoFornecedor ? "Buscando no ERP..." : form.nomeFornecedor}
+              readOnly
+              className="h-11 rounded-xl border border-gray-300 bg-gray-50 px-3 text-sm focus:outline-none dark:border-form-strokedark dark:bg-meta-4 dark:text-white"
             />
           </label>
 
@@ -252,7 +304,7 @@ export default function FornecedoresConfigPage() {
                   processoTipo: event.target.value as ProcessoTipo,
                 }))
               }
-              className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
             >
               {PROCESSO_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -272,7 +324,7 @@ export default function FornecedoresConfigPage() {
               disabled={isCopyMode}
               onChange={(event) => setForm((prev) => ({ ...prev, portalLink: event.target.value }))}
               placeholder="https://fornecedor.com/portal"
-              className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
             />
           </label>
         )}
@@ -287,7 +339,7 @@ export default function FornecedoresConfigPage() {
                 disabled={isCopyMode}
                 onChange={(event) => setForm((prev) => ({ ...prev, nomeFormulario: event.target.value }))}
                 placeholder="Ex.: FORMULARIO_GARANTIA.xlsx"
-                className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
               />
             </label>
 
@@ -305,7 +357,7 @@ export default function FornecedoresConfigPage() {
                     nomeFormulario: file?.name ?? prev.nomeFormulario,
                   }));
                 }}
-                className="h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                className="h-11 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
               />
             </label>
 
@@ -317,7 +369,7 @@ export default function FornecedoresConfigPage() {
                 disabled={isCopyMode}
                 onChange={(event) => setForm((prev) => ({ ...prev, formularioPath: event.target.value }))}
                 placeholder="Nome do arquivo salvo"
-                className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
               />
             </label>
           </div>
@@ -331,7 +383,7 @@ export default function FornecedoresConfigPage() {
             disabled={isCopyMode}
             onChange={(event) => setForm((prev) => ({ ...prev, instrucoes: event.target.value }))}
             placeholder="Descreva as instrucoes de garantia"
-            className="rounded-lg border border-gray-300 bg-white p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            className="rounded-xl border border-gray-300 bg-white p-3 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 disabled:opacity-60 dark:border-form-strokedark dark:bg-form-input dark:text-white"
           />
         </label>
       </FormModal>
@@ -369,7 +421,7 @@ export default function FornecedoresConfigPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar por ERP ID, nome do fornecedor, tipo ou instrucoes"
-            className="w-full rounded-lg border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-black dark:text-white"
+            className="w-full rounded-xl border border-gray-300 dark:border-form-strokedark bg-white dark:bg-form-input py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-0 focus:border-blue-500 text-black dark:text-white"
           />
         </label>
 
@@ -407,7 +459,11 @@ export default function FornecedoresConfigPage() {
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.id ?? "-"}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.erpFornecedorId}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.nomeFornecedor ?? "Nao encontrado"}</td>
-                    <td className="px-3 py-2 text-gray-700 dark:text-gray-200 uppercase">{item.processoTipo}</td>
+                    <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
+                      <span className="inline-flex items-center rounded-full border border-gray-300 dark:border-strokedark px-2.5 py-0.5 text-xs font-semibold uppercase">
+                        {item.processoTipo}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
                       {item.processoTipo === "portal" ? item.portalLink ?? "-" : item.nomeFormulario ?? item.formularioPath ?? "-"}
                     </td>
