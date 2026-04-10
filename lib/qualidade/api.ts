@@ -2,6 +2,8 @@ import { QUALIDADE_API_BASE, QUALIDADE_EMAIL_SYNC_URL } from "./config";
 import {
   Anexo,
   AtualizacaoPayload,
+  CopiarFornecedorConfigPayload,
+  FornecedorConfigPayload,
   FornecedorConfig,
   Garantia,
   InboxEmail,
@@ -286,7 +288,9 @@ const toVendaDetalhes = (payload: unknown): VendaDetalhes => {
 };
 
 const toFornecedorConfig = (payload: Record<string, unknown>): FornecedorConfig => ({
+  id: toNumber(payload.id),
   erpFornecedorId: toNumber(payload.erp_fornecedor_id ?? payload.erpFornecedorId ?? payload.erpId) ?? 0,
+  nomeFornecedor: payload.nome_fornecedor?.toString() ?? payload.nomeFornecedor?.toString(),
   processoTipo: String(payload.processo_tipo ?? payload.processoTipo ?? "padrao"),
   portalLink: payload.portal_link?.toString() ?? payload.portalLink?.toString(),
   formularioPath: payload.formulario_path?.toString() ?? payload.formularioPath?.toString(),
@@ -445,6 +449,61 @@ export const QualidadeApi = {
     const res = await apiFetch(`/fornecedores/config/${erpFornecedorId}`);
     const data = await res.json();
     return toFornecedorConfig(data);
+  },
+
+  async listarConfigsFornecedor(): Promise<FornecedorConfig[]> {
+    const res = await apiFetch("/fornecedores/config");
+    const data = await res.json();
+    const payload = Array.isArray(data) ? data : [];
+    return payload
+      .map((item: unknown) => (item && typeof item === "object" ? toFornecedorConfig(item as Record<string, unknown>) : null))
+      .filter(Boolean) as FornecedorConfig[];
+  },
+
+  async criarConfigFornecedor(payload: FornecedorConfigPayload, formulario?: File) {
+    const form = new FormData();
+    appendIfValue(form, "erp_fornecedor_id", payload.erpFornecedorId);
+    appendIfValue(form, "processo_tipo", payload.processoTipo);
+    appendIfValue(form, "portal_link", payload.portalLink);
+    appendIfValue(form, "instrucoes", payload.instrucoes);
+    appendIfValue(form, "formulario_path", payload.formularioPath);
+    appendIfValue(form, "nome_formulario", payload.nomeFormulario);
+    if (formulario) {
+      form.append("formulario", formulario, formulario.name);
+    }
+
+    await apiFetch("/fornecedores/config", {
+      method: "POST",
+      body: form,
+    });
+  },
+
+  async atualizarConfigFornecedor(id: number, payload: FornecedorConfigPayload, formulario?: File) {
+    const form = new FormData();
+    appendIfValue(form, "erp_fornecedor_id", payload.erpFornecedorId);
+    appendIfValue(form, "processo_tipo", payload.processoTipo);
+    appendIfValue(form, "portal_link", payload.portalLink);
+    appendIfValue(form, "instrucoes", payload.instrucoes);
+    appendIfValue(form, "formulario_path", payload.formularioPath);
+    appendIfValue(form, "nome_formulario", payload.nomeFormulario);
+    if (formulario) {
+      form.append("formulario", formulario, formulario.name);
+    }
+
+    await apiFetch(`/fornecedores/config/${id}`, {
+      method: "PATCH",
+      body: form,
+    });
+  },
+
+  async copiarConfigFornecedor(id: number, payload: CopiarFornecedorConfigPayload) {
+    await apiFetch(`/fornecedores/config/${id}/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        novo_erp_fornecedor_id: payload.novoErpFornecedorId,
+      }),
+    });
   },
 
   async listarEmails(): Promise<InboxEmail[]> {

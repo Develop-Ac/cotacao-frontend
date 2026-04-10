@@ -134,11 +134,26 @@ export interface VendaDetalhes {
 }
 
 export interface FornecedorConfig {
+  id?: number;
   erpFornecedorId: number;
+  nomeFornecedor?: string | null;
   processoTipo: string;
   portalLink?: string | null;
   formularioPath?: string | null;
   nomeFormulario?: string | null;
   formularioUrl?: string | null;
   instrucoes?: string | null;
+}
+
+export interface FornecedorConfigPayload {
+  erpFornecedorId: number;
+  processoTipo: "portal" | "formulario" | "email" | "whatsapp";
+  portalLink?: string;
+  instrucoes?: string;
+  formularioPath?: string;
+  nomeFormulario?: string;
+}
+
+export interface CopiarFornecedorConfigPayload {
+  novoErpFornecedorId: number;
 }

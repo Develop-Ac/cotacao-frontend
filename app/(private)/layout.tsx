@@ -179,6 +179,7 @@ export default function RootLayout({
       case 'Qualidade':
         return [
           { label: 'Central', href: '/qualidade' },
+          { label: 'Fornecedores', href: '/qualidade/fornecedores-config' },
           { label: 'Inbox', href: '/qualidade/caixa' },
         ];
       case 'Sac':
