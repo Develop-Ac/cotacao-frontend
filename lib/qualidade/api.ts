@@ -524,6 +524,20 @@ export const QualidadeApi = {
       .filter(Boolean) as InboxEmail[];
   },
 
+  async vincularEmail(emailId: number, garantiaId: number) {
+    await apiFetch(`/emails/${emailId}/link`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ garantiaId }),
+    });
+  },
+
+  async excluirEmailSemVinculo(emailId: number) {
+    await apiFetch(`/emails/${emailId}`, {
+      method: "DELETE",
+    });
+  },
+
   async sincronizarEmails() {
     if (!QUALIDADE_EMAIL_SYNC_URL) {
       throw new Error("Variável NEXT_PUBLIC_QUALIDADE_EMAIL_SYNC_URL não configurada.");

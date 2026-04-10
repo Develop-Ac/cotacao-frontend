@@ -5,11 +5,27 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
 import { QualidadeApi } from "@/lib/qualidade/api";
-import { InboxEmail } from "@/lib/qualidade/types";
+import { Garantia, InboxEmail } from "@/lib/qualidade/types";
 import { formatDateTime, stripHtml } from "@/lib/qualidade/formatters";
-import { MdArrowBack, MdOpenInNew, MdRefresh, MdSync } from "react-icons/md";
+import { MdArrowBack, MdClose, MdDeleteOutline, MdLink, MdOpenInNew, MdRefresh, MdSync } from "react-icons/md";
 
 type InboxFilter = "all" | "linked" | "unlinked";
+
+const buildEmailPreview = (html?: string | null): string => {
+  if (!html) return "";
+
+  return html
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/(?:v:\\*|o:\\*|w:\\*)\s*\{[^}]*\}/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+};
 
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
@@ -22,6 +38,13 @@ export default function CaixaDeEntradaPage() {
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [mobileReading, setMobileReading] = useState(false);
+  const [garantias, setGarantias] = useState<Garantia[]>([]);
+  const [loadingGarantias, setLoadingGarantias] = useState(false);
+  const [linkingEmailId, setLinkingEmailId] = useState<number | null>(null);
+  const [selectedGarantiaId, setSelectedGarantiaId] = useState<string>("");
+  const [garantiaSearchTerm, setGarantiaSearchTerm] = useState("");
+  const [submittingLink, setSubmittingLink] = useState(false);
+  const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
 
   const carregar = useCallback(async () => {
     setUpdating(true);
@@ -73,6 +96,25 @@ export default function CaixaDeEntradaPage() {
     [filteredEmails, selectedEmailId],
   );
 
+  const filteredGarantias = useMemo(() => {
+    const term = garantiaSearchTerm.trim().toLowerCase();
+    if (!term) return garantias;
+
+    return garantias.filter((garantia) => {
+      const garantiaId = garantia.id.toString().toLowerCase();
+      const notaInterna = (garantia.notaInterna ?? "").toLowerCase();
+      const fornecedor = (garantia.nomeFornecedor ?? "").toLowerCase();
+      const fornecedorId = String((garantia as Garantia & { erpFornecedorId?: number | string }).erpFornecedorId ?? "").toLowerCase();
+
+      return (
+        garantiaId.includes(term) ||
+        notaInterna.includes(term) ||
+        fornecedor.includes(term) ||
+        fornecedorId.includes(term)
+      );
+    });
+  }, [garantiaSearchTerm, garantias]);
+
   const selectedEmailHtml = useMemo(() => {
     if (!selectedEmail?.corpoHtml) return "";
     return selectedEmail.corpoHtml
@@ -97,6 +139,62 @@ export default function CaixaDeEntradaPage() {
   const abrirEmail = (emailId: number) => {
     setSelectedEmailId(emailId);
     setMobileReading(true);
+  };
+
+  const carregarGarantias = useCallback(async () => {
+    if (garantias.length > 0 || loadingGarantias) return;
+    setLoadingGarantias(true);
+    try {
+      const list = await QualidadeApi.listarGarantias();
+      setGarantias(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar garantias para vinculo.");
+    } finally {
+      setLoadingGarantias(false);
+    }
+  }, [garantias.length, loadingGarantias]);
+
+  const abrirVinculo = async (emailId: number) => {
+    setLinkingEmailId(emailId);
+    setSelectedGarantiaId("");
+    setGarantiaSearchTerm("");
+    await carregarGarantias();
+  };
+
+  const confirmarVinculo = async () => {
+    if (!linkingEmailId || !selectedGarantiaId) {
+      setError("Selecione uma garantia para vincular.");
+      return;
+    }
+
+    setSubmittingLink(true);
+    setError(null);
+    try {
+      await QualidadeApi.vincularEmail(linkingEmailId, Number(selectedGarantiaId));
+      setLinkingEmailId(null);
+      setSelectedGarantiaId("");
+      await carregar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao vincular e-mail.");
+    } finally {
+      setSubmittingLink(false);
+    }
+  };
+
+  const excluirSemVinculo = async (emailId: number) => {
+    const confirmed = window.confirm("Excluir este e-mail sem vinculo? Esta acao nao pode ser desfeita.");
+    if (!confirmed) return;
+
+    setDeletingEmailId(emailId);
+    setError(null);
+    try {
+      await QualidadeApi.excluirEmailSemVinculo(emailId);
+      await carregar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao excluir e-mail.");
+    } finally {
+      setDeletingEmailId(null);
+    }
   };
 
   return (
@@ -191,16 +289,18 @@ export default function CaixaDeEntradaPage() {
               <ul className="divide-y divide-gray-200 dark:divide-strokedark">
                 {filteredEmails.map((email) => {
                   const active = email.id === selectedEmailId;
+                  const preview = buildEmailPreview(email.corpoHtml);
                   return (
-                    <li key={email.id}>
+                    <li
+                      key={email.id}
+                      className={`border-l-4 transition-colors duration-200 ${
+                        active ? "bg-sky-50 dark:bg-sky-500/10 border-sky-600" : "border-transparent hover:bg-gray-50 dark:hover:bg-white/5"
+                      }`}
+                    >
                       <button
                         type="button"
                         onClick={() => abrirEmail(email.id)}
-                        className={`w-full text-left px-4 py-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset ${
-                          active
-                            ? "bg-sky-50 dark:bg-sky-500/10 border-l-4 border-sky-600"
-                            : "hover:bg-gray-50 dark:hover:bg-white/5 border-l-4 border-transparent"
-                        }`}
+                        className="w-full text-left px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -209,7 +309,7 @@ export default function CaixaDeEntradaPage() {
                           </div>
                           <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{formatDateTime(email.dataRecebimento)}</span>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">{stripHtml(email.corpoHtml) || "Sem conteudo exibivel."}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">{preview || "Sem conteudo exibivel."}</p>
                         <div className="mt-2 flex items-center gap-2 text-xs">
                           <span
                             className={`inline-flex px-2 py-0.5 rounded-full border font-semibold ${
@@ -225,6 +325,27 @@ export default function CaixaDeEntradaPage() {
                           )}
                         </div>
                       </button>
+
+                      {!email.garantiaId && (
+                        <div className="px-4 pb-3 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => abrirVinculo(email.id)}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-700 dark:text-sky-300 hover:text-sky-800 dark:hover:text-sky-200 transition"
+                          >
+                            <MdLink size={14} /> Vincular garantia
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => excluirSemVinculo(email.id)}
+                            disabled={deletingEmailId === email.id}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition disabled:opacity-60"
+                          >
+                            <MdDeleteOutline size={14} />
+                            {deletingEmailId === email.id ? "Excluindo..." : "Excluir"}
+                          </button>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -326,6 +447,68 @@ export default function CaixaDeEntradaPage() {
           </div>
         )}
       </div>
+
+      {linkingEmailId && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vincular e-mail a garantia</h3>
+              <button
+                type="button"
+                onClick={() => setLinkingEmailId(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <MdClose size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-300">Selecione a garantia para vincular este e-mail.</p>
+              <input
+                type="text"
+                value={garantiaSearchTerm}
+                onChange={(event) => setGarantiaSearchTerm(event.target.value)}
+                placeholder="Buscar por numero, nota, fornecedor ou fornecedor ID"
+                className="w-full rounded-md border border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark-2 px-3 py-2 text-sm"
+                disabled={loadingGarantias || submittingLink}
+              />
+              <select
+                value={selectedGarantiaId}
+                onChange={(event) => setSelectedGarantiaId(event.target.value)}
+                className="w-full rounded-md border border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark-2 px-3 py-2 text-sm"
+                disabled={loadingGarantias || submittingLink}
+              >
+                <option value="">Selecione uma garantia</option>
+                {filteredGarantias.map((garantia) => (
+                  <option key={garantia.id} value={garantia.id.toString()}>
+                    #{garantia.id} - {garantia.notaInterna || garantia.nomeFornecedor}
+                  </option>
+                ))}
+              </select>
+              {loadingGarantias && <p className="text-xs text-gray-500">Carregando garantias...</p>}
+              {!loadingGarantias && filteredGarantias.length === 0 && (
+                <p className="text-xs text-gray-500">Nenhuma garantia encontrada para o filtro informado.</p>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-strokedark flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLinkingEmailId(null)}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarVinculo}
+                disabled={!selectedGarantiaId || submittingLink}
+                className="px-3 py-1.5 text-sm rounded-md bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-60"
+              >
+                {submittingLink ? "Vinculando..." : "Vincular"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
