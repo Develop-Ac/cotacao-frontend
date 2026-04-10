@@ -107,19 +107,26 @@ export default function FornecedoresConfigPage() {
     }
 
     const timeoutId = window.setTimeout(async () => {
+      const nomeDaListagem =
+        items.find((item) => item.erpFornecedorId === parsed)?.nomeFornecedor?.trim() ?? "";
+
       try {
         setBuscandoFornecedor(true);
         const fornecedor = await QualidadeApi.buscarFornecedorErp(parsed);
-        setForm((prev) => ({ ...prev, nomeFornecedor: fornecedor.nomeFornecedor }));
+        const nome = fornecedor.nomeFornecedor?.trim() || nomeDaListagem;
+        setForm((prev) => ({ ...prev, nomeFornecedor: nome || "Fornecedor nao encontrado" }));
       } catch {
-        setForm((prev) => ({ ...prev, nomeFornecedor: "Fornecedor nao encontrado" }));
+        setForm((prev) => ({
+          ...prev,
+          nomeFornecedor: nomeDaListagem || "Fornecedor nao encontrado",
+        }));
       } finally {
         setBuscandoFornecedor(false);
       }
     }, 300);
 
     return () => window.clearTimeout(timeoutId);
-  }, [form.erpFornecedorId, modalOpen]);
+  }, [form.erpFornecedorId, modalOpen, items]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -391,7 +398,7 @@ export default function FornecedoresConfigPage() {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold text-black dark:text-white">
-            <Link href="/" className="hover:text-primary transition-colors">Intranet</Link> / Fornecedores Config
+            <Link href="/" className="hover:text-primary transition-colors">Intranet</Link> / Fornecedores
           </h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Base de configuracao padrao da garantia por fornecedor</p>
         </div>
@@ -444,31 +451,21 @@ export default function FornecedoresConfigPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 dark:bg-meta-4 text-gray-600 dark:text-gray-300">
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold">ID</th>
-                  <th className="px-3 py-2 text-left font-semibold">ERP fornecedor</th>
+                  <th className="px-3 py-2 text-left font-semibold">Cód.Fornecedor</th>
                   <th className="px-3 py-2 text-left font-semibold">Nome fornecedor</th>
                   <th className="px-3 py-2 text-left font-semibold">Processo</th>
-                  <th className="px-3 py-2 text-left font-semibold">Portal/Formulario</th>
-                  <th className="px-3 py-2 text-left font-semibold">Instrucoes</th>
                   <th className="px-3 py-2 text-left font-semibold">Acoes</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((item) => (
                   <tr key={item.id ?? `${item.erpFornecedorId}-${item.processoTipo}`} className="border-t border-gray-100 dark:border-strokedark">
-                    <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.id ?? "-"}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.erpFornecedorId}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{item.nomeFornecedor ?? "Nao encontrado"}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
                       <span className="inline-flex items-center rounded-full border border-gray-300 dark:border-strokedark px-2.5 py-0.5 text-xs font-semibold uppercase">
                         {item.processoTipo}
                       </span>
-                    </td>
-                    <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
-                      {item.processoTipo === "portal" ? item.portalLink ?? "-" : item.nomeFormulario ?? item.formularioPath ?? "-"}
-                    </td>
-                    <td className="px-3 py-2 text-gray-700 dark:text-gray-200 max-w-[360px] truncate" title={item.instrucoes ?? undefined}>
-                      {item.instrucoes ?? "-"}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
