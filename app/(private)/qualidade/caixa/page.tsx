@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
-import { StatusChip } from "@/components/qualidade/StatusChip";
 import { QualidadeApi } from "@/lib/qualidade/api";
 import { Garantia, InboxEmail } from "@/lib/qualidade/types";
 import { formatDate, formatDateTime, stripHtml } from "@/lib/qualidade/formatters";
@@ -395,7 +394,7 @@ export default function CaixaDeEntradaPage() {
                         onClick={() => router.push(`/qualidade/${selectedEmail.garantiaId}`)}
                         className="inline-flex items-center gap-2 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/30 transition"
                       >
-                        Ver garantia #{selectedEmail.garantiaId}
+                        Ver garantia #{selectedEmail.notaInterna?.trim() || selectedEmail.garantiaId}
                         <MdOpenInNew size={14} />
                       </button>
                     )}
@@ -457,7 +456,7 @@ export default function CaixaDeEntradaPage() {
       </div>
 
       {linkingEmailId && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-[2px] flex items-center justify-center p-4">
           <div className="w-full max-w-6xl rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vincular e-mail a garantia</h3>
@@ -479,8 +478,8 @@ export default function CaixaDeEntradaPage() {
                 className="w-full rounded-md border border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark-2 px-3 py-2 text-sm"
                 disabled={loadingGarantias || submittingLink}
               />
-              <div className="max-h-[52vh] overflow-auto pr-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="max-h-[52vh] overflow-auto pr-1 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 px-1 pb-1">
                   {filteredGarantias.map((garantia) => {
                     const isSelected = selectedGarantiaId === garantia.id.toString();
                     const status = getStatusDefinition(garantia.status);
@@ -495,7 +494,7 @@ export default function CaixaDeEntradaPage() {
                         onClick={() => setSelectedGarantiaId(garantia.id.toString())}
                         className={`text-left rounded-lg border p-3 transition ${
                           isSelected
-                            ? "border-sky-500 ring-2 ring-sky-200 dark:ring-sky-900"
+                            ? "border-sky-500 ring-2 ring-sky-200 dark:ring-sky-900 shadow-[0_10px_24px_-8px_rgba(2,132,199,0.65)]"
                             : "border-gray-200 dark:border-strokedark hover:border-sky-400"
                         }`}
                         disabled={submittingLink}
@@ -512,7 +511,13 @@ export default function CaixaDeEntradaPage() {
                         <p className="text-sm text-gray-800 dark:text-gray-100">{formatDate(garantia.dataCriacao)}</p>
 
                         <div className="mt-3">
-                          <StatusChip label={statusLabel} color={statusColor} background={statusBackground} />
+                          <span
+                            className="inline-flex max-w-full items-center rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-wide whitespace-normal break-words leading-4"
+                            style={{ borderColor: statusColor, color: statusColor, backgroundColor: statusBackground }}
+                            title={statusLabel}
+                          >
+                            {statusLabel}
+                          </span>
                         </div>
                       </button>
                     );
