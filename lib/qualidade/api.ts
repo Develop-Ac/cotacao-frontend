@@ -157,6 +157,7 @@ const toGarantia = (payload: Record<string, unknown>): Garantia => {
   const timeline = buildTimeline(payload);
   return {
     id: toNumber(payload.id) ?? 0,
+    erpFornecedorId: toNumber(payload.erp_fornecedor_id ?? payload.erpFornecedorId),
     nomeFornecedor: String(payload.nome_fornecedor ?? payload.fornecedor ?? "Fornecedor"),
     emailFornecedor: payload.email_fornecedor?.toString(),
     copiasEmail: payload.copias_email?.toString(),

@@ -33,6 +33,7 @@ export interface TimelineEmailItem extends TimelineBase {
 
 export interface Garantia {
   id: number;
+  erpFornecedorId?: number | null;
   nomeFornecedor: string;
   emailFornecedor?: string | null;
   copiasEmail?: string | null;

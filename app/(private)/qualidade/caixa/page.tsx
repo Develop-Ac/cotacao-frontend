@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
+import { StatusChip } from "@/components/qualidade/StatusChip";
 import { QualidadeApi } from "@/lib/qualidade/api";
 import { Garantia, InboxEmail } from "@/lib/qualidade/types";
-import { formatDateTime, stripHtml } from "@/lib/qualidade/formatters";
+import { formatDate, formatDateTime, stripHtml } from "@/lib/qualidade/formatters";
+import { getStatusDefinition } from "@/lib/qualidade/status";
 import { MdArrowBack, MdClose, MdDeleteOutline, MdLink, MdOpenInNew, MdRefresh, MdSync } from "react-icons/md";
 
 type InboxFilter = "all" | "linked" | "unlinked";
@@ -104,7 +106,7 @@ export default function CaixaDeEntradaPage() {
       const garantiaId = garantia.id.toString().toLowerCase();
       const notaInterna = (garantia.notaInterna ?? "").toLowerCase();
       const fornecedor = (garantia.nomeFornecedor ?? "").toLowerCase();
-      const fornecedorId = String((garantia as Garantia & { erpFornecedorId?: number | string }).erpFornecedorId ?? "").toLowerCase();
+      const fornecedorId = String(garantia.erpFornecedorId ?? "").toLowerCase();
 
       return (
         garantiaId.includes(term) ||
@@ -146,7 +148,12 @@ export default function CaixaDeEntradaPage() {
     setLoadingGarantias(true);
     try {
       const list = await QualidadeApi.listarGarantias();
-      setGarantias(list);
+      const sorted = [...list].sort((a, b) => {
+        const aTime = new Date(a.dataCriacao).getTime();
+        const bTime = new Date(b.dataCriacao).getTime();
+        return bTime - aTime;
+      });
+      setGarantias(sorted);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar garantias para vinculo.");
     } finally {
@@ -290,6 +297,7 @@ export default function CaixaDeEntradaPage() {
                 {filteredEmails.map((email) => {
                   const active = email.id === selectedEmailId;
                   const preview = buildEmailPreview(email.corpoHtml);
+                  const garantiaLabel = email.notaInterna?.trim() ? email.notaInterna : String(email.garantiaId ?? "");
                   return (
                     <li
                       key={email.id}
@@ -318,7 +326,7 @@ export default function CaixaDeEntradaPage() {
                                 : "bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
                             }`}
                           >
-                            {email.garantiaId ? `Garantia #${email.garantiaId}` : "Nao vinculado"}
+                            {email.garantiaId ? `Garantia #${garantiaLabel}` : "Nao vinculado"}
                           </span>
                           {email.attachments.length > 0 && (
                             <span className="font-medium text-primary">{email.attachments.length} anexo(s)</span>
@@ -450,7 +458,7 @@ export default function CaixaDeEntradaPage() {
 
       {linkingEmailId && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg">
+          <div className="w-full max-w-6xl rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vincular e-mail a garantia</h3>
               <button
@@ -471,19 +479,46 @@ export default function CaixaDeEntradaPage() {
                 className="w-full rounded-md border border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark-2 px-3 py-2 text-sm"
                 disabled={loadingGarantias || submittingLink}
               />
-              <select
-                value={selectedGarantiaId}
-                onChange={(event) => setSelectedGarantiaId(event.target.value)}
-                className="w-full rounded-md border border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark-2 px-3 py-2 text-sm"
-                disabled={loadingGarantias || submittingLink}
-              >
-                <option value="">Selecione uma garantia</option>
-                {filteredGarantias.map((garantia) => (
-                  <option key={garantia.id} value={garantia.id.toString()}>
-                    #{garantia.id} - {garantia.notaInterna || garantia.nomeFornecedor}
-                  </option>
-                ))}
-              </select>
+              <div className="max-h-[52vh] overflow-auto pr-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                  {filteredGarantias.map((garantia) => {
+                    const isSelected = selectedGarantiaId === garantia.id.toString();
+                    const status = getStatusDefinition(garantia.status);
+                    const statusLabel = status?.label ?? "Status desconhecido";
+                    const statusColor = status?.color ?? "#6B7280";
+                    const statusBackground = status?.background ?? "rgba(107,114,128,0.15)";
+
+                    return (
+                      <button
+                        key={garantia.id}
+                        type="button"
+                        onClick={() => setSelectedGarantiaId(garantia.id.toString())}
+                        className={`text-left rounded-lg border p-3 transition ${
+                          isSelected
+                            ? "border-sky-500 ring-2 ring-sky-200 dark:ring-sky-900"
+                            : "border-gray-200 dark:border-strokedark hover:border-sky-400"
+                        }`}
+                        disabled={submittingLink}
+                      >
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Fornecedor</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{garantia.nomeFornecedor || "--"}</p>
+
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Garantia</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                          Garantia #{garantia.notaInterna || garantia.id}
+                        </p>
+
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Abertura</p>
+                        <p className="text-sm text-gray-800 dark:text-gray-100">{formatDate(garantia.dataCriacao)}</p>
+
+                        <div className="mt-3">
+                          <StatusChip label={statusLabel} color={statusColor} background={statusBackground} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               {loadingGarantias && <p className="text-xs text-gray-500">Carregando garantias...</p>}
               {!loadingGarantias && filteredGarantias.length === 0 && (
                 <p className="text-xs text-gray-500">Nenhuma garantia encontrada para o filtro informado.</p>
