@@ -163,17 +163,17 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="p-8">
-      {/* Valor total no topo */}
-      <div className="mb-4 flex items-center gap-8">
-        <div className="text-2xl font-bold text-primary">Valor Total: R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-      </div>
-
       {/* Cabeçalho com pedido_cotacao */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">
           Pedido de Cotação: {pedidoData.pedido_cotacao}
         </h1>
         <p className="text-gray-600">Fornecedor: {pedidoData.for_codigo}</p>
+      </div>
+
+      {/* Valor total no topo */}
+      <div className="mb-4 flex items-center gap-8">
+        <div className="text-2xl font-bold text-primary">Valor Total: R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
       </div>
 
       {/* Tabela de itens */}
