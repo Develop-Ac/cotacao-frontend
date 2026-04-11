@@ -8,7 +8,20 @@ import { QualidadeApi } from "@/lib/qualidade/api";
 import { Garantia, InboxEmail } from "@/lib/qualidade/types";
 import { formatDate, formatDateTime, stripHtml } from "@/lib/qualidade/formatters";
 import { getStatusDefinition } from "@/lib/qualidade/status";
-import { MdArrowBack, MdClose, MdDeleteOutline, MdLink, MdOpenInNew, MdRefresh, MdSync } from "react-icons/md";
+import {
+  MdArrowBack,
+  MdAttachFile,
+  MdClose,
+  MdDeleteOutline,
+  MdDescription,
+  MdDownload,
+  MdImage,
+  MdLink,
+  MdOpenInNew,
+  MdPictureAsPdf,
+  MdRefresh,
+  MdSync,
+} from "react-icons/md";
 
 type InboxFilter = "all" | "linked" | "unlinked";
 
@@ -26,6 +39,59 @@ const buildEmailPreview = (html?: string | null): string => {
     .replace(/&gt;/gi, ">")
     .replace(/\s+/g, " ")
     .trim();
+};
+
+const formatFileSize = (sizeBytes?: number) => {
+  if (!sizeBytes || sizeBytes <= 0) return "Tamanho não informado";
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  const kb = sizeBytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+};
+
+const getAttachmentDescriptor = (attachment: InboxEmail["attachments"][number]) => {
+  const filename = (attachment.filename || "anexo").toLowerCase();
+  const mime = (attachment.mimeType || "").toLowerCase();
+
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(filename)) {
+    return { icon: MdImage, label: "Imagem" };
+  }
+
+  if (mime.includes("pdf") || filename.endsWith(".pdf")) {
+    return { icon: MdPictureAsPdf, label: "PDF" };
+  }
+
+  return { icon: MdDescription, label: "Arquivo" };
+};
+
+const sanitizeEmailHtml = (html?: string | null): string => {
+  if (!html) return "";
+  return html
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+=\'[^\']*\'/gi, "");
+};
+
+const normalizeInlineToken = (value?: string | null): string => {
+  if (!value) return "";
+  return value.trim().replace(/^<|>$/g, "").toLowerCase();
+};
+
+const extractCidCandidates = (cidSource: string): string[] => {
+  const normalized = normalizeInlineToken(cidSource);
+  if (!normalized) return [];
+
+  const candidates = new Set<string>();
+  candidates.add(normalized);
+
+  const beforeAt = normalized.split("@")[0];
+  if (beforeAt) candidates.add(beforeAt);
+
+  const withoutBrackets = normalized.replace(/[<>]/g, "");
+  if (withoutBrackets) candidates.add(withoutBrackets);
+
+  return Array.from(candidates);
 };
 
 export default function CaixaDeEntradaPage() {
@@ -46,6 +112,7 @@ export default function CaixaDeEntradaPage() {
   const [garantiaSearchTerm, setGarantiaSearchTerm] = useState("");
   const [submittingLink, setSubmittingLink] = useState(false);
   const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
+  const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
 
   const carregar = useCallback(async () => {
     setUpdating(true);
@@ -116,13 +183,108 @@ export default function CaixaDeEntradaPage() {
     });
   }, [garantiaSearchTerm, garantias]);
 
-  const selectedEmailHtml = useMemo(() => {
-    if (!selectedEmail?.corpoHtml) return "";
-    return selectedEmail.corpoHtml
-      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-      .replace(/\son\w+=\"[^\"]*\"/gi, "")
-      .replace(/\son\w+=\'[^\']*\'/gi, "");
-  }, [selectedEmail]);
+  const resolveAttachmentUrl = useCallback(async (attachment: InboxEmail["attachments"][number]) => {
+    if (attachment.url && /^https?:\/\//i.test(attachment.url)) {
+      return attachment.url;
+    }
+
+    const storageKey = attachment.objectKey || attachment.path || attachment.url;
+    if (!storageKey) {
+      throw new Error("Anexo sem caminho para download.");
+    }
+
+    return QualidadeApi.gerarLinkArquivo(storageKey);
+  }, []);
+
+  const abrirAnexo = useCallback(
+    async (attachment: InboxEmail["attachments"][number]) => {
+      const url = await resolveAttachmentUrl(attachment);
+      window.open(url, "_blank", "noopener,noreferrer");
+    },
+    [resolveAttachmentUrl],
+  );
+
+  const baixarAnexo = useCallback(
+    async (attachment: InboxEmail["attachments"][number]) => {
+      const url = await resolveAttachmentUrl(attachment);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.download = attachment.filename || "anexo";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    },
+    [resolveAttachmentUrl],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const prepareEmailHtml = async () => {
+      if (!selectedEmail?.corpoHtml) {
+        if (!cancelled) setSelectedEmailHtml("");
+        return;
+      }
+
+      const baseHtml = sanitizeEmailHtml(selectedEmail.corpoHtml);
+      const cidMatches = Array.from(baseHtml.matchAll(/src\s*=\s*(["'])cid:([^"']+)\1/gi));
+      if (!cidMatches.length) {
+        if (!cancelled) setSelectedEmailHtml(baseHtml);
+        return;
+      }
+
+      const attachmentUrlByToken = new Map<string, string>();
+      const attachments = selectedEmail.attachments || [];
+
+      for (const attachment of attachments) {
+        const tokens = new Set<string>();
+        const contentId = normalizeInlineToken(attachment.contentId);
+        const filename = normalizeInlineToken(attachment.filename);
+        if (contentId) {
+          tokens.add(contentId);
+          const beforeAt = contentId.split("@")[0];
+          if (beforeAt) tokens.add(beforeAt);
+        }
+        if (filename) tokens.add(filename);
+
+        if (!tokens.size) continue;
+
+        let url: string;
+        try {
+          url = await resolveAttachmentUrl(attachment);
+        } catch {
+          continue;
+        }
+
+        for (const token of tokens) {
+          if (!attachmentUrlByToken.has(token)) {
+            attachmentUrlByToken.set(token, url);
+          }
+        }
+      }
+
+      const rewritten = baseHtml.replace(/src\s*=\s*(["'])cid:([^"']+)\1/gi, (full, quote: string, cidValue: string) => {
+        const candidates = extractCidCandidates(cidValue);
+        for (const candidate of candidates) {
+          const mappedUrl = attachmentUrlByToken.get(candidate);
+          if (mappedUrl) {
+            return `src=${quote}${mappedUrl}${quote}`;
+          }
+        }
+        return full;
+      });
+
+      if (!cancelled) setSelectedEmailHtml(rewritten);
+    };
+
+    void prepareEmailHtml();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resolveAttachmentUrl, selectedEmail]);
 
   const sincronizar = async () => {
     setSyncing(true);
@@ -412,6 +574,57 @@ export default function CaixaDeEntradaPage() {
                           Cc: <span className="font-medium break-all">{selectedEmail.ccList.join(", ")}</span>
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {selectedEmail.attachments.length > 0 && (
+                    <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                        <MdAttachFile size={16} />
+                        Anexos ({selectedEmail.attachments.length})
+                      </div>
+                      <div className="space-y-2">
+                        {selectedEmail.attachments.map((attachment, index) => {
+                          const descriptor = getAttachmentDescriptor(attachment);
+                          const Icon = descriptor.icon;
+                          return (
+                            <div
+                              key={`${attachment.filename}-${index}`}
+                              className="rounded-lg border border-gray-200 dark:border-strokedark px-3 py-2 bg-gray-50/70 dark:bg-boxdark-2"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0 flex items-center gap-2">
+                                  <Icon size={18} className="text-sky-600 dark:text-sky-300 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={attachment.filename}>
+                                      {attachment.filename}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      {descriptor.label} • {formatFileSize(attachment.sizeBytes)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao abrir anexo."))}
+                                    className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-boxdark"
+                                  >
+                                    Abrir
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => baixarAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao baixar anexo."))}
+                                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20"
+                                  >
+                                    <MdDownload size={14} /> Baixar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 

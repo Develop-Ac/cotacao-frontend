@@ -67,6 +67,9 @@ export interface Garantia {
 export interface EmailAnexo {
   filename: string;
   url?: string;
+  objectKey?: string;
+  path?: string;
+  contentId?: string;
   sizeBytes?: number;
   mimeType?: string;
 }

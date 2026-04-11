@@ -315,8 +315,11 @@ const toInboxEmail = (payload: Record<string, unknown>): InboxEmail => ({
     ? ((payload.attachments ?? payload.anexos) as Array<Record<string, unknown>>).map((item) => ({
         filename: String(item.filename ?? item.nome ?? "Anexo"),
         url: item.url?.toString(),
+        objectKey: item.object_key?.toString() ?? item.objectKey?.toString() ?? item.path_ficheiro?.toString(),
+        path: item.path_ficheiro?.toString() ?? item.path?.toString() ?? item.caminho?.toString(),
+        contentId: item.content_id?.toString() ?? item.contentId?.toString(),
         sizeBytes: toNumber(item.size_bytes ?? item.sizeBytes),
-        mimeType: item.mime_type?.toString(),
+        mimeType: item.mime_type?.toString() ?? item.mimeType?.toString() ?? item.type?.toString(),
       }))
     : [],
 });
