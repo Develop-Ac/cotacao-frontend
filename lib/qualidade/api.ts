@@ -315,8 +315,27 @@ const toInboxEmail = (payload: Record<string, unknown>): InboxEmail => ({
     ? ((payload.attachments ?? payload.anexos) as Array<Record<string, unknown>>).map((item) => ({
         filename: String(item.filename ?? item.nome ?? "Anexo"),
         url: item.url?.toString(),
-        objectKey: item.object_key?.toString() ?? item.objectKey?.toString() ?? item.path_ficheiro?.toString(),
-        path: item.path_ficheiro?.toString() ?? item.path?.toString() ?? item.caminho?.toString(),
+        objectKey:
+          item.object_key?.toString() ??
+          item.objectKey?.toString() ??
+          item.storage_key?.toString() ??
+          item.storageKey?.toString() ??
+          item.file_key?.toString() ??
+          item.fileKey?.toString() ??
+          item.minio_key?.toString() ??
+          item.minioKey?.toString() ??
+          item.s3_key?.toString() ??
+          item.s3Key?.toString() ??
+          item.key?.toString() ??
+          item.path_ficheiro?.toString(),
+        path:
+          item.path_ficheiro?.toString() ??
+          item.file_path?.toString() ??
+          item.filePath?.toString() ??
+          item.path?.toString() ??
+          item.caminho?.toString() ??
+          item.location?.toString() ??
+          item.uri?.toString(),
         contentId: item.content_id?.toString() ?? item.contentId?.toString(),
         sizeBytes: toNumber(item.size_bytes ?? item.sizeBytes),
         mimeType: item.mime_type?.toString() ?? item.mimeType?.toString() ?? item.type?.toString(),

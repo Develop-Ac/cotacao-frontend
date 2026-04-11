@@ -94,6 +94,38 @@ const extractCidCandidates = (cidSource: string): string[] => {
   return Array.from(candidates);
 };
 
+const pickAttachmentStorageKey = (attachment: Record<string, unknown>): string => {
+  const candidates = [
+    attachment.objectKey,
+    attachment.object_key,
+    attachment.storageKey,
+    attachment.storage_key,
+    attachment.fileKey,
+    attachment.file_key,
+    attachment.minioKey,
+    attachment.minio_key,
+    attachment.s3Key,
+    attachment.s3_key,
+    attachment.key,
+    attachment.path,
+    attachment.path_ficheiro,
+    attachment.filePath,
+    attachment.file_path,
+    attachment.caminho,
+    attachment.url,
+    attachment.location,
+    attachment.uri,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "";
+};
+
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
   const [emails, setEmails] = useState<InboxEmail[]>([]);
@@ -184,11 +216,14 @@ export default function CaixaDeEntradaPage() {
   }, [garantiaSearchTerm, garantias]);
 
   const resolveAttachmentUrl = useCallback(async (attachment: InboxEmail["attachments"][number]) => {
-    if (attachment.url && /^https?:\/\//i.test(attachment.url)) {
-      return attachment.url;
+    if (attachment.url?.trim()) {
+      const trimmedUrl = attachment.url.trim();
+      if (/^https?:\/\//i.test(trimmedUrl)) {
+        return trimmedUrl;
+      }
     }
 
-    const storageKey = attachment.objectKey || attachment.path || attachment.url;
+    const storageKey = pickAttachmentStorageKey(attachment as unknown as Record<string, unknown>);
     if (!storageKey) {
       throw new Error("Anexo sem caminho para download.");
     }
