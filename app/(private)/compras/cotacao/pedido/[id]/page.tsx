@@ -43,6 +43,15 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkboxStates, setCheckboxStates] = useState<{[key: string]: {Carlos: boolean, Renato: boolean}}>({});
+  // Valor total calculado após pedidoData estar disponível
+  let valorTotal = 0;
+  if (pedidoData?.itens) {
+    valorTotal = pedidoData.itens.reduce((acc, item) => {
+      const quantidade = Number(item.quantidade) || 0;
+      const valor = parseFloat(item.valor_unitario) || 0;
+      return acc + quantidade * valor;
+    }, 0);
+  }
 
   const updateCheckbox = async (itemId: string, field: 'Carlos' | 'Renato', value: boolean) => {
     // Atualizar estado local primeiro
@@ -154,6 +163,11 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="p-8">
+      {/* Valor total no topo */}
+      <div className="mb-4 flex items-center gap-8">
+        <div className="text-2xl font-bold text-primary">Valor Total: R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+      </div>
+
       {/* Cabeçalho com pedido_cotacao */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">
