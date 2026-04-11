@@ -264,14 +264,20 @@ export default function CaixaDeEntradaPage() {
   const baixarAnexo = useCallback(
     async (attachment: InboxEmail["attachments"][number]) => {
       const url = await resolveAttachmentUrl(attachment);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Nao foi possivel baixar o anexo.");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
+      anchor.href = objectUrl;
       anchor.download = attachment.filename || "anexo";
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
     },
     [resolveAttachmentUrl],
   );
