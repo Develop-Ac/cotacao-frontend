@@ -126,6 +126,17 @@ const pickAttachmentStorageKey = (attachment: Record<string, unknown>): string =
   return "";
 };
 
+const buildAttachmentDataUrl = (attachment: InboxEmail["attachments"][number]): string => {
+  const rawBase64 = attachment.contentBase64?.trim();
+  if (!rawBase64) return "";
+
+  const alreadyDataUrl = /^data:[^;]+;base64,/i.test(rawBase64);
+  if (alreadyDataUrl) return rawBase64;
+
+  const mime = attachment.mimeType?.trim() || "application/octet-stream";
+  return `data:${mime};base64,${rawBase64}`;
+};
+
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
   const [emails, setEmails] = useState<InboxEmail[]>([]);
@@ -224,11 +235,22 @@ export default function CaixaDeEntradaPage() {
     }
 
     const storageKey = pickAttachmentStorageKey(attachment as unknown as Record<string, unknown>);
-    if (!storageKey) {
-      throw new Error("Anexo sem caminho para download.");
+    if (storageKey) {
+      return QualidadeApi.gerarLinkArquivo(storageKey);
     }
 
-    return QualidadeApi.gerarLinkArquivo(storageKey);
+    const dataUrl = buildAttachmentDataUrl(attachment);
+    if (dataUrl) {
+      return dataUrl;
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      // Log temporario para identificar formatos inesperados vindos do n8n.
+      // eslint-disable-next-line no-console
+      console.debug("[caixa] anexo sem chave/caminho/base64", attachment);
+    }
+
+    throw new Error("Anexo sem caminho para download.");
   }, []);
 
   const abrirAnexo = useCallback(

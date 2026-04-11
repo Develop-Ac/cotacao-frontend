@@ -70,6 +70,7 @@ export interface EmailAnexo {
   objectKey?: string;
   path?: string;
   contentId?: string;
+  contentBase64?: string;
   sizeBytes?: number;
   mimeType?: string;
 }

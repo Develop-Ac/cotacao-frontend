@@ -337,6 +337,11 @@ const toInboxEmail = (payload: Record<string, unknown>): InboxEmail => ({
           item.location?.toString() ??
           item.uri?.toString(),
         contentId: item.content_id?.toString() ?? item.contentId?.toString(),
+        contentBase64:
+          item.content_base64?.toString() ??
+          item.contentBase64?.toString() ??
+          item.base64?.toString() ??
+          item.content?.toString(),
         sizeBytes: toNumber(item.size_bytes ?? item.sizeBytes),
         mimeType: item.mime_type?.toString() ?? item.mimeType?.toString() ?? item.type?.toString(),
       }))
