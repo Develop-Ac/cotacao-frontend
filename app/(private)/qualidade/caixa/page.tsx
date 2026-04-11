@@ -227,16 +227,16 @@ export default function CaixaDeEntradaPage() {
   }, [garantiaSearchTerm, garantias]);
 
   const resolveAttachmentUrl = useCallback(async (attachment: InboxEmail["attachments"][number]) => {
+    const storageKey = pickAttachmentStorageKey(attachment as unknown as Record<string, unknown>);
+    if (storageKey) {
+      return QualidadeApi.gerarLinkArquivo(storageKey);
+    }
+
     if (attachment.url?.trim()) {
       const trimmedUrl = attachment.url.trim();
       if (/^https?:\/\//i.test(trimmedUrl)) {
         return trimmedUrl;
       }
-    }
-
-    const storageKey = pickAttachmentStorageKey(attachment as unknown as Record<string, unknown>);
-    if (storageKey) {
-      return QualidadeApi.gerarLinkArquivo(storageKey);
     }
 
     const dataUrl = buildAttachmentDataUrl(attachment);
