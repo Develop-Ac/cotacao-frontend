@@ -203,12 +203,6 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Valor Unitário
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Média 12M
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Média 3M
-                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
                   <input
                     type="checkbox"
@@ -260,12 +254,6 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     R$ {parseFloat(item.valor_unitario).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.MEDIA_MENSAL_12M ? item.MEDIA_MENSAL_12M.toFixed(2) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.MEDIA_MENSAL_3M ? item.MEDIA_MENSAL_3M.toFixed(2) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <input 
