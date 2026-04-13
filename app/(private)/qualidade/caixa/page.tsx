@@ -147,6 +147,7 @@ export default function CaixaDeEntradaPage() {
   const [submittingLink, setSubmittingLink] = useState(false);
   const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
   const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
+  const [emailIframeHeight, setEmailIframeHeight] = useState(720);
   const carregar = useCallback(async () => {
     setUpdating(true);
     try {
@@ -271,6 +272,44 @@ export default function CaixaDeEntradaPage() {
     },
     [resolveAttachmentUrl],
   );
+
+  const handleEmailIframeLoad = useCallback((event: React.SyntheticEvent<HTMLIFrameElement>) => {
+    const iframe = event.currentTarget as HTMLIFrameElement & { __resizeObserver?: ResizeObserver };
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+
+    const updateHeight = () => {
+      const body = doc.body;
+      const html = doc.documentElement;
+      if (!body || !html) return;
+      const nextHeight = Math.max(
+        body.scrollHeight,
+        body.offsetHeight,
+        html.scrollHeight,
+        html.offsetHeight,
+      );
+      if (Number.isFinite(nextHeight) && nextHeight > 0) {
+        setEmailIframeHeight(Math.min(Math.max(nextHeight + 8, 320), 20000));
+      }
+    };
+
+    iframe.__resizeObserver?.disconnect();
+    updateHeight();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => updateHeight());
+      observer.observe(doc.body);
+      observer.observe(doc.documentElement);
+      iframe.__resizeObserver = observer;
+    }
+
+    window.setTimeout(updateHeight, 200);
+    window.setTimeout(updateHeight, 800);
+  }, []);
+
+  useEffect(() => {
+    setEmailIframeHeight(720);
+  }, [selectedEmail?.id, selectedEmailHtml]);
 
   useEffect(() => {
     let cancelled = false;
@@ -590,129 +629,116 @@ export default function CaixaDeEntradaPage() {
                 </div>
               ) : (
                 <div className="flex h-full flex-col overflow-hidden transition-opacity duration-300">
-                  <div className="shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3 bg-white dark:bg-boxdark">
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => setMobileReading(false)}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 lg:hidden"
-                      >
-                        <MdArrowBack size={15} /> Voltar para a lista
-                      </button>
-                      <h2 className="text-base font-semibold text-gray-900 dark:text-white break-words leading-5">{selectedEmail.assunto || "(sem assunto)"}</h2>
-                      <div className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                        <p className="min-w-0 break-all">
-                          De: <span className="font-medium">{selectedEmail.remetente}</span>
-                        </p>
-                        <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400 sm:text-sm sm:text-right">
-                          Recebido em {formatDateTime(selectedEmail.dataRecebimento)}
-                        </p>
+                  <div className="shrink-0 border-b border-slate-700 bg-slate-900 px-4 py-2 text-slate-100">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => setMobileReading(false)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-slate-300 lg:hidden"
+                        >
+                          <MdArrowBack size={15} /> Voltar para a lista
+                        </button>
+                        <h2 className="break-words text-base font-semibold leading-5 text-white">{selectedEmail.assunto || "(sem assunto)"}</h2>
+                        <div className="flex items-center justify-between gap-3 text-xs text-slate-300">
+                          <p className="min-w-0 truncate">
+                            De: <span className="font-medium text-slate-100">{selectedEmail.remetente}</span>
+                          </p>
+                          <p className="shrink-0 text-right">Recebido em {formatDateTime(selectedEmail.dataRecebimento)}</p>
+                        </div>
                       </div>
+                      {selectedEmail.garantiaId && (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/qualidade/${selectedEmail.garantiaId}`)}
+                          className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-slate-700"
+                        >
+                          Ver garantia #{selectedEmail.notaInterna?.trim() || selectedEmail.garantiaId}
+                          <MdOpenInNew size={14} />
+                        </button>
+                      )}
                     </div>
-                    {selectedEmail.garantiaId && (
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/qualidade/${selectedEmail.garantiaId}`)}
-                        className="inline-flex items-center gap-2 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/30 transition"
-                      >
-                        Ver garantia #{selectedEmail.notaInterna?.trim() || selectedEmail.garantiaId}
-                        <MdOpenInNew size={14} />
-                      </button>
-                    )}
                   </div>
 
-                  <article className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-                    {selectedEmail.ccList.length > 0 && (
-                      <div className="mb-3 text-sm text-gray-600 dark:text-gray-300">
-                        <p>
-                          Cc: <span className="font-medium break-all">{selectedEmail.ccList.join(", ")}</span>
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedEmail.attachments.length > 0 && (
-                      <div className="mb-4 rounded-lg border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-3">
-                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                          <MdAttachFile size={15} />
-                          Anexos ({selectedEmail.attachments.length})
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                          {selectedEmail.attachments.map((attachment, index) => {
-                            const descriptor = getAttachmentDescriptor(attachment);
-                            const Icon = descriptor.icon;
-                            return (
-                              <div
-                                key={`${attachment.filename}-${index}`}
-                                className="rounded-lg border border-gray-200 dark:border-strokedark bg-gray-50/70 dark:bg-boxdark-2 p-2"
-                              >
-                                <div className="flex flex-col items-center gap-2 text-center">
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-300">
-                                    <Icon size={18} className="shrink-0" />
-                                  </div>
-                                  <p className="w-full truncate text-xs font-medium text-gray-900 dark:text-white" title={attachment.filename}>
-                                    {attachment.filename}
-                                  </p>
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => abrirAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao abrir anexo."))}
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-boxdark"
-                                      title={`Abrir ${attachment.filename || "anexo"}`}
-                                    >
-                                      <MdOpenInNew size={13} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => baixarAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao baixar anexo."))}
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20"
-                                      title={`Baixar ${attachment.filename || "anexo"}`}
-                                    >
-                                      <MdDownload size={13} />
-                                    </button>
-                                  </div>
+                  <article className="flex-1 min-h-0 overflow-hidden px-4 py-4">
+                    <div className="h-full min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white dark:border-strokedark dark:bg-boxdark">
+                      {selectedEmail.attachments.length > 0 && (
+                        <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-strokedark dark:bg-boxdark-2">
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                            {selectedEmail.attachments.map((attachment, index) => {
+                              const descriptor = getAttachmentDescriptor(attachment);
+                              const Icon = descriptor.icon;
+                              return (
+                                <div
+                                  key={`${attachment.filename}-${index}`}
+                                  className="flex min-w-0 items-center gap-2 rounded-md border border-gray-300 bg-white px-2 py-1.5 dark:border-strokedark dark:bg-boxdark"
+                                  title={attachment.filename}
+                                >
+                                  <Icon size={16} className="shrink-0 text-slate-500 dark:text-slate-300" />
+                                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800 dark:text-gray-200">
+                                    {attachment.filename || descriptor.label}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao abrir anexo."))}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-strokedark dark:text-gray-200 dark:hover:bg-boxdark-2"
+                                    title={`Abrir ${attachment.filename || "anexo"}`}
+                                  >
+                                    <MdOpenInNew size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => baixarAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao baixar anexo."))}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-strokedark dark:text-gray-200 dark:hover:bg-boxdark-2"
+                                    title={`Baixar ${attachment.filename || "anexo"}`}
+                                  >
+                                    <MdDownload size={12} />
+                                  </button>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {selectedEmailHtml ? (
-                      <div className="min-h-[420px] overflow-hidden rounded-lg border border-gray-200 dark:border-strokedark bg-white">
-                        <iframe
-                          title={`email-${selectedEmail.id}`}
-                          sandbox="allow-same-origin"
-                          className="block h-[min(72vh,980px)] w-full bg-white"
-                          srcDoc={`
-                            <html>
-                              <head>
-                                <meta charset="utf-8" />
-                                <style>
-                                  body {
-                                    margin: 0;
-                                    padding: 16px;
-                                    font-family: Segoe UI, Arial, sans-serif;
-                                    color: #1f2937;
-                                    line-height: 1.5;
-                                    word-break: break-word;
-                                  }
-                                  img { max-width: 100%; height: auto; }
-                                  table { max-width: 100%; }
-                                </style>
-                              </head>
-                              <body>${selectedEmailHtml}</body>
-                            </html>
-                          `}
-                        />
+                      <div className="p-3">
+                        {selectedEmailHtml ? (
+                          <iframe
+                            title={`email-${selectedEmail.id}`}
+                            sandbox="allow-same-origin"
+                            scrolling="no"
+                            onLoad={handleEmailIframeLoad}
+                            style={{ height: `${emailIframeHeight}px` }}
+                            className="block w-full bg-white"
+                            srcDoc={`
+                              <html>
+                                <head>
+                                  <meta charset="utf-8" />
+                                  <style>
+                                    body {
+                                      margin: 0;
+                                      padding: 16px;
+                                      font-family: Segoe UI, Arial, sans-serif;
+                                      color: #1f2937;
+                                      line-height: 1.5;
+                                      word-break: break-word;
+                                      overflow: hidden;
+                                    }
+                                    img { max-width: 100%; height: auto; }
+                                    table { max-width: 100%; }
+                                  </style>
+                                </head>
+                                <body>${selectedEmailHtml}</body>
+                              </html>
+                            `}
+                          />
+                        ) : (
+                          <p className="text-sm leading-6 text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words">
+                            {stripHtml(selectedEmail.corpoHtml) || "Sem conteudo exibivel."}
+                          </p>
+                        )}
                       </div>
-                    ) : (
-                      <div>
-                        <p className="text-sm leading-6 text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words">
-                          {stripHtml(selectedEmail.corpoHtml) || "Sem conteudo exibivel."}
-                        </p>
-                      </div>
-                    )}
+                    </div>
                   </article>
                 </div>
               )}
