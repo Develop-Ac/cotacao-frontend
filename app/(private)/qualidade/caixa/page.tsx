@@ -589,7 +589,7 @@ export default function CaixaDeEntradaPage() {
             <section
               className={`relative ${mobileReading ? "block" : "hidden lg:block"} transition-all duration-300 ease-out ${
                 selectedEmail ? "opacity-100 translate-x-0" : "opacity-60"
-              } lg:h-full lg:min-h-0`}
+              } lg:h-full lg:min-h-0 lg:overflow-hidden`}
             >
               {!selectedEmail ? (
                 <div className="h-full flex items-center justify-center text-center p-8">
@@ -599,7 +599,7 @@ export default function CaixaDeEntradaPage() {
                   </div>
                 </div>
               ) : (
-                <div className="h-full flex flex-col transition-opacity duration-300">
+                <div className="h-full flex flex-col overflow-hidden transition-opacity duration-300">
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3">
                     <div className="space-y-2 min-w-0">
                       <button
