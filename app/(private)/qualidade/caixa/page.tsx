@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
@@ -139,6 +139,7 @@ const buildAttachmentDataUrl = (attachment: InboxEmail["attachments"][number]): 
 
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
+  const sidebarRef = useRef<HTMLElement | null>(null);
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -156,6 +157,7 @@ export default function CaixaDeEntradaPage() {
   const [submittingLink, setSubmittingLink] = useState(false);
   const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
   const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
+  const [sidebarHeight, setSidebarHeight] = useState<number | null>(null);
 
   const carregar = useCallback(async () => {
     setUpdating(true);
@@ -174,6 +176,34 @@ export default function CaixaDeEntradaPage() {
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    const updateSidebarHeight = () => {
+      if (typeof window === "undefined") return;
+
+      if (window.innerWidth < 1024) {
+        setSidebarHeight(null);
+        return;
+      }
+
+      const sidebar = sidebarRef.current;
+      if (!sidebar) return;
+
+      const rect = sidebar.getBoundingClientRect();
+      const topOffset = Math.max(rect.top, 16);
+      const nextHeight = Math.max(window.innerHeight - topOffset - 16, 320);
+      setSidebarHeight((current) => (current === nextHeight ? current : nextHeight));
+    };
+
+    updateSidebarHeight();
+    window.addEventListener("resize", updateSidebarHeight);
+    window.addEventListener("scroll", updateSidebarHeight, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", updateSidebarHeight);
+      window.removeEventListener("scroll", updateSidebarHeight);
+    };
+  }, []);
 
   const filteredEmails = useMemo(() => {
     const filtered = emails.filter((email) => {
@@ -517,7 +547,9 @@ export default function CaixaDeEntradaPage() {
         ) : (
           <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px]">
             <aside
-              className={`border-r border-gray-200 dark:border-strokedark lg:self-start lg:sticky lg:top-4 lg:h-[calc(100vh-180px)] lg:overflow-hidden ${mobileReading ? "hidden lg:block" : "block"}`}
+              ref={sidebarRef}
+              style={sidebarHeight ? { height: `${sidebarHeight}px` } : undefined}
+              className={`border-r border-gray-200 dark:border-strokedark lg:self-start lg:sticky lg:top-4 lg:overflow-hidden ${mobileReading ? "hidden lg:block" : "block"}`}
             >
               <ul className="divide-y divide-gray-200 dark:divide-strokedark lg:h-full lg:overflow-y-auto">
                 {filteredEmails.map((email) => {
@@ -589,7 +621,7 @@ export default function CaixaDeEntradaPage() {
             <section
               className={`relative ${mobileReading ? "block" : "hidden lg:block"} transition-all duration-300 ease-out ${
                 selectedEmail ? "opacity-100 translate-x-0" : "opacity-60"
-              }`}
+              } lg:self-start lg:sticky lg:top-4 lg:h-[calc(100vh-180px)] lg:overflow-hidden`}
             >
               {!selectedEmail ? (
                 <div className="min-h-[400px] flex items-center justify-center text-center p-8">
@@ -599,8 +631,8 @@ export default function CaixaDeEntradaPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col transition-opacity duration-300">
-                  <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3">
+                <div className="flex h-full flex-col overflow-hidden transition-opacity duration-300">
+                  <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3 bg-white dark:bg-boxdark">
                     <div className="space-y-2 min-w-0">
                       <button
                         type="button"
@@ -628,7 +660,7 @@ export default function CaixaDeEntradaPage() {
                   </div>
 
                   {(selectedEmail.toList.length > 0 || selectedEmail.ccList.length > 0) && (
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                    <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark text-sm text-gray-600 dark:text-gray-300 space-y-1 bg-white dark:bg-boxdark">
                       {selectedEmail.toList.length > 0 && (
                         <p>
                           Para: <span className="font-medium break-all">{selectedEmail.toList.join(", ")}</span>
@@ -643,7 +675,7 @@ export default function CaixaDeEntradaPage() {
                   )}
 
                   {selectedEmail.attachments.length > 0 && (
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark">
+                    <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark">
                       <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
                         <MdAttachFile size={16} />
                         Anexos ({selectedEmail.attachments.length})
@@ -693,7 +725,7 @@ export default function CaixaDeEntradaPage() {
                     </div>
                   )}
 
-                  <article className="px-4 py-5">
+                  <article className="flex-1 overflow-auto px-4 py-5">
                     {selectedEmailHtml ? (
                       <iframe
                         title={`email-${selectedEmail.id}`}
