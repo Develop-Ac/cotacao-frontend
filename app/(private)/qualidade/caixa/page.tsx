@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
@@ -139,6 +139,7 @@ const buildAttachmentDataUrl = (attachment: InboxEmail["attachments"][number]): 
 
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
+  const viewportCardRef = useRef<HTMLDivElement | null>(null);
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -156,6 +157,7 @@ export default function CaixaDeEntradaPage() {
   const [submittingLink, setSubmittingLink] = useState(false);
   const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
   const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
+  const [viewportCardHeight, setViewportCardHeight] = useState<number | null>(null);
   const carregar = useCallback(async () => {
     setUpdating(true);
     try {
@@ -173,6 +175,29 @@ export default function CaixaDeEntradaPage() {
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    const updateViewportCardHeight = () => {
+      if (typeof window === "undefined") return;
+
+      const card = viewportCardRef.current;
+      if (!card) return;
+
+      const rect = card.getBoundingClientRect();
+      const bottomGap = 16;
+      const nextHeight = Math.max(window.innerHeight - rect.top - bottomGap, 360);
+      setViewportCardHeight((current) => (current === nextHeight ? current : nextHeight));
+    };
+
+    updateViewportCardHeight();
+    window.addEventListener("resize", updateViewportCardHeight);
+    window.addEventListener("scroll", updateViewportCardHeight, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", updateViewportCardHeight);
+      window.removeEventListener("scroll", updateViewportCardHeight);
+    };
+  }, []);
 
   const filteredEmails = useMemo(() => {
     const filtered = emails.filter((email) => {
@@ -428,7 +453,7 @@ export default function CaixaDeEntradaPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 lg:p-6 h-full">
+    <div className="flex min-h-0 flex-col gap-4 p-4 lg:p-6">
       <PageHeader title="Inbox de Garantias" subtitle="Integração direta com qualidade@ac" onBack={() => router.back()}>
         <ActionButton
           label="Sincronizar"
@@ -446,7 +471,11 @@ export default function CaixaDeEntradaPage() {
         />
       </PageHeader>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div
+        ref={viewportCardRef}
+        style={viewportCardHeight ? { height: `${viewportCardHeight}px` } : undefined}
+        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark flex flex-col min-h-0 overflow-hidden"
+      >
           <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="inline-flex rounded-lg border border-gray-200 dark:border-strokedark overflow-hidden w-full lg:w-auto">
             <button
@@ -514,9 +543,9 @@ export default function CaixaDeEntradaPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ajuste o filtro ou clique em sincronizar para atualizar a caixa.</p>
           </div>
         ) : (
-          <div className="flex-1 min-h-0 grid lg:grid-cols-[380px_minmax(0,1fr)] overflow-hidden">
+          <div className="flex-1 min-h-0 grid h-full lg:grid-cols-[380px_minmax(0,1fr)] overflow-hidden">
             <aside
-              className={`border-r border-gray-200 dark:border-strokedark overflow-y-auto ${mobileReading ? "hidden lg:block" : "block"}`}
+              className={`h-full border-r border-gray-200 dark:border-strokedark overflow-y-auto ${mobileReading ? "hidden lg:block" : "block"}`}
             >
               <ul className="divide-y divide-gray-200 dark:divide-strokedark">
                 {filteredEmails.map((email) => {
@@ -586,12 +615,12 @@ export default function CaixaDeEntradaPage() {
             </aside>
 
             <section
-              className={`relative flex flex-col overflow-hidden transition-all duration-300 ease-out ${mobileReading ? "flex" : "hidden lg:flex"} ${
+              className={`relative h-full flex-col overflow-hidden transition-all duration-300 ease-out ${mobileReading ? "flex" : "hidden lg:flex"} ${
                 selectedEmail ? "opacity-100" : "opacity-60"
               }`}
             >
               {!selectedEmail ? (
-                <div className="min-h-[400px] flex items-center justify-center text-center p-8">
+                <div className="flex h-full items-center justify-center text-center p-8">
                   <div>
                     <p className="text-lg font-semibold text-gray-900 dark:text-white">Selecione um e-mail</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ao selecionar, o conteudo sera exibido aqui como painel de leitura.</p>
@@ -692,48 +721,41 @@ export default function CaixaDeEntradaPage() {
                     </div>
                   )}
 
-                  <article className="flex-1 min-h-0 overflow-auto px-4 py-5">
+                  <article className="flex-1 min-h-0 overflow-hidden px-4 py-5">
                     {selectedEmailHtml ? (
-                      <iframe
-                        title={`email-${selectedEmail.id}`}
-                        sandbox="allow-same-origin"
-                        className="w-full rounded-lg border border-gray-200 dark:border-strokedark bg-white block"
-                        style={{ minHeight: "200px" }}
-                        onLoad={(e) => {
-                          try {
-                            const doc = e.currentTarget.contentDocument;
-                            if (doc?.body) {
-                              e.currentTarget.style.height = `${doc.body.scrollHeight + 32}px`;
-                            }
-                          } catch {
-                            // cross-origin fallback
-                          }
-                        }}
-                        srcDoc={`
-                          <html>
-                            <head>
-                              <meta charset="utf-8" />
-                              <style>
-                                body {
-                                  margin: 0;
-                                  padding: 16px;
-                                  font-family: Segoe UI, Arial, sans-serif;
-                                  color: #1f2937;
-                                  line-height: 1.5;
-                                  word-break: break-word;
-                                }
-                                img { max-width: 100%; height: auto; }
-                                table { max-width: 100%; }
-                              </style>
-                            </head>
-                            <body>${selectedEmailHtml}</body>
-                          </html>
-                        `}
-                      />
+                      <div className="h-full min-h-[260px] overflow-hidden rounded-lg border border-gray-200 dark:border-strokedark bg-white">
+                        <iframe
+                          title={`email-${selectedEmail.id}`}
+                          sandbox="allow-same-origin"
+                          className="block h-full w-full bg-white"
+                          srcDoc={`
+                            <html>
+                              <head>
+                                <meta charset="utf-8" />
+                                <style>
+                                  body {
+                                    margin: 0;
+                                    padding: 16px;
+                                    font-family: Segoe UI, Arial, sans-serif;
+                                    color: #1f2937;
+                                    line-height: 1.5;
+                                    word-break: break-word;
+                                  }
+                                  img { max-width: 100%; height: auto; }
+                                  table { max-width: 100%; }
+                                </style>
+                              </head>
+                              <body>${selectedEmailHtml}</body>
+                            </html>
+                          `}
+                        />
+                      </div>
                     ) : (
-                      <p className="text-sm leading-6 text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words">
-                        {stripHtml(selectedEmail.corpoHtml) || "Sem conteudo exibivel."}
-                      </p>
+                      <div className="h-full overflow-y-auto">
+                        <p className="text-sm leading-6 text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words">
+                          {stripHtml(selectedEmail.corpoHtml) || "Sem conteudo exibivel."}
+                        </p>
+                      </div>
                     )}
                   </article>
                 </div>
