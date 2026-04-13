@@ -30,9 +30,9 @@ import { InfoLine } from "@/components/qualidade/InfoLine";
 import { FormModal } from "@/components/qualidade/FormModal";
 import { NovaGarantiaForm } from "@/components/qualidade/NovaGarantiaForm";
 import { QualidadeApi } from "@/lib/qualidade/api";
-import { Garantia, TimelineItem, UploadAttachment } from "@/lib/qualidade/types";
+import { Garantia, TimelineEmailItem, TimelineItem, UploadAttachment } from "@/lib/qualidade/types";
 import { STATUS_CODES, STATUS_FLOW, getStatusDefinition } from "@/lib/qualidade/status";
-import { formatCurrency, formatDate, formatDateTime, parseBrDate, parseCurrencyInput } from "@/lib/qualidade/formatters";
+import { formatCurrency, formatDate, formatDateTime, parseBrDate, parseCurrencyInput, stripHtml } from "@/lib/qualidade/formatters";
 import { FaChevronLeft, FaChevronRight, FaDownload, FaTimes } from "react-icons/fa";
 
 type AbatimentoRow = { nf: string; parcela: string; vencimento: string; valor: string };
@@ -82,6 +82,20 @@ const isImageAttachment = (anexo?: Garantia["anexos"][number]) => {
   const name = anexo.nome?.toLowerCase() ?? "";
   const caminho = anexo.caminho?.toLowerCase() ?? "";
   return /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(name) || /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(caminho);
+};
+
+const sanitizeEmailHtml = (html?: string | null): string => {
+  if (!html) return "";
+  return html
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+=\'[^\']*\'/gi, "");
+};
+
+const summarizeEmailText = (html?: string | null, maxChars = 120): string => {
+  const clean = stripHtml(html ?? "").replace(/\s+/g, " ").trim();
+  if (clean.length <= maxChars) return clean;
+  return `${clean.slice(0, maxChars).trim()}...`;
 };
 
 const FINAL_STATUS_CODES = new Set<number>([
@@ -289,6 +303,7 @@ export default function GarantiaDetalhePage() {
   const [envioFrete, setEnvioFrete] = useState<"fornecedor" | "loja">("fornecedor");
   const [envioCorreio, setEnvioCorreio] = useState(false);
   const [codigoObjeto, setCodigoObjeto] = useState("");
+  const [emailHistoricoAberto, setEmailHistoricoAberto] = useState<TimelineEmailItem | null>(null);
   const [anexoViewerOpen, setAnexoViewerOpen] = useState(false);
   const [anexoViewerIndex, setAnexoViewerIndex] = useState(0);
   const [anexoViewerLoading, setAnexoViewerLoading] = useState(false);
@@ -1147,7 +1162,13 @@ export default function GarantiaDetalhePage() {
             {garantia.timeline.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma interação registrada ainda.</p>
             ) : (
-              garantia.timeline.map((item) => <TimelineItemCard key={item.id} item={item} />)
+              garantia.timeline.map((item) => (
+                <TimelineItemCard
+                  key={item.id}
+                  item={item}
+                  onOpenEmail={(email) => setEmailHistoricoAberto(email)}
+                />
+              ))
             )}
           </SectionCard>
 
@@ -1242,6 +1263,61 @@ export default function GarantiaDetalhePage() {
           <p className="text-lg font-semibold text-gray-900 dark:text-white">Nenhum dado encontrado.</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">{error ?? "Tente atualizar para buscar novamente."}</p>
           <ActionButton label="Tentar novamente" icon={<MdRefresh size={18} />} onClick={carregar} />
+        </div>
+      )}
+
+      {emailHistoricoAberto && (
+        <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="w-full max-w-5xl rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3">
+              <div className="space-y-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{emailHistoricoAberto.assunto || "(sem assunto)"}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                  De: {emailHistoricoAberto.remetente}
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                  Para: {emailHistoricoAberto.destinatarios || "Não informado"}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  Resumo: {summarizeEmailText(emailHistoricoAberto.corpoHtml, 120) || "Sem conteúdo exibível."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEmailHistoricoAberto(null)}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200"
+              >
+                Fechar
+              </button>
+            </div>
+            <div className="h-[70vh] bg-white">
+              <iframe
+                title={`historico-email-${emailHistoricoAberto.id}`}
+                sandbox="allow-same-origin"
+                className="block h-full w-full bg-white"
+                srcDoc={`
+                  <html>
+                    <head>
+                      <meta charset="utf-8" />
+                      <style>
+                        body {
+                          margin: 0;
+                          padding: 16px;
+                          font-family: Segoe UI, Arial, sans-serif;
+                          color: #1f2937;
+                          line-height: 1.5;
+                          word-break: break-word;
+                        }
+                        img { max-width: 100%; height: auto; }
+                        table { max-width: 100%; }
+                      </style>
+                    </head>
+                    <body>${sanitizeEmailHtml(emailHistoricoAberto.corpoHtml)}</body>
+                  </html>
+                `}
+              />
+            </div>
+          </div>
         </div>
       )}
 
