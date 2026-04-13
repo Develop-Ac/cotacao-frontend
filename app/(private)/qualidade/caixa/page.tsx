@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
@@ -139,7 +139,6 @@ const buildAttachmentDataUrl = (attachment: InboxEmail["attachments"][number]): 
 
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
-  const viewportCardRef = useRef<HTMLDivElement | null>(null);
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -157,7 +156,6 @@ export default function CaixaDeEntradaPage() {
   const [submittingLink, setSubmittingLink] = useState(false);
   const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
   const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
-  const [viewportCardHeight, setViewportCardHeight] = useState<number | null>(null);
   const carregar = useCallback(async () => {
     setUpdating(true);
     try {
@@ -175,29 +173,6 @@ export default function CaixaDeEntradaPage() {
   useEffect(() => {
     carregar();
   }, [carregar]);
-
-  useEffect(() => {
-    const updateViewportCardHeight = () => {
-      if (typeof window === "undefined") return;
-
-      const card = viewportCardRef.current;
-      if (!card) return;
-
-      const rect = card.getBoundingClientRect();
-      const bottomGap = 16;
-      const nextHeight = Math.max(window.innerHeight - rect.top - bottomGap, 360);
-      setViewportCardHeight((current) => (current === nextHeight ? current : nextHeight));
-    };
-
-    updateViewportCardHeight();
-    window.addEventListener("resize", updateViewportCardHeight);
-    window.addEventListener("scroll", updateViewportCardHeight, { passive: true });
-
-    return () => {
-      window.removeEventListener("resize", updateViewportCardHeight);
-      window.removeEventListener("scroll", updateViewportCardHeight);
-    };
-  }, []);
 
   const filteredEmails = useMemo(() => {
     const filtered = emails.filter((email) => {
@@ -471,11 +446,7 @@ export default function CaixaDeEntradaPage() {
         />
       </PageHeader>
 
-      <div
-        ref={viewportCardRef}
-        style={viewportCardHeight ? { height: `${viewportCardHeight}px` } : undefined}
-        className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark flex flex-col min-h-0 overflow-hidden"
-      >
+      <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark flex flex-col min-h-[592px] max-h-[calc(100vh-9.5rem)] overflow-hidden">
           <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="inline-flex rounded-lg border border-gray-200 dark:border-strokedark overflow-hidden w-full lg:w-auto">
             <button
