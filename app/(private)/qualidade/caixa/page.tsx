@@ -553,39 +553,56 @@ export default function CaixaDeEntradaPage() {
                   const active = email.id === selectedEmailId;
                   const preview = buildEmailPreview(email.corpoHtml);
                   const garantiaLabel = email.notaInterna?.trim() ? email.notaInterna : String(email.garantiaId ?? "");
+                  const senderInitial = (email.remetente || "?").trim().charAt(0).toUpperCase();
                   return (
                     <li
                       key={email.id}
                       className={`border-l-4 transition-colors duration-200 ${
-                        active ? "bg-sky-50 dark:bg-sky-500/10 border-sky-600" : "border-transparent hover:bg-gray-50 dark:hover:bg-white/5"
+                        active
+                          ? "border-sky-600 bg-sky-50 dark:bg-sky-500/10"
+                          : "border-transparent hover:bg-gray-50 dark:hover:bg-white/5"
                       }`}
                     >
                       <button
                         type="button"
                         onClick={() => abrirEmail(email.id)}
-                        className="w-full text-left px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
+                        className="w-full px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{email.remetente}</p>
-                            <p className="text-sm text-gray-700 dark:text-gray-200 truncate">{email.assunto || "(sem assunto)"}</p>
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-xs font-semibold text-gray-700 dark:border-strokedark dark:bg-boxdark-2 dark:text-gray-200">
+                            {senderInitial}
                           </div>
-                          <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{formatDateTime(email.dataRecebimento)}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">{preview || "Sem conteudo exibivel."}</p>
-                        <div className="mt-2 flex items-center gap-2 text-xs">
-                          <span
-                            className={`inline-flex px-2 py-0.5 rounded-full border font-semibold ${
-                              email.garantiaId
-                                ? "bg-lime-100 dark:bg-lime-900/20 text-lime-700 dark:text-lime-300 border-lime-200 dark:border-lime-800"
-                                : "bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
-                            }`}
-                          >
-                            {email.garantiaId ? `Garantia #${garantiaLabel}` : "Nao vinculado"}
-                          </span>
-                          {email.attachments.length > 0 && (
-                            <span className="font-medium text-primary">{email.attachments.length} anexo(s)</span>
-                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{email.remetente}</p>
+                              <span className="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">
+                                {formatDateTime(email.dataRecebimento)}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-100">
+                              {email.assunto || "(sem assunto)"}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                              {preview || "Sem conteudo exibivel."}
+                            </p>
+                            <div className="mt-2 flex items-center gap-2 text-xs">
+                              <span
+                                className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${
+                                  email.garantiaId
+                                    ? "border-lime-200 bg-lime-100 text-lime-700 dark:border-lime-800 dark:bg-lime-900/20 dark:text-lime-300"
+                                    : "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300"
+                                }`}
+                              >
+                                {email.garantiaId ? `Garantia #${garantiaLabel}` : "Nao vinculado"}
+                              </span>
+
+                              {email.attachments.length > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2 py-0.5 font-medium text-gray-600 dark:border-strokedark dark:bg-boxdark-2 dark:text-gray-300">
+                                  <MdAttachFile size={12} /> {email.attachments.length}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </button>
 
@@ -629,29 +646,29 @@ export default function CaixaDeEntradaPage() {
                 </div>
               ) : (
                 <div className="flex h-full flex-col overflow-hidden transition-opacity duration-300">
-                  <div className="shrink-0 border-b border-slate-700 bg-slate-900 px-4 py-2 text-slate-100">
+                  <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-2 text-gray-900 dark:border-strokedark dark:bg-boxdark dark:text-white">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-1">
                         <button
                           type="button"
                           onClick={() => setMobileReading(false)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-slate-300 lg:hidden"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 lg:hidden"
                         >
                           <MdArrowBack size={15} /> Voltar para a lista
                         </button>
-                        <h2 className="break-words text-base font-semibold leading-5 text-white">{selectedEmail.assunto || "(sem assunto)"}</h2>
-                        <div className="flex items-center justify-between gap-3 text-xs text-slate-300">
+                        <h2 className="break-words text-base font-semibold leading-5 text-gray-900 dark:text-white">{selectedEmail.assunto || "(sem assunto)"}</h2>
+                        <div className="flex items-center justify-between gap-3 text-xs text-gray-600 dark:text-gray-300">
                           <p className="min-w-0 truncate">
-                            De: <span className="font-medium text-slate-100">{selectedEmail.remetente}</span>
+                            De: <span className="font-medium text-gray-900 dark:text-white">{selectedEmail.remetente}</span>
                           </p>
-                          <p className="shrink-0 text-right">Recebido em {formatDateTime(selectedEmail.dataRecebimento)}</p>
+                          <p className="shrink-0 text-right text-gray-500 dark:text-gray-400">Recebido em {formatDateTime(selectedEmail.dataRecebimento)}</p>
                         </div>
                       </div>
                       {selectedEmail.garantiaId && (
                         <button
                           type="button"
                           onClick={() => router.push(`/qualidade/${selectedEmail.garantiaId}`)}
-                          className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-slate-700"
+                          className="inline-flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30"
                         >
                           Ver garantia #{selectedEmail.notaInterna?.trim() || selectedEmail.garantiaId}
                           <MdOpenInNew size={14} />
