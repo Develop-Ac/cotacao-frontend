@@ -515,11 +515,11 @@ export default function CaixaDeEntradaPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ajuste o filtro ou clique em sincronizar para atualizar a caixa.</p>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px] lg:h-[calc(100vh-220px)] lg:max-h-[820px]">
+          <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px] lg:h-[calc(100vh-220px)] lg:max-h-[820px] lg:overflow-hidden">
             <aside
-              className={`border-r border-gray-200 dark:border-strokedark lg:h-full ${mobileReading ? "hidden lg:block" : "block"}`}
+              className={`border-r border-gray-200 dark:border-strokedark lg:h-full lg:min-h-0 ${mobileReading ? "hidden lg:block" : "block"}`}
             >
-              <ul className="divide-y divide-gray-200 dark:divide-strokedark lg:h-full lg:overflow-y-auto">
+              <ul className="divide-y divide-gray-200 dark:divide-strokedark lg:h-full lg:min-h-0 lg:overflow-y-auto">
                 {filteredEmails.map((email) => {
                   const active = email.id === selectedEmailId;
                   const preview = buildEmailPreview(email.corpoHtml);
@@ -589,7 +589,7 @@ export default function CaixaDeEntradaPage() {
             <section
               className={`relative ${mobileReading ? "block" : "hidden lg:block"} transition-all duration-300 ease-out ${
                 selectedEmail ? "opacity-100 translate-x-0" : "opacity-60"
-              } lg:h-full`}
+              } lg:h-full lg:min-h-0`}
             >
               {!selectedEmail ? (
                 <div className="h-full flex items-center justify-center text-center p-8">
