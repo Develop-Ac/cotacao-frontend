@@ -41,15 +41,6 @@ const buildEmailPreview = (html?: string | null): string => {
     .trim();
 };
 
-const formatFileSize = (sizeBytes?: number) => {
-  if (!sizeBytes || sizeBytes <= 0) return "Tamanho não informado";
-  if (sizeBytes < 1024) return `${sizeBytes} B`;
-  const kb = sizeBytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(2)} MB`;
-};
-
 const getAttachmentDescriptor = (attachment: InboxEmail["attachments"][number]) => {
   const filename = (attachment.filename || "anexo").toLowerCase();
   const mime = (attachment.mimeType || "").toLowerCase();
@@ -599,8 +590,8 @@ export default function CaixaDeEntradaPage() {
                 </div>
               ) : (
                 <div className="flex h-full flex-col overflow-hidden transition-opacity duration-300">
-                  <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3 bg-white dark:bg-boxdark">
-                    <div className="space-y-2 min-w-0">
+                  <div className="shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3 bg-white dark:bg-boxdark">
+                    <div className="space-y-1 min-w-0 flex-1">
                       <button
                         type="button"
                         onClick={() => setMobileReading(false)}
@@ -608,11 +599,15 @@ export default function CaixaDeEntradaPage() {
                       >
                         <MdArrowBack size={15} /> Voltar para a lista
                       </button>
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white break-words">{selectedEmail.assunto || "(sem assunto)"}</h2>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 break-all">
-                        De: <span className="font-medium">{selectedEmail.remetente}</span>
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Recebido em {formatDateTime(selectedEmail.dataRecebimento)}</p>
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white break-words leading-5">{selectedEmail.assunto || "(sem assunto)"}</h2>
+                      <div className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                        <p className="min-w-0 break-all">
+                          De: <span className="font-medium">{selectedEmail.remetente}</span>
+                        </p>
+                        <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400 sm:text-sm sm:text-right">
+                          Recebido em {formatDateTime(selectedEmail.dataRecebimento)}
+                        </p>
+                      </div>
                     </div>
                     {selectedEmail.garantiaId && (
                       <button
@@ -626,79 +621,69 @@ export default function CaixaDeEntradaPage() {
                     )}
                   </div>
 
-                  {(selectedEmail.toList.length > 0 || selectedEmail.ccList.length > 0) && (
-                    <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark text-sm text-gray-600 dark:text-gray-300 space-y-1 bg-white dark:bg-boxdark">
-                      {selectedEmail.toList.length > 0 && (
-                        <p>
-                          Para: <span className="font-medium break-all">{selectedEmail.toList.join(", ")}</span>
-                        </p>
-                      )}
-                      {selectedEmail.ccList.length > 0 && (
+                  <article className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+                    {selectedEmail.ccList.length > 0 && (
+                      <div className="mb-3 text-sm text-gray-600 dark:text-gray-300">
                         <p>
                           Cc: <span className="font-medium break-all">{selectedEmail.ccList.join(", ")}</span>
                         </p>
-                      )}
-                    </div>
-                  )}
-
-                  {selectedEmail.attachments.length > 0 && (
-                    <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
-                        <MdAttachFile size={16} />
-                        Anexos ({selectedEmail.attachments.length})
                       </div>
-                      <div className="space-y-2">
-                        {selectedEmail.attachments.map((attachment, index) => {
-                          const descriptor = getAttachmentDescriptor(attachment);
-                          const Icon = descriptor.icon;
-                          return (
-                            <div
-                              key={`${attachment.filename}-${index}`}
-                              className="rounded-lg border border-gray-200 dark:border-strokedark px-3 py-2 bg-gray-50/70 dark:bg-boxdark-2"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0 flex items-center gap-2">
-                                  <Icon size={18} className="text-sky-600 dark:text-sky-300 shrink-0" />
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={attachment.filename}>
-                                      {attachment.filename}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                      {descriptor.label} • {formatFileSize(attachment.sizeBytes)}
-                                    </p>
+                    )}
+
+                    {selectedEmail.attachments.length > 0 && (
+                      <div className="mb-4 rounded-lg border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-3">
+                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                          <MdAttachFile size={15} />
+                          Anexos ({selectedEmail.attachments.length})
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                          {selectedEmail.attachments.map((attachment, index) => {
+                            const descriptor = getAttachmentDescriptor(attachment);
+                            const Icon = descriptor.icon;
+                            return (
+                              <div
+                                key={`${attachment.filename}-${index}`}
+                                className="rounded-lg border border-gray-200 dark:border-strokedark bg-gray-50/70 dark:bg-boxdark-2 p-2"
+                              >
+                                <div className="flex flex-col items-center gap-2 text-center">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-300">
+                                    <Icon size={18} className="shrink-0" />
+                                  </div>
+                                  <p className="w-full truncate text-xs font-medium text-gray-900 dark:text-white" title={attachment.filename}>
+                                    {attachment.filename}
+                                  </p>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => abrirAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao abrir anexo."))}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-boxdark"
+                                      title={`Abrir ${attachment.filename || "anexo"}`}
+                                    >
+                                      <MdOpenInNew size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => baixarAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao baixar anexo."))}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20"
+                                      title={`Baixar ${attachment.filename || "anexo"}`}
+                                    >
+                                      <MdDownload size={13} />
+                                    </button>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => abrirAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao abrir anexo."))}
-                                    className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-boxdark"
-                                  >
-                                    Abrir
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => baixarAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao baixar anexo."))}
-                                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20"
-                                  >
-                                    <MdDownload size={14} /> Baixar
-                                  </button>
-                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <article className="flex-1 min-h-0 overflow-hidden px-4 py-5">
                     {selectedEmailHtml ? (
-                      <div className="h-full min-h-[260px] overflow-hidden rounded-lg border border-gray-200 dark:border-strokedark bg-white">
+                      <div className="min-h-[420px] overflow-hidden rounded-lg border border-gray-200 dark:border-strokedark bg-white">
                         <iframe
                           title={`email-${selectedEmail.id}`}
                           sandbox="allow-same-origin"
-                          className="block h-full w-full bg-white"
+                          className="block h-[min(72vh,980px)] w-full bg-white"
                           srcDoc={`
                             <html>
                               <head>
@@ -722,7 +707,7 @@ export default function CaixaDeEntradaPage() {
                         />
                       </div>
                     ) : (
-                      <div className="h-full overflow-y-auto">
+                      <div>
                         <p className="text-sm leading-6 text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words">
                           {stripHtml(selectedEmail.corpoHtml) || "Sem conteudo exibivel."}
                         </p>
