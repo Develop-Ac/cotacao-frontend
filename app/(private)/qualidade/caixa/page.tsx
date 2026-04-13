@@ -515,7 +515,7 @@ export default function CaixaDeEntradaPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ajuste o filtro ou clique em sincronizar para atualizar a caixa.</p>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px] lg:h-[calc(100vh-220px)] lg:max-h-[820px] lg:overflow-hidden">
+          <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px] lg:h-[calc(100vh-220px)] lg:overflow-hidden">
             <aside
               className={`border-r border-gray-200 dark:border-strokedark lg:h-full lg:min-h-0 ${mobileReading ? "hidden lg:block" : "block"}`}
             >
