@@ -515,11 +515,11 @@ export default function CaixaDeEntradaPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ajuste o filtro ou clique em sincronizar para atualizar a caixa.</p>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px] lg:h-[calc(100vh-220px)] lg:overflow-hidden">
+          <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px]">
             <aside
-              className={`border-r border-gray-200 dark:border-strokedark lg:h-full lg:min-h-0 ${mobileReading ? "hidden lg:block" : "block"}`}
+              className={`border-r border-gray-200 dark:border-strokedark lg:self-start lg:sticky lg:top-4 lg:h-[calc(100vh-180px)] lg:overflow-hidden ${mobileReading ? "hidden lg:block" : "block"}`}
             >
-              <ul className="divide-y divide-gray-200 dark:divide-strokedark lg:h-full lg:min-h-0 lg:overflow-y-auto">
+              <ul className="divide-y divide-gray-200 dark:divide-strokedark lg:h-full lg:overflow-y-auto">
                 {filteredEmails.map((email) => {
                   const active = email.id === selectedEmailId;
                   const preview = buildEmailPreview(email.corpoHtml);
@@ -589,17 +589,17 @@ export default function CaixaDeEntradaPage() {
             <section
               className={`relative ${mobileReading ? "block" : "hidden lg:block"} transition-all duration-300 ease-out ${
                 selectedEmail ? "opacity-100 translate-x-0" : "opacity-60"
-              } lg:h-full lg:min-h-0 lg:overflow-hidden`}
+              }`}
             >
               {!selectedEmail ? (
-                <div className="h-full flex items-center justify-center text-center p-8">
+                <div className="min-h-[400px] flex items-center justify-center text-center p-8">
                   <div>
                     <p className="text-lg font-semibold text-gray-900 dark:text-white">Selecione um e-mail</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ao selecionar, o conteudo sera exibido aqui como painel de leitura.</p>
                   </div>
                 </div>
               ) : (
-                <div className="h-full flex flex-col overflow-hidden transition-opacity duration-300">
+                <div className="flex flex-col transition-opacity duration-300">
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3">
                     <div className="space-y-2 min-w-0">
                       <button
@@ -693,12 +693,23 @@ export default function CaixaDeEntradaPage() {
                     </div>
                   )}
 
-                  <article className="px-4 py-5 flex-1 min-h-0 overflow-auto">
+                  <article className="px-4 py-5">
                     {selectedEmailHtml ? (
                       <iframe
                         title={`email-${selectedEmail.id}`}
-                        sandbox=""
-                        className="w-full min-h-[460px] rounded-lg border border-gray-200 dark:border-strokedark bg-white"
+                        sandbox="allow-same-origin"
+                        className="w-full rounded-lg border border-gray-200 dark:border-strokedark bg-white block"
+                        style={{ minHeight: "200px" }}
+                        onLoad={(e) => {
+                          try {
+                            const doc = e.currentTarget.contentDocument;
+                            if (doc?.body) {
+                              e.currentTarget.style.height = `${doc.body.scrollHeight + 32}px`;
+                            }
+                          } catch {
+                            // cross-origin fallback
+                          }
+                        }}
                         srcDoc={`
                           <html>
                             <head>
