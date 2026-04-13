@@ -556,7 +556,7 @@ export const QualidadeApi = {
     await apiFetch(`/emails/${emailId}/link`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ garantiaId }),
+      body: JSON.stringify({ garantia_id: garantiaId }),
     });
   },
 
