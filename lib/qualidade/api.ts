@@ -440,11 +440,9 @@ export const QualidadeApi = {
     appendIfValue(form, "protocoloFornecedor", payload.protocoloFornecedor);
     appendIfValue(form, "nfsCompra", payload.nfsCompra);
     appendIfValue(form, "outrosMeios", payload.outrosMeios ? "true" : undefined);
-    // para compatibilidade com backends que não aceitam PUT diretamente
-    form.append("_method", "PUT");
     payload.anexos?.forEach((file) => appendAttachment(form, "anexos", file));
 
-    await apiFetch(`/garantias/${id}`, {
+    await apiFetch(`/garantias/${id}/update`, {
       method: "POST",
       body: form,
     });
@@ -556,7 +554,7 @@ export const QualidadeApi = {
     await apiFetch(`/emails/${emailId}/link`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ garantiaId }),
+      body: JSON.stringify({ garantia_id: garantiaId }),
     });
   },
 
