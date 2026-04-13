@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
@@ -139,7 +139,6 @@ const buildAttachmentDataUrl = (attachment: InboxEmail["attachments"][number]): 
 
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
-  const sidebarRef = useRef<HTMLElement | null>(null);
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -157,8 +156,6 @@ export default function CaixaDeEntradaPage() {
   const [submittingLink, setSubmittingLink] = useState(false);
   const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
   const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
-  const [sidebarHeight, setSidebarHeight] = useState<number | null>(null);
-
   const carregar = useCallback(async () => {
     setUpdating(true);
     try {
@@ -176,34 +173,6 @@ export default function CaixaDeEntradaPage() {
   useEffect(() => {
     carregar();
   }, [carregar]);
-
-  useEffect(() => {
-    const updateSidebarHeight = () => {
-      if (typeof window === "undefined") return;
-
-      if (window.innerWidth < 1024) {
-        setSidebarHeight(null);
-        return;
-      }
-
-      const sidebar = sidebarRef.current;
-      if (!sidebar) return;
-
-      const rect = sidebar.getBoundingClientRect();
-      const topOffset = Math.max(rect.top, 16);
-      const nextHeight = Math.max(window.innerHeight - topOffset - 16, 320);
-      setSidebarHeight((current) => (current === nextHeight ? current : nextHeight));
-    };
-
-    updateSidebarHeight();
-    window.addEventListener("resize", updateSidebarHeight);
-    window.addEventListener("scroll", updateSidebarHeight, { passive: true });
-
-    return () => {
-      window.removeEventListener("resize", updateSidebarHeight);
-      window.removeEventListener("scroll", updateSidebarHeight);
-    };
-  }, []);
 
   const filteredEmails = useMemo(() => {
     const filtered = emails.filter((email) => {
@@ -459,7 +428,7 @@ export default function CaixaDeEntradaPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-4">
+    <div className="flex flex-col gap-4 p-4 lg:p-6 h-full">
       <PageHeader title="Inbox de Garantias" subtitle="Integração direta com qualidade@ac" onBack={() => router.back()}>
         <ActionButton
           label="Sincronizar"
@@ -477,8 +446,8 @@ export default function CaixaDeEntradaPage() {
         />
       </PageHeader>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark">
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="inline-flex rounded-lg border border-gray-200 dark:border-strokedark overflow-hidden w-full lg:w-auto">
             <button
               type="button"
@@ -528,10 +497,10 @@ export default function CaixaDeEntradaPage() {
           </label>
         </div>
 
-        {error && <p className="px-4 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="shrink-0 px-4 py-2 text-sm text-red-600">{error}</p>}
 
         {loading ? (
-          <div className="p-4 space-y-3">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
             {Array.from({ length: 5 }).map((_, idx) => (
               <div
                 key={idx}
@@ -540,18 +509,16 @@ export default function CaixaDeEntradaPage() {
             ))}
           </div>
         ) : filteredEmails.length === 0 ? (
-          <div className="p-12 text-center">
+          <div className="flex-1 min-h-0 flex items-center justify-center text-center p-8">
             <p className="text-lg font-semibold text-gray-900 dark:text-white">Nenhum e-mail encontrado</p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ajuste o filtro ou clique em sincronizar para atualizar a caixa.</p>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] min-h-[540px]">
+          <div className="flex-1 min-h-0 grid lg:grid-cols-[380px_minmax(0,1fr)] overflow-hidden">
             <aside
-              ref={sidebarRef}
-              style={sidebarHeight ? { height: `${sidebarHeight}px` } : undefined}
-              className={`border-r border-gray-200 dark:border-strokedark lg:self-start lg:sticky lg:top-4 lg:overflow-hidden ${mobileReading ? "hidden lg:block" : "block"}`}
+              className={`border-r border-gray-200 dark:border-strokedark overflow-y-auto ${mobileReading ? "hidden lg:block" : "block"}`}
             >
-              <ul className="divide-y divide-gray-200 dark:divide-strokedark lg:h-full lg:overflow-y-auto">
+              <ul className="divide-y divide-gray-200 dark:divide-strokedark">
                 {filteredEmails.map((email) => {
                   const active = email.id === selectedEmailId;
                   const preview = buildEmailPreview(email.corpoHtml);
@@ -619,9 +586,9 @@ export default function CaixaDeEntradaPage() {
             </aside>
 
             <section
-              className={`relative ${mobileReading ? "block" : "hidden lg:block"} transition-all duration-300 ease-out ${
-                selectedEmail ? "opacity-100 translate-x-0" : "opacity-60"
-              } lg:self-start lg:sticky lg:top-4 lg:h-[calc(100vh-180px)] lg:overflow-hidden`}
+              className={`relative flex flex-col overflow-hidden transition-all duration-300 ease-out ${mobileReading ? "flex" : "hidden lg:flex"} ${
+                selectedEmail ? "opacity-100" : "opacity-60"
+              }`}
             >
               {!selectedEmail ? (
                 <div className="min-h-[400px] flex items-center justify-center text-center p-8">
@@ -725,7 +692,7 @@ export default function CaixaDeEntradaPage() {
                     </div>
                   )}
 
-                  <article className="flex-1 overflow-auto px-4 py-5">
+                  <article className="flex-1 min-h-0 overflow-auto px-4 py-5">
                     {selectedEmailHtml ? (
                       <iframe
                         title={`email-${selectedEmail.id}`}
