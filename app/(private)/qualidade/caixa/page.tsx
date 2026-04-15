@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/qualidade/PageHeader";
 import { ActionButton } from "@/components/qualidade/ActionButton";
+import ConfirmationModal from "@/components/ConfirmationModal";
 import { QualidadeApi } from "@/lib/qualidade/api";
 import { Garantia, InboxEmail } from "@/lib/qualidade/types";
 import { formatDate, formatDateTime, stripHtml } from "@/lib/qualidade/formatters";
@@ -146,6 +147,7 @@ export default function CaixaDeEntradaPage() {
   const [garantiaSearchTerm, setGarantiaSearchTerm] = useState("");
   const [submittingLink, setSubmittingLink] = useState(false);
   const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
+  const [deleteConfirmEmailId, setDeleteConfirmEmailId] = useState<number | null>(null);
   const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
   const [emailIframeHeight, setEmailIframeHeight] = useState(720);
   const carregar = useCallback(async () => {
@@ -442,13 +444,11 @@ export default function CaixaDeEntradaPage() {
   };
 
   const excluirSemVinculo = async (emailId: number) => {
-    const confirmed = window.confirm("Excluir este e-mail sem vinculo? Esta acao nao pode ser desfeita.");
-    if (!confirmed) return;
-
     setDeletingEmailId(emailId);
     setError(null);
     try {
       await QualidadeApi.excluirEmailSemVinculo(emailId);
+      setDeleteConfirmEmailId(null);
       await carregar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao excluir e-mail.");
@@ -459,6 +459,22 @@ export default function CaixaDeEntradaPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-4 p-4 lg:p-6">
+      <ConfirmationModal
+        isOpen={deleteConfirmEmailId !== null}
+        title="Excluir e-mail"
+        message="Excluir este e-mail sem vinculo? Esta acao nao pode ser desfeita."
+        onConfirm={() => {
+          if (deleteConfirmEmailId === null) return;
+          void excluirSemVinculo(deleteConfirmEmailId);
+        }}
+        onCancel={() => {
+          if (deletingEmailId === null) setDeleteConfirmEmailId(null);
+        }}
+        isLoading={deletingEmailId !== null}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+      />
+
       <PageHeader title="Inbox de Garantias" subtitle="Integração direta com qualidade@ac" onBack={() => router.back()}>
         <ActionButton
           label="Sincronizar"
@@ -617,7 +633,7 @@ export default function CaixaDeEntradaPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => excluirSemVinculo(email.id)}
+                            onClick={() => setDeleteConfirmEmailId(email.id)}
                             disabled={deletingEmailId === email.id}
                             className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition disabled:opacity-60"
                           >
