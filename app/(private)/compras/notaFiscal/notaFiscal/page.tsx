@@ -490,7 +490,18 @@ export default function NotaFiscalList() {
             await fetchAll();
           }
         } else {
-          timer = setTimeout(poll, 1000);
+          const notFoundMessage = statusData?.message || 'Status do job não disponível.';
+          setSyncStatus(prev => ({
+            status: 'failed',
+            totalEncontradas: prev?.totalEncontradas ?? 0,
+            processadas: prev?.processadas ?? 0,
+            inseridas: prev?.inseridas ?? 0,
+            ignoradas: prev?.ignoradas ?? 0,
+            progresso: prev?.progresso ?? 0,
+            logs: [...(prev?.logs ?? []), `Falha ao consultar status: ${notFoundMessage}`],
+            errorMessage: notFoundMessage,
+          }));
+          setSyncJobId(null);
         }
       } catch (error) {
         if (canceled) return;
@@ -504,6 +515,7 @@ export default function NotaFiscalList() {
           logs: [...(prev?.logs ?? []), 'Falha ao consultar status da sincronização.'],
           errorMessage: error instanceof Error ? error.message : String(error),
         }));
+        setSyncJobId(null);
       }
     };
 
