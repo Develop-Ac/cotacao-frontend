@@ -274,6 +274,15 @@ export default function NotaFiscalList() {
     return d.toLocaleDateString("pt-BR");
   };
 
+  const getXmlType = (row: NotaFiscalRow): 'COMPLETO' | 'RESUMO' | 'SEM_XML' => {
+    if (row.XML_TIPO) return row.XML_TIPO;
+
+    const xml = String(row.XML_COMPLETO || '').toLowerCase();
+    if (!xml.trim()) return 'SEM_XML';
+    if (xml.includes('<det') && xml.includes('<prod')) return 'COMPLETO';
+    return 'RESUMO';
+  };
+
   // --- SELETION LOGIC ---
   const toggleSelect = (chave: string) => {
     const next = new Set(selectedChaves);
@@ -784,6 +793,7 @@ export default function NotaFiscalList() {
                       {paged.map((row, idx) => {
                         const isSelected = selectedChaves.has(row.CHAVE_NFE);
                         const numNota = row.CHAVE_NFE ? row.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "N/A";
+                        const xmlType = getXmlType(row);
 
                         return (
                           <tr
@@ -835,6 +845,16 @@ export default function NotaFiscalList() {
                                 </span>
                                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono tracking-wider" title={row.CHAVE_NFE}>
                                   {row.CHAVE_NFE.substring(0, 4)} {row.CHAVE_NFE.substring(4, 20)}...
+                                </span>
+                                <span
+                                  className={`inline-flex w-fit items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold border ${xmlType === 'COMPLETO'
+                                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                    : xmlType === 'RESUMO'
+                                      ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300'
+                                      : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300'}`}
+                                  title={xmlType === 'COMPLETO' ? 'XML completo disponível' : xmlType === 'RESUMO' ? 'Apenas XML resumo disponível' : 'XML não disponível'}
+                                >
+                                  {xmlType === 'COMPLETO' ? 'XML completo' : xmlType === 'RESUMO' ? 'Somente resumo' : 'Sem XML'}
                                 </span>
                                 {row.VALOR_TOTAL ? <span className="text-xs text-green-600 dark:text-green-400 font-semibold mt-0.5">Vlr NFe: R$ {row.VALOR_TOTAL.toFixed(2)}</span> : null}
                               </div>

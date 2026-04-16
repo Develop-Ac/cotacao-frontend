@@ -9,6 +9,7 @@ export type NotaFiscalRow = {
     TIPO_OPERACAO_DESC: string;
     STATUS_ERP?: 'PENDENTE' | 'LANCADA';
     XML_COMPLETO?: string; // Optional, might be fetched separately
+    XML_TIPO?: 'COMPLETO' | 'RESUMO' | 'SEM_XML';
     VALOR_TOTAL?: number;
     TIPO_IMPOSTO?: string;
 };
