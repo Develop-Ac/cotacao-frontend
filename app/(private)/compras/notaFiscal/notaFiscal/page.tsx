@@ -22,6 +22,7 @@ import UnmatchedSelection from "./components/UnmatchedSelection";
 const COMPRAS_BASE = serviceUrl("compras");
 const SERVICE_URL = serviceUrl("calculadoraSt");
 const API_BASE = `${SERVICE_URL}/icms/nfe-distribuicao`;
+const LAUNCHED_SYNC_ENDPOINT = `${SERVICE_URL}/icms/nfe-lancadas/sync`;
 const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
 
@@ -55,6 +56,7 @@ export default function NotaFiscalList() {
   const [filterNumero, setFilterNumero] = useState("");
   const [filterEmitente, setFilterEmitente] = useState("");
   const [filterImposto, setFilterImposto] = useState("");
+  const [filterEstado, setFilterEstado] = useState<"TODOS" | "DENTRO" | "FORA">("TODOS");
 
   // Dropdown PageSize
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
@@ -156,10 +158,24 @@ export default function NotaFiscalList() {
       // Filter by Date
       if (!dateRange.start && !dateRange.end) return true;
       const d = new Date(i.DATA_EMISSAO);
-      if (dateRange.start && d < new Date(dateRange.start)) return false;
-      if (dateRange.end && d > new Date(dateRange.end)) return false;
+      if (dateRange.start) {
+        const startDate = new Date(`${dateRange.start}T00:00:00`);
+        if (d < startDate) return false;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(`${dateRange.end}T23:59:59.999`);
+        if (d > endDate) return false;
+      }
       return true;
     });
+
+    if (filterEstado !== 'TODOS') {
+      filtered = filtered.filter(i => {
+        const ufEmitente = i.CHAVE_NFE?.slice(0, 2) || '';
+        const dentroMt = ufEmitente === '51';
+        return filterEstado === 'DENTRO' ? dentroMt : !dentroMt;
+      });
+    }
 
     if (filterNumero) {
       filtered = filtered.filter(i => {
@@ -188,7 +204,7 @@ export default function NotaFiscalList() {
     }
 
     return filtered;
-  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto]);
+  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado]);
 
   const total = filteredItems.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -387,13 +403,42 @@ export default function NotaFiscalList() {
     }
   };
 
+  const handleSyncLaunchedInvoices = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(LAUNCHED_SYNC_ENDPOINT, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        let msg = `Erro HTTP: ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
+        } catch { }
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      alert(`Busca de NFs lançadas concluída. Inseridas: ${data?.inseridas ?? 0}. Ignoradas: ${data?.ignoradas ?? 0}.`);
+      await fetchAll();
+    } catch (err: any) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Erro ao buscar NFs lançadas:", msg);
+      alert(`Erro ao buscar NFs lançadas: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
       {/* Header visible only in LIST or maybe always? keeping explicit for now */}
       {viewState === 'LIST' && (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <div>
-            <h3 className="text-2xl font-semibold mb-1 text-black dark:text-white">ICMS ST - Portaria 195/2019</h3>
+            <h3 className="text-2xl font-semibold mb-1 text-black dark:text-white">Notas Fiscais de Entrada</h3>
             <p className="text-sm text-gray-500">Conciliação de Notas Fiscais e Cálculo de Guia Complementar</p>
           </div>
 
@@ -424,6 +469,16 @@ export default function NotaFiscalList() {
                 <span>Calcular ({selectedChaves.size})</span>
               </button>
             )}
+
+            <button
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-md transition-all active:scale-95 disabled:opacity-50"
+              onClick={handleSyncLaunchedInvoices}
+              disabled={loading || dataSource === 'UPLOAD'}
+              title="Busca NFs lançadas na NF_ENTRADA_XML"
+            >
+              <FaFilter size={16} />
+              <span>Buscar NFs lançadas</span>
+            </button>
 
             <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-600 dark:text-gray-300 mr-4">
               <div className="relative">
@@ -498,13 +553,41 @@ export default function NotaFiscalList() {
                     <option value="TRIBUTADA">Tributada</option>
                     <option value="NENHUM">Não Selecionado / Sem Imposto</option>
                   </select>
+
+                  <select
+                    value={filterEstado}
+                    onChange={(e) => setFilterEstado(e.target.value as "TODOS" | "DENTRO" | "FORA")}
+                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                  >
+                    <option value="TODOS">Estado: Todos</option>
+                    <option value="DENTRO">Somente Dentro do Estado (MT)</option>
+                    <option value="FORA">Somente Fora do Estado</option>
+                  </select>
+
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                    title="Data de emissão inicial"
+                    aria-label="Data de emissão inicial"
+                  />
+
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                    title="Data de emissão final"
+                    aria-label="Data de emissão final"
+                  />
                 </div>
               </div>
 
               <div className="bg-white dark:bg-boxdark rounded-xl shadow-md border border-gray-100 dark:border-strokedark">
                 <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-strokedark bg-gray-50/50 dark:bg-meta-4/20 rounded-t-xl">
                   <div className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-                    {dataSource === 'DATABASE' ? 'Notas Recentes (Entrada Própria)' : 'Arquivos Carregados'}
+                    {dataSource === 'DATABASE' ? 'Notas Fiscais de Entrada' : 'Arquivos Carregados'}
                   </div>
                   <div className="relative" ref={pageSizeRef}>
                     <button

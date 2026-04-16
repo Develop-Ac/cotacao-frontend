@@ -161,7 +161,7 @@ export default function RootLayout({
           { label: 'Comparativo', href: '/compras/cotacao/comparativo' },
           { label: 'Pedido', href: '/compras/cotacao/pedido' },
           { label: 'Kanban', href: '/compras/kanban' },
-          { label: 'Calculo do ICMS ST', href: '/compras/notaFiscal/notaFiscal' },
+          { label: 'Notas Fiscais de Entrada', href: '/compras/notaFiscal/notaFiscal' },
           { label: 'Análise de Produtos', href: '/compras/analise' },
         ];
       case 'Oficina':
