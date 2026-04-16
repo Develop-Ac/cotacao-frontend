@@ -11,6 +11,7 @@ import {
   FaFilter
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { serviceUrl } from "@/lib/services";
 import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
 import StCalculationResults from "./components/StCalculationResults";
@@ -34,6 +35,8 @@ const toInputDate = (date: Date) => {
 };
 
 export default function NotaFiscalList() {
+  const router = useRouter();
+
   // Paginação no front
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<10 | 20 | 50>(10);
@@ -445,6 +448,10 @@ export default function NotaFiscalList() {
     }
   };
 
+  const handleOpenInvoiceDetails = (row: NotaFiscalRow) => {
+    router.push(`/compras/notaFiscal/notaFiscal/${row.CHAVE_NFE}`);
+  };
+
   const handleSyncLaunchedInvoices = async () => {
     try {
       setSyncModalOpen(true);
@@ -777,9 +784,20 @@ export default function NotaFiscalList() {
                         const numNota = row.CHAVE_NFE ? row.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "N/A";
 
                         return (
-                          <tr key={row.CHAVE_NFE ?? idx} className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}>
+                          <tr
+                            key={row.CHAVE_NFE ?? idx}
+                            onClick={() => handleOpenInvoiceDetails(row)}
+                            className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark cursor-pointer ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}
+                            title="Clique para abrir detalhes da nota"
+                          >
                             <td className="py-3 px-4 text-center align-top pt-4">
-                              <button onClick={() => toggleSelect(row.CHAVE_NFE)} className={`transition-colors ${isSelected ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSelect(row.CHAVE_NFE);
+                                }}
+                                className={`transition-colors ${isSelected ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}
+                              >
                                 {isSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
                               </button>
                             </td>
@@ -851,7 +869,16 @@ export default function NotaFiscalList() {
                             </td>
                             <td className="py-3 px-4 text-center align-top pt-4">
                               <div className="flex justify-center">
-                                <button onClick={() => handleDownloadPdf(row)} className="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Baixar PDF DANFE"><FaFilePdf className="w-5 h-5" /></button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadPdf(row);
+                                  }}
+                                  className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+                                  title="Baixar PDF DANFE"
+                                >
+                                  <FaFilePdf className="w-5 h-5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
