@@ -45,6 +45,7 @@ export default function NotaFiscalList() {
   const [items, setItems] = useState<NotaFiscalRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [confirmSyncModalOpen, setConfirmSyncModalOpen] = useState(false);
   const [syncJobId, setSyncJobId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<{
     status: 'running' | 'completed' | 'failed';
@@ -454,6 +455,7 @@ export default function NotaFiscalList() {
 
   const handleSyncLaunchedInvoices = async () => {
     try {
+      setConfirmSyncModalOpen(false);
       setSyncModalOpen(true);
       setSyncStatus({
         status: 'running',
@@ -575,6 +577,16 @@ export default function NotaFiscalList() {
           </div>
 
           <div className="flex items-center gap-2 mt-4 md:mt-0">
+            <button
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 hover:text-gray-700 transition-all active:scale-95 disabled:opacity-50 dark:bg-meta-4 dark:text-gray-300 dark:border-strokedark"
+              onClick={() => setConfirmSyncModalOpen(true)}
+              disabled={dataSource === 'UPLOAD' || syncStatus?.status === 'running'}
+              title="Buscar NFs lançadas na NF_ENTRADA_XML"
+            >
+              <FaFilter size={14} />
+              <span className="text-sm">Buscar NFs lançadas</span>
+            </button>
+
             <div className="flex bg-gray-100 dark:bg-meta-4 rounded-lg p-1 mr-4">
               <button
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${dataSource === 'DATABASE' ? 'bg-white shadow text-primary dark:bg-boxdark dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
@@ -601,16 +613,6 @@ export default function NotaFiscalList() {
                 <span>Calcular ({selectedChaves.size})</span>
               </button>
             )}
-
-            <button
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-md transition-all active:scale-95 disabled:opacity-50"
-              onClick={handleSyncLaunchedInvoices}
-              disabled={dataSource === 'UPLOAD' || syncStatus?.status === 'running'}
-              title="Busca NFs lançadas na NF_ENTRADA_XML"
-            >
-              <FaFilter size={16} />
-              <span>Buscar NFs lançadas</span>
-            </button>
 
             <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-600 dark:text-gray-300 mr-4">
               <div className="relative">
@@ -1011,6 +1013,44 @@ export default function NotaFiscalList() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmSyncModalOpen && (
+        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white dark:bg-boxdark border border-gray-100 dark:border-strokedark shadow-2xl">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-strokedark">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Confirmar busca de NFs lançadas</h4>
+            </div>
+
+            <div className="px-5 py-4 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+              <p>
+                Essa consulta pode demorar alguns minutos, dependendo do volume de notas no ERP.
+              </p>
+              <p className="font-medium text-amber-700 dark:text-amber-300">
+                Após iniciar, o processo não poderá ser cancelado.
+              </p>
+              <p>
+                Deseja continuar?
+              </p>
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100 dark:border-strokedark flex items-center justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-strokedark text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                onClick={() => setConfirmSyncModalOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
+                onClick={handleSyncLaunchedInvoices}
+                disabled={syncStatus?.status === 'running'}
+              >
+                Iniciar busca
+              </button>
             </div>
           </div>
         </div>
