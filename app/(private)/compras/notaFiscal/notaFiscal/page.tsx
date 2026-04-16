@@ -84,6 +84,7 @@ export default function NotaFiscalList() {
   const [filterEmitente, setFilterEmitente] = useState("");
   const [filterImposto, setFilterImposto] = useState("");
   const [filterEstado, setFilterEstado] = useState<"TODOS" | "DENTRO" | "FORA">("TODOS");
+  const [filterModelo, setFilterModelo] = useState<"55" | "TODOS">("55");
 
   // Dropdown PageSize
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
@@ -201,6 +202,15 @@ export default function NotaFiscalList() {
       return true;
     });
 
+    if (filterModelo !== 'TODOS') {
+      filtered = filtered.filter(i => {
+        const chave = i.CHAVE_NFE || '';
+        // Modelo do documento na chave de acesso (posições 21-22, 1-based)
+        const modelo = chave.length >= 22 ? chave.substring(20, 22) : '';
+        return modelo === filterModelo;
+      });
+    }
+
     if (filterEstado !== 'TODOS') {
       filtered = filtered.filter(i => {
         const ufEmitente = i.CHAVE_NFE?.slice(0, 2) || '';
@@ -236,7 +246,7 @@ export default function NotaFiscalList() {
     }
 
     return filtered;
-  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado]);
+  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado, filterModelo]);
 
   const total = filteredItems.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -629,7 +639,7 @@ export default function NotaFiscalList() {
               <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-3 mb-6 border border-gray-100 dark:border-strokedark overflow-hidden">
                 <div className="flex flex-nowrap items-center gap-2 w-full">
                   {/* Search Nota */}
-                  <div className="flex items-center h-9 w-[18%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                  <div className="flex items-center h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
                     <div className="pl-2 pr-1.5 text-gray-400">
                       <FaSearch size={12} />
                     </div>
@@ -643,7 +653,7 @@ export default function NotaFiscalList() {
                   </div>
 
                   {/* Search Emitente */}
-                  <div className="flex items-center h-9 w-[18%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                  <div className="flex items-center h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
                     <div className="pl-2 pr-1.5 text-gray-400">
                       <FaSearch size={12} />
                     </div>
@@ -660,7 +670,7 @@ export default function NotaFiscalList() {
                   <select
                     value={filterImposto}
                     onChange={(e) => setFilterImposto(e.target.value)}
-                    className="h-9 w-[16%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[13%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="">Filtro Imposto: Todos</option>
                     <option value="ST">Somente ICMS ST</option>
@@ -670,9 +680,18 @@ export default function NotaFiscalList() {
                   </select>
 
                   <select
+                    value={filterModelo}
+                    onChange={(e) => setFilterModelo(e.target.value as "55" | "TODOS")}
+                    className="h-9 w-[12%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                  >
+                    <option value="55">Modelo 55</option>
+                    <option value="TODOS">Todos modelos</option>
+                  </select>
+
+                  <select
                     value={filterEstado}
                     onChange={(e) => setFilterEstado(e.target.value as "TODOS" | "DENTRO" | "FORA")}
-                    className="h-9 w-[20%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[17%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="TODOS">Estado: Todos</option>
                     <option value="DENTRO">Somente Dentro do Estado (MT)</option>
@@ -683,7 +702,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.start}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                    className="h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[15%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão inicial"
                     aria-label="Data de emissão inicial"
                   />
@@ -692,7 +711,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.end}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                    className="h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[15%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão final"
                     aria-label="Data de emissão final"
                   />
