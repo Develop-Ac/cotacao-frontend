@@ -146,30 +146,30 @@ export default function NotaFiscalList() {
           const j = await res.json();
           if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
         } catch { }
-        throw new Error(msg);
+                  <div className="flex items-center h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
       }
-
+                      <FaSearch size={12} />
       const json: unknown = await res.json();
 
       if (Array.isArray(json)) {
         setItems(json as NotaFiscalRow[]);
       } else if (json && typeof json === "object") {
         setItems([json as NotaFiscalRow]);
-      } else {
+                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
         setItems([]);
       }
 
       // Fetch Status Map too
-      fetch(`${SERVICE_URL}/icms/payment-status`)
+                  <div className="flex items-center h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
         .then(r => r.json())
-        .then(map => setStatusMap(map))
+                      <FaSearch size={12} />
         .catch(console.error);
 
     } catch (err: any) {
-      if (err?.name !== "AbortError") {
+                      placeholder="Emitente/CNPJ"
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Erro ao carregar notas fiscais:", msg);
-        setItems([]);
+                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
       }
     } finally {
       setLoading(false);
@@ -177,7 +177,7 @@ export default function NotaFiscalList() {
   }, [dataSource, dateRange.start, dateRange.end]);
 
   // carrega ao montar
-  useEffect(() => {
+                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
     fetchAll();
   }, [fetchAll]);
 
@@ -626,8 +626,8 @@ export default function NotaFiscalList() {
           {viewState === 'LIST' && (
             <>
               {/* FILTERS BAR */}
-              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-4 mb-6 border border-gray-100 dark:border-strokedark">
-                <div className="flex flex-wrap items-center gap-3 w-full">
+              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-4 mb-6 border border-gray-100 dark:border-strokedark overflow-x-auto">
+                <div className="flex flex-nowrap items-center gap-3 min-w-max">
                   {/* Search Nota */}
                   <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
                     <div className="pl-3 pr-2 text-gray-400">
@@ -672,7 +672,7 @@ export default function NotaFiscalList() {
                   <select
                     value={filterEstado}
                     onChange={(e) => setFilterEstado(e.target.value as "TODOS" | "DENTRO" | "FORA")}
-                    className="h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="TODOS">Estado: Todos</option>
                     <option value="DENTRO">Somente Dentro do Estado (MT)</option>
@@ -683,7 +683,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.start}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                    className="h-10 w-full sm:w-44 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão inicial"
                     aria-label="Data de emissão inicial"
                   />
@@ -692,7 +692,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.end}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                    className="h-10 w-full sm:w-44 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão final"
                     aria-label="Data de emissão final"
                   />
