@@ -34,6 +34,18 @@ export default function NotaFiscalList() {
   // Dados e estado
   const [items, setItems] = useState<NotaFiscalRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncJobId, setSyncJobId] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{
+    status: 'running' | 'completed' | 'failed';
+    totalEncontradas: number;
+    processadas: number;
+    inseridas: number;
+    ignoradas: number;
+    progresso: number;
+    logs: string[];
+    errorMessage?: string;
+  } | null>(null);
 
   // Selection
   const [selectedChaves, setSelectedChaves] = useState<Set<string>>(new Set());
@@ -405,7 +417,17 @@ export default function NotaFiscalList() {
 
   const handleSyncLaunchedInvoices = async () => {
     try {
-      setLoading(true);
+      setSyncModalOpen(true);
+      setSyncStatus({
+        status: 'running',
+        totalEncontradas: 0,
+        processadas: 0,
+        inseridas: 0,
+        ignoradas: 0,
+        progresso: 0,
+        logs: ['Iniciando sincronização...'],
+      });
+
       const res = await fetch(LAUNCHED_SYNC_ENDPOINT, {
         method: "POST",
         headers: { Accept: "application/json" },
@@ -421,16 +443,77 @@ export default function NotaFiscalList() {
       }
 
       const data = await res.json();
-      alert(`Busca de NFs lançadas concluída. Inseridas: ${data?.inseridas ?? 0}. Ignoradas: ${data?.ignoradas ?? 0}.`);
-      await fetchAll();
+      if (!data?.jobId) {
+        throw new Error('Não foi possível iniciar o job de sincronização.');
+      }
+      setSyncJobId(data.jobId);
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Erro ao buscar NFs lançadas:", msg);
-      alert(`Erro ao buscar NFs lançadas: ${msg}`);
-    } finally {
-      setLoading(false);
+      setSyncStatus({
+        status: 'failed',
+        totalEncontradas: 0,
+        processadas: 0,
+        inseridas: 0,
+        ignoradas: 0,
+        progresso: 0,
+        logs: ['Falha ao iniciar sincronização.'],
+        errorMessage: msg,
+      });
     }
   };
+
+  useEffect(() => {
+    if (!syncJobId) return;
+
+    let canceled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${LAUNCHED_SYNC_ENDPOINT}/${syncJobId}`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+
+        if (!res.ok) throw new Error(`Erro ao consultar status: ${res.status}`);
+
+        const statusData = await res.json();
+        if (canceled) return;
+
+        if (statusData?.status) {
+          setSyncStatus(statusData);
+
+          if (statusData.status === 'running') {
+            timer = setTimeout(poll, 1000);
+          } else {
+            await fetchAll();
+          }
+        } else {
+          timer = setTimeout(poll, 1000);
+        }
+      } catch (error) {
+        if (canceled) return;
+        setSyncStatus(prev => ({
+          status: 'failed',
+          totalEncontradas: prev?.totalEncontradas ?? 0,
+          processadas: prev?.processadas ?? 0,
+          inseridas: prev?.inseridas ?? 0,
+          ignoradas: prev?.ignoradas ?? 0,
+          progresso: prev?.progresso ?? 0,
+          logs: [...(prev?.logs ?? []), 'Falha ao consultar status da sincronização.'],
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }));
+      }
+    };
+
+    poll();
+
+    return () => {
+      canceled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [syncJobId, fetchAll]);
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
@@ -473,7 +556,7 @@ export default function NotaFiscalList() {
             <button
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-md transition-all active:scale-95 disabled:opacity-50"
               onClick={handleSyncLaunchedInvoices}
-              disabled={loading || dataSource === 'UPLOAD'}
+              disabled={dataSource === 'UPLOAD' || syncStatus?.status === 'running'}
               title="Busca NFs lançadas na NF_ENTRADA_XML"
             >
               <FaFilter size={16} />
@@ -511,8 +594,8 @@ export default function NotaFiscalList() {
           {viewState === 'LIST' && (
             <>
               {/* FILTERS BAR */}
-              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-4 mb-6 border border-gray-100 dark:border-strokedark flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-4 mb-6 border border-gray-100 dark:border-strokedark">
+                <div className="flex flex-wrap items-center gap-3 w-full">
                   {/* Search Nota */}
                   <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
                     <div className="pl-3 pr-2 text-gray-400">
@@ -545,7 +628,7 @@ export default function NotaFiscalList() {
                   <select
                     value={filterImposto}
                     onChange={(e) => setFilterImposto(e.target.value)}
-                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                    className="h-10 w-full sm:w-56 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="">Filtro Imposto: Todos</option>
                     <option value="ST">Somente ICMS ST</option>
@@ -557,7 +640,7 @@ export default function NotaFiscalList() {
                   <select
                     value={filterEstado}
                     onChange={(e) => setFilterEstado(e.target.value as "TODOS" | "DENTRO" | "FORA")}
-                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                    className="h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="TODOS">Estado: Todos</option>
                     <option value="DENTRO">Somente Dentro do Estado (MT)</option>
@@ -568,7 +651,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.start}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                    className="h-10 w-full sm:w-44 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão inicial"
                     aria-label="Data de emissão inicial"
                   />
@@ -577,7 +660,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.end}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                    className="h-10 w-full sm:w-44 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão final"
                     aria-label="Data de emissão final"
                   />
@@ -783,6 +866,77 @@ export default function NotaFiscalList() {
           )}
         </div>
       </div>
+
+      {syncModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-boxdark border border-gray-100 dark:border-strokedark shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-strokedark">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Log da Busca de NFs Lançadas</h4>
+              <button
+                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-strokedark text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                onClick={() => {
+                  if (syncStatus?.status !== 'running') {
+                    setSyncModalOpen(false);
+                    setSyncJobId(null);
+                  }
+                }}
+                disabled={syncStatus?.status === 'running'}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Encontradas</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{syncStatus?.totalEncontradas ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Processadas</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{syncStatus?.processadas ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Inseridas</p>
+                  <p className="text-lg font-semibold text-emerald-600">{syncStatus?.inseridas ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Ignoradas</p>
+                  <p className="text-lg font-semibold text-amber-600">{syncStatus?.ignoradas ?? 0}</p>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progresso</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{syncStatus?.progresso ?? 0}%</span>
+                </div>
+                <div className="h-3 w-full rounded-full bg-gray-200 dark:bg-meta-4 overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${Math.max(0, Math.min(100, syncStatus?.progresso ?? 0))}%` }}
+                  />
+                </div>
+              </div>
+
+              {syncStatus?.errorMessage && (
+                <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">
+                  {syncStatus.errorMessage}
+                </div>
+              )}
+
+              <div className="rounded-lg border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4/20 p-3 h-52 overflow-auto">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Eventos</p>
+                <div className="space-y-1">
+                  {(syncStatus?.logs ?? []).map((log, idx) => (
+                    <p key={`${idx}-${log}`} className="text-xs font-mono text-gray-700 dark:text-gray-300">{log}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
