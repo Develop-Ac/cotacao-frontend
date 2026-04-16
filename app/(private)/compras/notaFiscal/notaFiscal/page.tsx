@@ -626,33 +626,33 @@ export default function NotaFiscalList() {
           {viewState === 'LIST' && (
             <>
               {/* FILTERS BAR */}
-              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-4 mb-6 border border-gray-100 dark:border-strokedark overflow-x-auto">
-                <div className="flex flex-nowrap items-center gap-3 min-w-max">
+              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-3 mb-6 border border-gray-100 dark:border-strokedark overflow-hidden">
+                <div className="flex flex-nowrap items-center gap-2 w-full">
                   {/* Search Nota */}
-                  <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
-                    <div className="pl-3 pr-2 text-gray-400">
-                      <FaSearch size={14} />
+                  <div className="flex items-center h-9 w-[18%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                    <div className="pl-2 pr-1.5 text-gray-400">
+                      <FaSearch size={12} />
                     </div>
                     <input
                       type="text"
-                      placeholder="Nº da Nota ou Chave..."
+                      placeholder="Nº/Chave"
                       value={filterNumero}
                       onChange={(e) => setFilterNumero(e.target.value)}
-                      className="w-full h-full bg-transparent outline-none text-sm text-black dark:text-white placeholder:text-gray-400 min-w-0"
+                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
                     />
                   </div>
 
                   {/* Search Emitente */}
-                  <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
-                    <div className="pl-3 pr-2 text-gray-400">
-                      <FaSearch size={14} />
+                  <div className="flex items-center h-9 w-[18%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                    <div className="pl-2 pr-1.5 text-gray-400">
+                      <FaSearch size={12} />
                     </div>
                     <input
                       type="text"
-                      placeholder="Emitente ou CNPJ..."
+                      placeholder="Emitente/CNPJ"
                       value={filterEmitente}
                       onChange={(e) => setFilterEmitente(e.target.value)}
-                      className="w-full h-full bg-transparent outline-none text-sm text-black dark:text-white placeholder:text-gray-400 min-w-0"
+                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
                     />
                   </div>
 
@@ -660,7 +660,7 @@ export default function NotaFiscalList() {
                   <select
                     value={filterImposto}
                     onChange={(e) => setFilterImposto(e.target.value)}
-                    className="h-10 w-full sm:w-56 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[16%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="">Filtro Imposto: Todos</option>
                     <option value="ST">Somente ICMS ST</option>
@@ -672,7 +672,7 @@ export default function NotaFiscalList() {
                   <select
                     value={filterEstado}
                     onChange={(e) => setFilterEstado(e.target.value as "TODOS" | "DENTRO" | "FORA")}
-                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[20%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="TODOS">Estado: Todos</option>
                     <option value="DENTRO">Somente Dentro do Estado (MT)</option>
@@ -683,7 +683,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.start}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão inicial"
                     aria-label="Data de emissão inicial"
                   />
@@ -692,7 +692,7 @@ export default function NotaFiscalList() {
                     type="date"
                     value={dateRange.end}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    className="h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                     title="Data de emissão final"
                     aria-label="Data de emissão final"
                   />
