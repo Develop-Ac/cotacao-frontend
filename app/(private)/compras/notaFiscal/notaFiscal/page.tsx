@@ -146,30 +146,30 @@ export default function NotaFiscalList() {
           const j = await res.json();
           if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
         } catch { }
-                  <div className="flex items-center h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+        throw new Error(msg);
       }
-                      <FaSearch size={12} />
+
       const json: unknown = await res.json();
 
       if (Array.isArray(json)) {
         setItems(json as NotaFiscalRow[]);
       } else if (json && typeof json === "object") {
         setItems([json as NotaFiscalRow]);
-                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
+      } else {
         setItems([]);
       }
 
       // Fetch Status Map too
-                  <div className="flex items-center h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+      fetch(`${SERVICE_URL}/icms/payment-status`)
         .then(r => r.json())
-                      <FaSearch size={12} />
+        .then(map => setStatusMap(map))
         .catch(console.error);
 
     } catch (err: any) {
-                      placeholder="Emitente/CNPJ"
+      if (err?.name !== "AbortError") {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Erro ao carregar notas fiscais:", msg);
-                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
+        setItems([]);
       }
     } finally {
       setLoading(false);
@@ -177,7 +177,7 @@ export default function NotaFiscalList() {
   }, [dataSource, dateRange.start, dateRange.end]);
 
   // carrega ao montar
-                    className="h-9 w-full border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+  useEffect(() => {
     fetchAll();
   }, [fetchAll]);
 
