@@ -26,6 +26,13 @@ const LAUNCHED_SYNC_ENDPOINT = `${SERVICE_URL}/icms/nfe-lancadas/sync`;
 const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
 
+const toInputDate = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function NotaFiscalList() {
   // Paginação no front
   const [page, setPage] = useState(1);
@@ -62,7 +69,15 @@ export default function NotaFiscalList() {
   // Filters
   const [dataSource, setDataSource] = useState<'DATABASE' | 'UPLOAD'>('DATABASE');
   const [showLaunched, setShowLaunched] = useState(false);
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 90);
+    return {
+      start: toInputDate(start),
+      end: toInputDate(end),
+    };
+  });
 
   // New Filters
   const [filterNumero, setFilterNumero] = useState("");
@@ -114,7 +129,12 @@ export default function NotaFiscalList() {
 
     setLoading(true);
     try {
-      const res = await fetch(API_BASE, {
+      const params = new URLSearchParams();
+      if (dateRange.start) params.set("start", dateRange.start);
+      if (dateRange.end) params.set("end", dateRange.end);
+      const endpoint = params.toString() ? `${API_BASE}?${params.toString()}` : API_BASE;
+
+      const res = await fetch(endpoint, {
         method: "GET",
         headers: { Accept: "application/json" },
         signal: ctrl.signal,
@@ -154,7 +174,7 @@ export default function NotaFiscalList() {
     } finally {
       setLoading(false);
     }
-  }, [dataSource]);
+  }, [dataSource, dateRange.start, dateRange.end]);
 
   // carrega ao montar
   useEffect(() => {
