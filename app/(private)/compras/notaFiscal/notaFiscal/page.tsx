@@ -34,6 +34,26 @@ const toInputDate = (date: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const parseDecimal = (raw?: string | null) => {
+  const value = String(raw ?? "").trim();
+  if (!value) return 0;
+
+  let normalized = value;
+  if (normalized.includes(",") && normalized.includes(".")) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (normalized.includes(",")) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const extractVnfFromXml = (xml: string) => {
+  const match = xml.match(/<(?:\w+:)?vNF>([^<]+)<\/(?:\w+:)?vNF>/i);
+  return parseDecimal(match?.[1]);
+};
+
 export default function NotaFiscalList() {
   const router = useRouter();
 
@@ -340,7 +360,7 @@ export default function NotaFiscalList() {
           new Date().toISOString();
 
         // Extract valor total da NF-e
-        const valorTotal = parseFloat(xmlText.match(/<vNF>([\d.]+)<\/vNF>/)?.[1] ?? '0');
+        const valorTotal = extractVnfFromXml(xmlText);
 
         loadedItems.push({
           EMPRESA: 0,
