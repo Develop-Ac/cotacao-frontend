@@ -408,13 +408,21 @@ export default function NotaFiscalList() {
     }
   };
 
-  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>) => {
+  const handleConfirmUnmatched = (
+    selectedIndices: Set<number>,
+    taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>,
+    destinations: Record<number, 'COMERCIALIZACAO' | 'USO_CONSUMO'>,
+  ) => {
     if (!tempResults) return;
 
     // tempResults.unmatched arrays holds ALL items now (we passed allData into it)
     const finalized = tempResults.unmatched.reduce((acc, item, idx) => {
       if (selectedIndices.has(idx)) {
-        acc.push({ ...item, impostoEscolhido: taxTypes[idx] });
+        acc.push({
+          ...item,
+          impostoEscolhido: taxTypes[idx],
+          destinacaoMercadoria: destinations[idx],
+        });
       }
       return acc;
     }, [] as StCalculationResult[]);

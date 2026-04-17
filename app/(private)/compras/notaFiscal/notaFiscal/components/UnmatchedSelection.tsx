@@ -6,7 +6,11 @@ import { FaCheckSquare, FaSquare, FaExclamationTriangle, FaArrowRight } from "re
 
 type Props = {
     unmatchedItems: StCalculationResult[];
-    onConfirm: (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>) => void;
+    onConfirm: (
+        selectedIndices: Set<number>,
+        taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>,
+        destinations: Record<number, 'COMERCIALIZACAO' | 'USO_CONSUMO'>,
+    ) => void;
     onCancel: () => void;
 };
 
@@ -32,6 +36,15 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
     });
 
     const [headerTaxType, setHeaderTaxType] = useState<'ST' | 'DIFAL' | 'TRIBUTADA' | ''>('');
+    const [destinations, setDestinations] = useState<Record<number, 'COMERCIALIZACAO' | 'USO_CONSUMO'>>(() => {
+        const initial: Record<number, 'COMERCIALIZACAO' | 'USO_CONSUMO'> = {};
+        unmatchedItems.forEach((item, idx) => {
+            const imposto = (item.matchType && item.matchType !== 'Não Encontrado') ? 'ST' : 'DIFAL';
+            initial[idx] = imposto === 'ST' ? 'COMERCIALIZACAO' : 'USO_CONSUMO';
+        });
+        return initial;
+    });
+    const [headerDestination, setHeaderDestination] = useState<'COMERCIALIZACAO' | 'USO_CONSUMO' | ''>('');
 
     const toggle = (idx: number) => {
         const next = new Set(selected);
@@ -80,10 +93,26 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
         }
     };
 
+    const handleHeaderDestinationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value as 'COMERCIALIZACAO' | 'USO_CONSUMO' | '';
+        setHeaderDestination(val);
+        if (!val) return;
+
+        const next = { ...destinations };
+        selected.forEach((idx) => {
+            next[idx] = val;
+        });
+        setDestinations(next);
+    };
+
     const handleRowTaxChange = (idx: number, e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value as 'ST' | 'DIFAL' | 'TRIBUTADA' | '';
         if (val) {
             setTaxTypes(prev => ({ ...prev, [idx]: val as 'ST' | 'DIFAL' | 'TRIBUTADA' }));
+            setDestinations(prev => ({
+                ...prev,
+                [idx]: val === 'ST' ? 'COMERCIALIZACAO' : (prev[idx] || 'USO_CONSUMO'),
+            }));
             if (!selected.has(idx)) {
                 setSelected(prev => new Set(prev).add(idx));
             }
@@ -94,6 +123,16 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
         }
     };
 
+    const handleRowDestinationChange = (idx: number, e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value as 'COMERCIALIZACAO' | 'USO_CONSUMO' | '';
+        if (!val) return;
+
+        setDestinations(prev => ({ ...prev, [idx]: val }));
+        if (!selected.has(idx)) {
+            setSelected(prev => new Set(prev).add(idx));
+        }
+    };
+
     const handleConfirm = () => {
         // Validation: Every selected item must have a tax type
         const missing = Array.from(selected).filter(idx => !taxTypes[idx]);
@@ -101,7 +140,14 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
             alert("Você precisa selecionar o Tipo de Imposto (ICMS ST ou DIFAL) para todos os produtos marcados na lista.");
             return;
         }
-        onConfirm(selected, taxTypes);
+
+        const missingDestination = Array.from(selected).filter((idx) => !destinations[idx]);
+        if (missingDestination.length > 0) {
+            alert("Você precisa definir a destinação da mercadoria para todos os itens selecionados.");
+            return;
+        }
+
+        onConfirm(selected, taxTypes, destinations);
     };
 
     return (
@@ -114,6 +160,7 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
             <p className="mb-6 text-gray-600 dark:text-gray-300">
                 Abaixo estão todos os produtos da nota. Itens com vínculo de MVA já vêm selecionados como <b>ICMS ST</b>.
                 Para produtos de uso e consumo, você pode trocar livremente a opção para <b>DIFAL</b>.
+                Para compras fora do estado a destinação é sugerida automaticamente, mas pode ser alterada manualmente.
                 Itens sem MVA vêm desmarcados, selecione-os e escolha a tributação obrigatoriamente caso deseje calculá-los.
             </p>
 
@@ -143,16 +190,32 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
                                     </select>
                                 </div>
                             </th>
+                            <th className="px-4 py-3 w-[220px]">
+                                <div className="flex flex-col gap-1">
+                                    <span>Destinação</span>
+                                    <select
+                                        value={headerDestination}
+                                        onChange={handleHeaderDestinationChange}
+                                        className="w-full border p-1 rounded font-normal text-xs bg-white text-black dark:bg-form-input dark:text-white dark:border-form-strokedark focus:ring focus:ring-blue-500/50"
+                                    >
+                                        <option value="">-- Aplicar a todos --</option>
+                                        <option value="COMERCIALIZACAO">Compra para Comercialização</option>
+                                        <option value="USO_CONSUMO">Uso e Consumo</option>
+                                    </select>
+                                </div>
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-stroke dark:divide-strokedark">
                         {unmatchedItems.map((row, idx) => {
                             const isSelected = selected.has(idx);
                             const rowTax = taxTypes[idx] || '';
+                            const rowDestination = destinations[idx] || '';
                             const hasError = isSelected && !rowTax;
+                            const hasDestinationError = isSelected && !rowDestination;
 
                             return (
-                                <tr key={idx} className={`hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors ${isSelected ? (hasError ? 'bg-red-50 dark:bg-red-900/10' : 'bg-blue-50 dark:bg-blue-900/10') : ''}`}>
+                                <tr key={idx} className={`hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors ${isSelected ? (hasError || hasDestinationError ? 'bg-red-50 dark:bg-red-900/10' : 'bg-blue-50 dark:bg-blue-900/10') : ''}`}>
                                     <td className="px-4 py-3 text-center align-middle">
                                         <button onClick={() => toggle(idx)} className={isSelected ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}>
                                             {isSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
@@ -182,6 +245,22 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
                                             <option value="TRIBUTADA">Tributada</option>
                                         </select>
                                         {hasError && (
+                                            <span className="text-[10px] text-red-500 font-medium block mt-1">
+                                                Obrigatório
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 align-middle">
+                                        <select
+                                            value={rowDestination}
+                                            onChange={(e) => handleRowDestinationChange(idx, e)}
+                                            className={`w-full border p-1.5 rounded text-sm bg-white dark:bg-form-input focus:ring focus:ring-blue-500/50 transition-colors ${hasDestinationError ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300 dark:border-form-strokedark'}`}
+                                        >
+                                            <option value="">Selecione...</option>
+                                            <option value="COMERCIALIZACAO">Compra para Comercialização</option>
+                                            <option value="USO_CONSUMO">Uso e Consumo</option>
+                                        </select>
+                                        {hasDestinationError && (
                                             <span className="text-[10px] text-red-500 font-medium block mt-1">
                                                 Obrigatório
                                             </span>

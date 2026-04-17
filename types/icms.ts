@@ -22,6 +22,9 @@ export type StCalculationResult = {
     produto: string;
     ncmNota: string;
     cfop: string;
+    cstNota?: string;
+    icmsTag?: string;
+    possuiIcmsSt?: boolean;
     refTabela?: number;
     matchType: string;
     mvaNota: number;
@@ -35,6 +38,37 @@ export type StCalculationResult = {
     diferenca: number;
     status: 'Guia Complementar' | 'Pago a Maior' | 'OK' | 'NCM s/ Ref' | 'Erro';
     impostoEscolhido?: 'ST' | 'DIFAL' | 'TRIBUTADA';
+    destinacaoMercadoria?: 'COMERCIALIZACAO' | 'USO_CONSUMO';
+};
+
+export type FiscalConferenceItem = {
+    item: number;
+    codProdFornecedor: string;
+    impostoEscolhido: 'ST' | 'DIFAL' | 'TRIBUTADA';
+    destinacaoMercadoria: 'COMERCIALIZACAO' | 'USO_CONSUMO';
+    ncmNota?: string;
+    cfop?: string;
+    cstNota?: string;
+    possuiIcmsSt?: boolean;
+    possuiDifal?: boolean;
+};
+
+export type FiscalConferenceInvoiceResult = {
+    chaveNfe: string;
+    flagsNota: {
+        compraComercializacao: boolean;
+        usoConsumo: boolean;
+    };
+    itens: Array<{
+        item: number;
+        codProdFornecedor: string;
+        statusConferencia: 'OK' | 'DIVERGENTE';
+        divergencias: string[];
+        fornecedor?: { forCodigo: string; forNome: string } | null;
+        produtoInterno?: { proCodigo: string; descricao: string } | null;
+        produtoVinculado?: { proCodigo: string; descFornecedor: string } | null;
+    }>;
+    warnings?: string[];
 };
 
 export type InvoicePaymentStatus = {
