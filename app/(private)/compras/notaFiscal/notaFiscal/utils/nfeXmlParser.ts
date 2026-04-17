@@ -10,6 +10,8 @@ export type NfeItemDetail = {
   valorTotal: number;
   icmsProprio: number;
   icmsSt: number;
+  cst: string;
+  icmsTag: string;
   ipi: number;
   pis: number;
   cofins: number;
@@ -37,6 +39,14 @@ export type ParsedNfe = {
   header: NfeHeaderDetail;
   items: NfeItemDetail[];
   taxes: NfeTaxesDetail;
+};
+
+const findIcmsTag = (imposto?: Element | null) => {
+  if (!imposto) return '';
+  const icmsNode = getFirstByLocalName(imposto, 'ICMS');
+  if (!icmsNode) return '';
+  const child = Array.from(icmsNode.children).find((el) => el.localName.startsWith('ICMS'));
+  return child?.localName || '';
 };
 
 const toNumber = (raw?: string | null) => {
@@ -97,6 +107,8 @@ export const parseNfeXml = (xml: string): ParsedNfe => {
   const items: NfeItemDetail[] = detNodes.map((detNode, index) => {
     const prod = getFirstByLocalName(detNode, 'prod');
     const imposto = getFirstByLocalName(detNode, 'imposto');
+    const cst = imposto ? (getTextByLocalName(imposto, 'CST') || getTextByLocalName(imposto, 'CSOSN')) : '';
+    const icmsTag = findIcmsTag(imposto);
 
     return {
       nItem: Number(detNode.getAttribute('nItem') || index + 1),
@@ -110,6 +122,8 @@ export const parseNfeXml = (xml: string): ParsedNfe => {
       valorTotal: prod ? toNumber(getTextByLocalName(prod, 'vProd')) : 0,
       icmsProprio: imposto ? toNumber(getTextByLocalName(imposto, 'vICMS')) : 0,
       icmsSt: imposto ? toNumber(getTextByLocalName(imposto, 'vICMSST')) : 0,
+      cst,
+      icmsTag,
       ipi: imposto ? toNumber(getTextByLocalName(imposto, 'vIPI')) : 0,
       pis: imposto ? toNumber(getTextByLocalName(imposto, 'vPIS')) : 0,
       cofins: imposto ? toNumber(getTextByLocalName(imposto, 'vCOFINS')) : 0,

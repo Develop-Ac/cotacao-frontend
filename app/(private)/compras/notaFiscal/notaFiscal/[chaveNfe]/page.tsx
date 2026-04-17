@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { FaArrowLeft, FaFilePdf, FaSync } from "react-icons/fa";
+import { FaArrowLeft, FaCheckCircle, FaExclamationTriangle, FaFilePdf, FaSearch, FaSync } from "react-icons/fa";
 import { serviceUrl } from "@/lib/services";
 import { NotaFiscalRow } from "@/types/icms";
 import { parseNfeXml, ParsedNfe } from "../utils/nfeXmlParser";
@@ -14,6 +14,25 @@ type PaymentStatusByKey = {
   valor: number | null;
   tipo_imposto: string | null;
   data_pagamento: string | null;
+};
+
+type DestinacaoMercadoria = "COMERCIALIZACAO" | "USO_CONSUMO";
+
+type FiscalCheckItemResult = {
+  item: number;
+  codProdFornecedor: string;
+  statusConferencia: "OK" | "DIVERGENTE";
+  divergencias: string[];
+};
+
+type FiscalCheckResult = {
+  chaveNfe: string;
+  flagsNota: {
+    compraComercializacao: boolean;
+    usoConsumo: boolean;
+  };
+  itens: FiscalCheckItemResult[];
+  warnings?: string[];
 };
 
 const SERVICE_URL = serviceUrl("calculadoraSt");
@@ -45,6 +64,14 @@ export default function NotaFiscalDetailsPage() {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusByKey | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [productCheckOpen, setProductCheckOpen] = useState(false);
+  const [checkingProducts, setCheckingProducts] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [destinations, setDestinations] = useState<Record<number, DestinacaoMercadoria>>({});
+  const [headerDestination, setHeaderDestination] = useState<DestinacaoMercadoria | "">("");
+  const [fiscalCheckResult, setFiscalCheckResult] = useState<FiscalCheckResult | null>(null);
+
+  const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
 
   useEffect(() => {
     return () => {
@@ -167,6 +194,97 @@ export default function NotaFiscalDetailsPage() {
     }
   }, [invoice?.XML_COMPLETO]);
 
+  useEffect(() => {
+    const nextSelected = new Set<number>();
+    const nextDestinations: Record<number, DestinacaoMercadoria> = {};
+    (parsed?.items || []).forEach((item, index) => {
+      nextSelected.add(index);
+      const isStItem = item.icmsSt > 0 || item.cst.endsWith("10") || item.cst.endsWith("60");
+      nextDestinations[index] = isStItem ? "COMERCIALIZACAO" : "USO_CONSUMO";
+    });
+    setSelectedItems(nextSelected);
+    setDestinations(nextDestinations);
+    setFiscalCheckResult(null);
+  }, [parsed?.items]);
+
+  const toggleItemSelection = (index: number) => {
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const applyHeaderDestination = (value: DestinacaoMercadoria | "") => {
+    setHeaderDestination(value);
+    if (!value) return;
+    setDestinations((prev) => {
+      const next = { ...prev };
+      selectedItems.forEach((idx) => {
+        next[idx] = value;
+      });
+      return next;
+    });
+  };
+
+  const runProductCheck = async () => {
+    if (!parsed?.items?.length || !invoice) return;
+
+    if (selectedItems.size === 0) {
+      alert("Selecione ao menos um item para verificar o cadastro do produto.");
+      return;
+    }
+
+    const missingDestination = Array.from(selectedItems).filter((idx) => !destinations[idx]);
+    if (missingDestination.length > 0) {
+      alert("Defina a destinação para todos os itens selecionados.");
+      return;
+    }
+
+    const itens = Array.from(selectedItems).map((idx) => {
+      const item = parsed.items[idx];
+      const destinacao = destinations[idx];
+      const impostoEscolhido = destinacao === "USO_CONSUMO"
+        ? (isDentroDoEstado ? "TRIBUTADA" : "DIFAL")
+        : "ST";
+
+      return {
+        item: item.nItem,
+        codProdFornecedor: item.codigo,
+        impostoEscolhido,
+        destinacaoMercadoria: destinacao,
+        ncmNota: item.ncm,
+        cfop: item.cfop,
+        cstNota: item.cst,
+        possuiIcmsSt: item.icmsSt > 0 || item.cst.endsWith("10") || item.cst.endsWith("60"),
+        possuiDifal: impostoEscolhido === "DIFAL",
+      };
+    });
+
+    setCheckingProducts(true);
+    setError(null);
+    try {
+      const res = await fetch(`${SERVICE_URL}/icms/fiscal-conferencia/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notas: [{ chaveNfe: invoice.CHAVE_NFE, itens }] }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Erro ao executar a verificação de cadastro do produto.");
+      }
+
+      const data = await res.json();
+      setFiscalCheckResult((data?.notas || [])[0] || null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao verificar cadastro do produto.";
+      setError(message);
+    } finally {
+      setCheckingProducts(false);
+    }
+  };
+
   const headerData = useMemo(() => {
     if (!invoice) return null;
 
@@ -198,14 +316,22 @@ export default function NotaFiscalDetailsPage() {
         </div>
 
         {invoice?.XML_COMPLETO && (
-          <button
-            onClick={generatePreviewPdf}
-            disabled={loadingPdf}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-          >
-            <FaSync className={loadingPdf ? "animate-spin" : ""} />
-            Atualizar PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setProductCheckOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              <FaSearch /> Verificação do Produto
+            </button>
+            <button
+              onClick={generatePreviewPdf}
+              disabled={loadingPdf}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              <FaSync className={loadingPdf ? "animate-spin" : ""} />
+              Atualizar PDF
+            </button>
+          </div>
         )}
       </div>
 
@@ -249,8 +375,7 @@ export default function NotaFiscalDetailsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div className="xl:col-span-2 space-y-6">
+          <div className="space-y-6">
               <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Produtos da NF</h2>
@@ -337,42 +462,175 @@ export default function NotaFiscalDetailsPage() {
                   </div>
                 </div>
               </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">PDF da NF (DANFE)</h2>
+              <button
+                onClick={downloadPdf}
+                disabled={!pdfUrl}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <FaFilePdf /> Download
+              </button>
             </div>
 
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">PDF da NF (DANFE)</h2>
+            {!invoice.XML_COMPLETO && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                XML indisponível para gerar o PDF desta nota.
+              </div>
+            )}
+
+            {invoice.XML_COMPLETO && !pdfUrl && (
+              <div className="flex h-[75vh] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500">
+                Gerando pré-visualização do PDF...
+              </div>
+            )}
+
+            {pdfUrl && (
+              <iframe
+                title="Pré-visualização DANFE"
+                src={pdfUrl}
+                className="h-[75vh] w-full rounded-lg border border-gray-200"
+              />
+            )}
+          </div>
+        </>
+      )}
+
+      {productCheckOpen && parsed && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-6xl rounded-xl border border-gray-100 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Verificação de Cadastro do Produto</h3>
+              <button
+                onClick={() => setProductCheckOpen(false)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                disabled={checkingProducts}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <p className="text-sm text-gray-600">
+                Selecione a destinação por item. Para uso e consumo: dentro do estado o imposto não é obrigatório; fora do estado será aplicado DIFAL automaticamente.
+              </p>
+
+              <div className="overflow-x-auto rounded-lg border border-gray-100">
+                <table className="min-w-full table-fixed border-collapse text-left text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-600">
+                    <tr>
+                      <th className="w-[60px] px-2 py-2 text-center">Sel.</th>
+                      <th className="w-[70px] px-2 py-2">Item</th>
+                      <th className="px-2 py-2">Produto</th>
+                      <th className="w-[140px] px-2 py-2">NCM/CFOP</th>
+                      <th className="w-[240px] px-2 py-2">
+                        <div className="flex flex-col gap-1">
+                          <span>Destinação</span>
+                          <select
+                            value={headerDestination}
+                            onChange={(e) => applyHeaderDestination(e.target.value as DestinacaoMercadoria | "")}
+                            className="rounded border border-gray-300 p-1 text-xs"
+                          >
+                            <option value="">Aplicar a todos</option>
+                            <option value="COMERCIALIZACAO">Compra para Comercialização</option>
+                            <option value="USO_CONSUMO">Uso e Consumo</option>
+                          </select>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsed.items.map((item, idx) => {
+                      const isSelected = selectedItems.has(idx);
+                      return (
+                        <tr key={`${item.nItem}-${item.codigo}`} className={`border-t border-gray-100 ${isSelected ? "bg-blue-50/50" : ""}`}>
+                          <td className="px-2 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleItemSelection(idx)}
+                            />
+                          </td>
+                          <td className="px-2 py-2">{item.nItem}</td>
+                          <td className="px-2 py-2">
+                            <p className="font-medium text-gray-900">{item.descricao || "-"}</p>
+                            <p className="text-xs text-gray-500">Cód: {item.codigo || "-"}</p>
+                          </td>
+                          <td className="px-2 py-2 text-xs text-gray-700">
+                            NCM: {item.ncm || "-"}
+                            <br />
+                            CFOP: {item.cfop || "-"}
+                          </td>
+                          <td className="px-2 py-2">
+                            <select
+                              value={destinations[idx] || ""}
+                              onChange={(e) => setDestinations((prev) => ({ ...prev, [idx]: e.target.value as DestinacaoMercadoria }))}
+                              className="w-full rounded border border-gray-300 p-1.5 text-sm"
+                            >
+                              <option value="">Selecione...</option>
+                              <option value="COMERCIALIZACAO">Compra para Comercialização</option>
+                              <option value="USO_CONSUMO">Uso e Consumo</option>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-end">
                 <button
-                  onClick={downloadPdf}
-                  disabled={!pdfUrl}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  onClick={runProductCheck}
+                  disabled={checkingProducts}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
                 >
-                  <FaFilePdf /> Download
+                  <FaSearch /> {checkingProducts ? "Verificando..." : "Verificar Cadastro"}
                 </button>
               </div>
 
-              {!invoice.XML_COMPLETO && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                  XML indisponível para gerar o PDF desta nota.
+              {fiscalCheckResult && (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-3">
+                    <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+                      Comercialização: {fiscalCheckResult.flagsNota.compraComercializacao ? "Sim" : "Não"}
+                    </span>
+                    <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                      Uso e Consumo: {fiscalCheckResult.flagsNota.usoConsumo ? "Sim" : "Não"}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {fiscalCheckResult.itens.map((item) => (
+                      <div key={`${item.item}-${item.codProdFornecedor}`} className="rounded border border-gray-200 bg-white px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-gray-900">Item {item.item} - Cód. fornecedor: {item.codProdFornecedor}</p>
+                          {item.statusConferencia === "OK" ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700"><FaCheckCircle /> OK</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700"><FaExclamationTriangle /> Divergente</span>
+                          )}
+                        </div>
+                        {item.divergencias.length > 0 && (
+                          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-red-700">
+                            {item.divergencias.map((div, idx) => <li key={`${item.item}-div-${idx}`}>{div}</li>)}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {(fiscalCheckResult.warnings || []).length > 0 && (
+                    <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      {(fiscalCheckResult.warnings || []).join(" | ")}
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {invoice.XML_COMPLETO && !pdfUrl && (
-                <div className="flex h-[75vh] items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500">
-                  Gerando pré-visualização do PDF...
-                </div>
-              )}
-
-              {pdfUrl && (
-                <iframe
-                  title="Pré-visualização DANFE"
-                  src={pdfUrl}
-                  className="h-[75vh] w-full rounded-lg border border-gray-200"
-                />
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

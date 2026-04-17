@@ -1,7 +1,7 @@
 "use client";
 
 import { serviceUrl } from "@/lib/services";
-import { FiscalConferenceInvoiceResult, NotaFiscalRow, StCalculationResult } from "@/types/icms";
+import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
 import { useMemo, useState, useEffect } from "react";
 import { FaExclamationTriangle, FaCheckCircle, FaMoneyBillWave, FaCalculator, FaArrowLeft, FaFilePdf, FaFileArchive, FaCheckSquare, FaSquare } from "react-icons/fa";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -27,8 +27,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
     // --- PDF / ZIP STATE ---
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [generating, setGenerating] = useState(false);
-    const [conferenceByInvoice, setConferenceByInvoice] = useState<Record<string, FiscalConferenceInvoiceResult>>({});
-    const [loadingConference, setLoadingConference] = useState(false);
 
     const activeOriginalItems = useMemo(() => {
         return originalItems.filter(i => selectedInvoices.has(i.CHAVE_NFE));
@@ -105,62 +103,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
         results.forEach((_, i) => initial.add(i));
         setSelectedIndices(initial);
     }, [results]);
-
-    useEffect(() => {
-        const activeResults = results.filter((_, i) => selectedIndices.has(i));
-        if (activeResults.length === 0) {
-            setConferenceByInvoice({});
-            return;
-        }
-
-        const notasMap: Record<string, any[]> = {};
-        for (const row of activeResults) {
-            if (!notasMap[row.chaveNfe]) notasMap[row.chaveNfe] = [];
-            notasMap[row.chaveNfe].push({
-                item: row.item,
-                codProdFornecedor: row.codProd,
-                impostoEscolhido: row.impostoEscolhido,
-                destinacaoMercadoria: row.destinacaoMercadoria,
-                ncmNota: row.ncmNota,
-                cfop: row.cfop,
-                cstNota: row.cstNota,
-                possuiIcmsSt: row.impostoEscolhido === 'ST' || row.possuiIcmsSt,
-                possuiDifal: row.impostoEscolhido === 'DIFAL',
-            });
-        }
-
-        const notas = Object.entries(notasMap)
-            .map(([chaveNfe, itens]) => ({ chaveNfe, itens }))
-            .filter((nota) => nota.itens.every((item) => item.impostoEscolhido && item.destinacaoMercadoria));
-
-        if (notas.length === 0) {
-            setConferenceByInvoice({});
-            return;
-        }
-
-        setLoadingConference(true);
-        fetch(`${serviceUrl("calculadoraSt")}/icms/fiscal-conferencia/preview`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ notas }),
-        })
-            .then(async (res) => {
-                if (!res.ok) throw new Error('Falha ao gerar prévia da conferência fiscal.');
-                return res.json();
-            })
-            .then((data) => {
-                const map: Record<string, FiscalConferenceInvoiceResult> = {};
-                for (const nota of data?.notas || []) {
-                    map[nota.chaveNfe] = nota;
-                }
-                setConferenceByInvoice(map);
-            })
-            .catch((err) => {
-                console.error(err);
-                setConferenceByInvoice({});
-            })
-            .finally(() => setLoadingConference(false));
-    }, [results, selectedIndices]);
 
     const toggleItem = (index: number) => {
         const next = new Set(selectedIndices);
@@ -270,17 +212,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 observacoes: status,
                 valor: Number(totalValue.toFixed(2)),
                 tipo_imposto: tipoImposto,
-                itens: activeItemsForInvoice.map((item) => ({
-                    item: item.item,
-                    codProdFornecedor: item.codProd,
-                    impostoEscolhido: item.impostoEscolhido,
-                    destinacaoMercadoria: item.destinacaoMercadoria,
-                    ncmNota: item.ncmNota,
-                    cfop: item.cfop,
-                    cstNota: item.cstNota,
-                    possuiIcmsSt: item.impostoEscolhido === 'ST' || item.possuiIcmsSt,
-                    possuiDifal: item.impostoEscolhido === 'DIFAL',
-                })),
                 usuario: user?.nome || 'Sistema'
             };
         });
@@ -406,7 +337,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
                             <th className="px-4 py-3 text-right">Calc. (Ref)</th>
                             <th className="px-4 py-3 text-right">A Recolher</th>
                             <th className="px-4 py-3 text-center">Status</th>
-                            <th className="px-4 py-3 text-center">Conferência Fiscal</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-stroke dark:divide-strokedark">
@@ -415,7 +345,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
                             const isDifal = row.impostoEscolhido === 'DIFAL';
                             const isTributada = row.impostoEscolhido === 'TRIBUTADA';
                             const valorARecolher = isTributada ? 0 : isDifal ? (row.vlDifal || 0) : row.diferenca;
-                            const conferenceItem = conferenceByInvoice[row.chaveNfe]?.itens?.find((it) => it.item === row.item);
                             return (
                                 <tr key={idx} className={`hover:bg-gray-50 dark:hover:bg-meta-4 transition-colors ${isSelected ? '' : 'opacity-50 grayscale'}`}>
                                     <td className="px-4 py-3 text-center">
@@ -474,26 +403,6 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                                 : <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600">OK</span>
                                         ) : (
                                             <StatusBadge status={row.status} />
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 text-center">
-                                        {!isSelected ? (
-                                            <span className="text-xs text-gray-400">Não selecionado</span>
-                                        ) : conferenceItem ? (
-                                            conferenceItem.statusConferencia === 'OK' ? (
-                                                <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">OK</span>
-                                            ) : (
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Divergente</span>
-                                                    <span className="text-[10px] text-red-600 max-w-[220px] line-clamp-2" title={conferenceItem.divergencias.join(' | ')}>
-                                                        {conferenceItem.divergencias[0]}
-                                                    </span>
-                                                </div>
-                                            )
-                                        ) : loadingConference ? (
-                                            <span className="text-xs text-gray-500">Conferindo...</span>
-                                        ) : (
-                                            <span className="text-xs text-gray-400">Sem prévia</span>
                                         )}
                                     </td>
                                 </tr>

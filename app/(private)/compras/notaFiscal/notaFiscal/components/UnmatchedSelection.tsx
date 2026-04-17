@@ -15,6 +15,8 @@ type Props = {
 };
 
 export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel }: Props) {
+    const isDentroDoEstado = (idx: number) => String(unmatchedItems[idx]?.chaveNfe || '').startsWith('51');
+
     const [selected, setSelected] = useState<Set<number>>(() => {
         const init = new Set<number>();
         unmatchedItems.forEach((item, idx) => {
@@ -134,20 +136,42 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
     };
 
     const handleConfirm = () => {
-        // Validation: Every selected item must have a tax type
-        const missing = Array.from(selected).filter(idx => !taxTypes[idx]);
-        if (missing.length > 0) {
-            alert("Você precisa selecionar o Tipo de Imposto (ICMS ST ou DIFAL) para todos os produtos marcados na lista.");
-            return;
-        }
-
         const missingDestination = Array.from(selected).filter((idx) => !destinations[idx]);
         if (missingDestination.length > 0) {
             alert("Você precisa definir a destinação da mercadoria para todos os itens selecionados.");
             return;
         }
 
-        onConfirm(selected, taxTypes, destinations);
+        const missingTax = Array.from(selected).filter((idx) => {
+            const destino = destinations[idx];
+            const imposto = taxTypes[idx];
+
+            if (destino === 'USO_CONSUMO') {
+                // Dentro do estado: imposto opcional
+                if (isDentroDoEstado(idx)) return false;
+                // Fora do estado: DIFAL obrigatório
+                return imposto !== 'DIFAL';
+            }
+
+            // Comercialização: imposto obrigatório
+            return !imposto;
+        });
+
+        if (missingTax.length > 0) {
+            alert("Revise o imposto dos itens selecionados: para Uso e Consumo fora do estado é obrigatório DIFAL; dentro do estado o imposto é opcional.");
+            return;
+        }
+
+        const normalizedTaxTypes = { ...taxTypes };
+        selected.forEach((idx) => {
+            if (!normalizedTaxTypes[idx]) {
+                const destino = destinations[idx];
+                // Preenche fallback para manter o payload consistente.
+                normalizedTaxTypes[idx] = destino === 'USO_CONSUMO' ? 'TRIBUTADA' : 'ST';
+            }
+        });
+
+        onConfirm(selected, normalizedTaxTypes, destinations);
     };
 
     return (
