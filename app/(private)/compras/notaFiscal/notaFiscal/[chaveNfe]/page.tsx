@@ -550,7 +550,7 @@ export default function NotaFiscalDetailsPage() {
       }
     }
 
-    router.push(`/compras/notaFiscal/notaFiscal?calcChave=${encodeURIComponent(invoice.CHAVE_NFE)}`);
+    router.push(`/compras/notaFiscal/notaFiscal?calcChave=${encodeURIComponent(invoice.CHAVE_NFE)}&replaceConfirmed=1`);
   };
 
   const headerData = useMemo(() => {

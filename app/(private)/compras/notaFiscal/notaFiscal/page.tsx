@@ -136,6 +136,7 @@ export default function NotaFiscalList() {
   const [tempResults, setTempResults] = useState<{ matched: StCalculationResult[], unmatched: StCalculationResult[] } | null>(null);
   const [autoCalcHandledKey, setAutoCalcHandledKey] = useState<string>("");
   const [pendingCalcChave, setPendingCalcChave] = useState<string>("");
+  const [pendingCalcSkipReplaceConfirm, setPendingCalcSkipReplaceConfirm] = useState(false);
 
   // Filters
   const [dataSource, setDataSource] = useState<'DATABASE' | 'UPLOAD'>('DATABASE');
@@ -335,8 +336,11 @@ export default function NotaFiscalList() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const chave = String(new URLSearchParams(window.location.search).get("calcChave") || "").trim();
+    const search = new URLSearchParams(window.location.search);
+    const chave = String(search.get("calcChave") || "").trim();
+    const skipReplaceConfirm = String(search.get("replaceConfirmed") || "") === "1";
     setPendingCalcChave(chave);
+    setPendingCalcSkipReplaceConfirm(skipReplaceConfirm);
   }, []);
 
   // Helper para data
@@ -454,7 +458,7 @@ export default function NotaFiscalList() {
   };
 
   // --- CALCULATION LOGIC ---
-  const handleCalculate = useCallback(async (overrideSelectedChaves?: Set<string>) => {
+  const handleCalculate = useCallback(async (overrideSelectedChaves?: Set<string>, skipReplaceConfirm = false) => {
     const selectedSet = overrideSelectedChaves || selectedChaves;
     if (selectedSet.size === 0) {
       alert("Selecione ao menos uma NF para calcular.");
@@ -477,7 +481,7 @@ export default function NotaFiscalList() {
       }
 
       const alreadyAnalyzed = selectedRows.filter(hasPreviousCalculation);
-      if (alreadyAnalyzed.length > 0) {
+      if (alreadyAnalyzed.length > 0 && !skipReplaceConfirm) {
         const shouldContinue = window.confirm(
           `Há ${alreadyAnalyzed.length} NF(s) com cálculo/análise anterior. A nova análise irá substituir a feita anteriormente. Deseja continuar?`
         );
@@ -518,8 +522,8 @@ export default function NotaFiscalList() {
     const selected = new Set<string>([pendingCalcChave]);
     setSelectedChaves(selected);
     setAutoCalcHandledKey(pendingCalcChave);
-    void handleCalculate(selected);
-  }, [pendingCalcChave, loading, viewState, autoCalcHandledKey, items, handleCalculate]);
+    void handleCalculate(selected, pendingCalcSkipReplaceConfirm);
+  }, [pendingCalcChave, pendingCalcSkipReplaceConfirm, loading, viewState, autoCalcHandledKey, items, handleCalculate]);
 
   const handleConfirmUnmatched = (
     selectedIndices: Set<number>,
