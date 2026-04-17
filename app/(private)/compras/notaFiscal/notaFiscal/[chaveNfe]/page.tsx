@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FaArrowLeft, FaCalculator, FaCheckCircle, FaExclamationTriangle, FaFilePdf, FaSearch, FaSync } from "react-icons/fa";
 import { createPortal } from "react-dom";
 import { serviceUrl } from "@/lib/services";
+import ConfirmationModal from "@/components/ConfirmationModal";
 import { NotaFiscalRow } from "@/types/icms";
 import { parseNfeXml, ParsedNfe } from "../utils/nfeXmlParser";
 
@@ -42,6 +43,16 @@ type FiscalCheckResult = {
   };
   itens: FiscalCheckItemResult[];
   warnings?: string[];
+};
+
+type ModalDialogState = {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  showCancel?: boolean;
+  onConfirmAction?: () => void;
 };
 
 const SERVICE_URL = serviceUrl("calculadoraSt");
@@ -87,7 +98,16 @@ export default function NotaFiscalDetailsPage() {
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [checkProgress, setCheckProgress] = useState(0);
   const [checkProgressText, setCheckProgressText] = useState("Preparando verificação...");
+  const [dialogState, setDialogState] = useState<ModalDialogState>({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirmar",
+    cancelText: "Cancelar",
+    showCancel: true,
+  });
   const checkProgressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dialogResolverRef = useRef<((value: boolean) => void) | null>(null);
 
   const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
   const hasPreviousTaxCalculation = useMemo(() => {
@@ -318,6 +338,40 @@ export default function NotaFiscalDetailsPage() {
     });
   };
 
+  const closeDialog = (result: boolean) => {
+    const resolver = dialogResolverRef.current;
+    dialogResolverRef.current = null;
+    setDialogState((prev) => ({ ...prev, isOpen: false }));
+    if (resolver) resolver(result);
+  };
+
+  const showNotice = (title: string, message: string) => {
+    setDialogState({
+      isOpen: true,
+      title,
+      message,
+      confirmText: "OK",
+      cancelText: "",
+      showCancel: false,
+      onConfirmAction: () => closeDialog(true),
+    });
+  };
+
+  const askConfirmation = (title: string, message: string, confirmText = "Confirmar") => {
+    return new Promise<boolean>((resolve) => {
+      dialogResolverRef.current = resolve;
+      setDialogState({
+        isOpen: true,
+        title,
+        message,
+        confirmText,
+        cancelText: "Cancelar",
+        showCancel: true,
+        onConfirmAction: () => closeDialog(true),
+      });
+    });
+  };
+
   const getImpostoLabel = (imposto?: ImpostoEscolhido) => {
     if (imposto === "ST") return "ICMS ST";
     if (imposto === "DIFAL") return "DIFAL";
@@ -336,13 +390,13 @@ export default function NotaFiscalDetailsPage() {
     if (!parsed?.items?.length || !invoice) return;
 
     if (selectedItems.size === 0) {
-      alert("Selecione ao menos um item para verificar o cadastro do produto.");
+      showNotice("Aviso", "Selecione ao menos um item para verificar o cadastro do produto.");
       return;
     }
 
     const missingDestination = Array.from(selectedItems).filter((idx) => !destinations[idx]);
     if (missingDestination.length > 0) {
-      alert("Defina a destinação para todos os itens selecionados.");
+      showNotice("Aviso", "Defina a destinação para todos os itens selecionados.");
       return;
     }
 
@@ -407,13 +461,13 @@ export default function NotaFiscalDetailsPage() {
 
   const generateErrorsPdfReport = () => {
     if (!fiscalCheckResult) {
-      alert("Execute a verificação antes de gerar o relatório.");
+      showNotice("Aviso", "Execute a verificação antes de gerar o relatório.");
       return;
     }
 
     const itensComErro = fiscalCheckResult.itens.filter((item) => item.divergencias.length > 0);
     if (itensComErro.length === 0) {
-      alert("Nenhum erro encontrado para gerar relatório.");
+      showNotice("Aviso", "Nenhum erro encontrado para gerar relatório.");
       return;
     }
 
@@ -469,7 +523,7 @@ export default function NotaFiscalDetailsPage() {
 
     const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
     if (!printWindow) {
-      alert("Não foi possível abrir a janela de impressão.");
+      showNotice("Aviso", "Não foi possível abrir a janela de impressão.");
       return;
     }
 
@@ -478,15 +532,17 @@ export default function NotaFiscalDetailsPage() {
     printWindow.document.close();
   };
 
-  const handleOpenTaxCalculation = () => {
+  const handleOpenTaxCalculation = async () => {
     if (!invoice?.CHAVE_NFE) {
-      alert("NF inválida para iniciar cálculo.");
+      showNotice("Aviso", "NF inválida para iniciar cálculo.");
       return;
     }
 
     if (hasPreviousTaxCalculation) {
-      const shouldContinue = window.confirm(
-        "Esta NF já possui cálculo/análise anterior. A nova análise irá substituir a feita anteriormente. Deseja continuar?"
+      const shouldContinue = await askConfirmation(
+        "Substituir Análise",
+        "Esta NF já possui cálculo/análise anterior. A nova análise irá substituir a feita anteriormente. Deseja continuar?",
+        "Sim, continuar"
       );
 
       if (!shouldContinue) {
@@ -530,6 +586,23 @@ export default function NotaFiscalDetailsPage() {
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
+      <ConfirmationModal
+        isOpen={dialogState.isOpen}
+        title={dialogState.title}
+        message={dialogState.message}
+        confirmText={dialogState.confirmText}
+        cancelText={dialogState.cancelText}
+        showCancel={dialogState.showCancel}
+        onConfirm={() => {
+          if (dialogState.onConfirmAction) {
+            dialogState.onConfirmAction();
+          } else {
+            closeDialog(true);
+          }
+        }}
+        onCancel={() => closeDialog(false)}
+      />
+
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
