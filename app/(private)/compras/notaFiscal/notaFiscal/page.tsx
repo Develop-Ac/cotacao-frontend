@@ -26,6 +26,7 @@ const API_BASE = `${SERVICE_URL}/icms/nfe-distribuicao`;
 const LAUNCHED_SYNC_ENDPOINT = `${SERVICE_URL}/icms/nfe-lancadas/sync`;
 const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
+const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
 
 const toInputDate = (date: Date) => {
   const yyyy = date.getFullYear();
@@ -52,6 +53,35 @@ const parseDecimal = (raw?: string | null) => {
 const extractVnfFromXml = (xml: string) => {
   const match = xml.match(/<(?:\w+:)?vNF>([^<]+)<\/(?:\w+:)?vNF>/i);
   return parseDecimal(match?.[1]);
+};
+
+const persistItemDestinations = (rows: StCalculationResult[]) => {
+  if (typeof window === "undefined" || rows.length === 0) return;
+
+  try {
+    const raw = window.localStorage.getItem(DESTINATION_CACHE_KEY);
+    const current = raw ? JSON.parse(raw) : {};
+
+    rows.forEach((row) => {
+      const chave = String(row.chaveNfe || "").trim();
+      if (!chave || !row.destinacaoMercadoria) return;
+
+      const nItem = Number(row.item ?? 0);
+      const codProd = String(row.codProd || "").trim();
+      const itemKey = `${nItem}|${codProd}`;
+
+      if (!current[chave]) {
+        current[chave] = { updatedAt: new Date().toISOString(), items: {} };
+      }
+
+      current[chave].updatedAt = new Date().toISOString();
+      current[chave].items[itemKey] = row.destinacaoMercadoria;
+    });
+
+    window.localStorage.setItem(DESTINATION_CACHE_KEY, JSON.stringify(current));
+  } catch {
+    // Non-blocking cache used only to propagate choices to detail screen.
+  }
 };
 
 export default function NotaFiscalList() {
@@ -89,6 +119,8 @@ export default function NotaFiscalList() {
   // Flow State
   const [viewState, setViewState] = useState<'LIST' | 'UNMATCHED_SELECTION' | 'RESULTS'>('LIST');
   const [tempResults, setTempResults] = useState<{ matched: StCalculationResult[], unmatched: StCalculationResult[] } | null>(null);
+  const [autoCalcHandledKey, setAutoCalcHandledKey] = useState<string>("");
+  const [pendingCalcChave, setPendingCalcChave] = useState<string>("");
 
   // Filters
   const [dataSource, setDataSource] = useState<'DATABASE' | 'UPLOAD'>('DATABASE');
@@ -286,6 +318,12 @@ export default function NotaFiscalList() {
 
   const pageSizes: (10 | 20 | 50)[] = [10, 20, 50];
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const chave = String(new URLSearchParams(window.location.search).get("calcChave") || "").trim();
+    setPendingCalcChave(chave);
+  }, []);
+
   // Helper para data
   const fmtDate = (iso?: string | null) => {
     if (!iso) return "-";
@@ -322,6 +360,13 @@ export default function NotaFiscalList() {
   };
 
   const isAllSelected = paged.length > 0 && paged.every(r => selectedChaves.has(r.CHAVE_NFE));
+
+  const hasPreviousCalculation = useCallback((row: NotaFiscalRow) => {
+    const savedStatus = statusMap[row.CHAVE_NFE];
+    const hasSavedStatus = Boolean(savedStatus && ((savedStatus.status || "").trim() || Number(savedStatus.valor || 0) > 0));
+    const hasTipoImposto = Boolean(String(row.TIPO_IMPOSTO || "").trim());
+    return hasSavedStatus || hasTipoImposto;
+  }, [statusMap]);
 
   // --- UPLOAD LOGIC ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -394,16 +439,36 @@ export default function NotaFiscalList() {
   };
 
   // --- CALCULATION LOGIC ---
-  const handleCalculate = async () => {
+  const handleCalculate = useCallback(async (overrideSelectedChaves?: Set<string>) => {
+    const selectedSet = overrideSelectedChaves || selectedChaves;
+    if (selectedSet.size === 0) {
+      alert("Selecione ao menos uma NF para calcular.");
+      return;
+    }
+
     setAnalyzing(true);
     try {
-      const selectedRows = items.filter(r => selectedChaves.has(r.CHAVE_NFE));
+      const selectedRows = items.filter(r => selectedSet.has(r.CHAVE_NFE));
       const xmls = selectedRows.map(r => r.XML_COMPLETO).filter(Boolean) as string[];
+
+      if (selectedRows.length === 0) {
+        alert("Nenhuma nota selecionada foi encontrada na lista atual.");
+        return;
+      }
 
       if (xmls.length === 0) {
         alert("Nenhum XML disponível para as notas selecionadas.");
-        setAnalyzing(false);
         return;
+      }
+
+      const alreadyAnalyzed = selectedRows.filter(hasPreviousCalculation);
+      if (alreadyAnalyzed.length > 0) {
+        const shouldContinue = window.confirm(
+          `Há ${alreadyAnalyzed.length} NF(s) com cálculo/análise anterior. A nova análise irá substituir a feita anteriormente. Deseja continuar?`
+        );
+        if (!shouldContinue) {
+          return;
+        }
       }
 
       const res = await fetch(CALCULATE_ENDPOINT, {
@@ -426,7 +491,20 @@ export default function NotaFiscalList() {
     } finally {
       setAnalyzing(false);
     }
-  };
+  }, [selectedChaves, items, hasPreviousCalculation]);
+
+  useEffect(() => {
+    if (!pendingCalcChave || loading || viewState !== 'LIST') return;
+    if (autoCalcHandledKey === pendingCalcChave) return;
+
+    const row = items.find((item) => item.CHAVE_NFE === pendingCalcChave);
+    if (!row) return;
+
+    const selected = new Set<string>([pendingCalcChave]);
+    setSelectedChaves(selected);
+    setAutoCalcHandledKey(pendingCalcChave);
+    void handleCalculate(selected);
+  }, [pendingCalcChave, loading, viewState, autoCalcHandledKey, items, handleCalculate]);
 
   const handleConfirmUnmatched = (
     selectedIndices: Set<number>,
@@ -446,6 +524,8 @@ export default function NotaFiscalList() {
       }
       return acc;
     }, [] as StCalculationResult[]);
+
+    persistItemDestinations(finalized);
 
     setResults(finalized);
     setViewState('RESULTS');
@@ -643,7 +723,7 @@ export default function NotaFiscalList() {
             {selectedChaves.size > 0 && (
               <button
                 className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all active:scale-95"
-                onClick={handleCalculate}
+                onClick={() => void handleCalculate()}
                 disabled={analyzing}
               >
                 <FaCalculator size={16} />

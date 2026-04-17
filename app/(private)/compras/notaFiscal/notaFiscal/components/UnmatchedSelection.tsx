@@ -101,7 +101,7 @@ export default function UnmatchedSelection({ unmatchedItems, onConfirm, onCancel
         if (!val) return;
 
         const next = { ...destinations };
-        selected.forEach((idx) => {
+        unmatchedItems.forEach((_, idx) => {
             next[idx] = val;
         });
         setDestinations(next);

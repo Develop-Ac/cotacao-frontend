@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { FaArrowLeft, FaCheckCircle, FaExclamationTriangle, FaFilePdf, FaSearch, FaSync } from "react-icons/fa";
+import { FaArrowLeft, FaCalculator, FaCheckCircle, FaExclamationTriangle, FaFilePdf, FaSearch, FaSync } from "react-icons/fa";
 import { createPortal } from "react-dom";
 import { serviceUrl } from "@/lib/services";
 import { NotaFiscalRow } from "@/types/icms";
@@ -40,6 +40,7 @@ type FiscalCheckResult = {
 
 const SERVICE_URL = serviceUrl("calculadoraSt");
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
+const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
 
 const money = (value?: number | null) =>
   (value ?? 0).toLocaleString("pt-BR", {
@@ -75,8 +76,18 @@ export default function NotaFiscalDetailsPage() {
   const [fiscalCheckResult, setFiscalCheckResult] = useState<FiscalCheckResult | null>(null);
   const [selectedDetailItem, setSelectedDetailItem] = useState<FiscalCheckItemResult | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [checkProgress, setCheckProgress] = useState(0);
+  const [checkProgressText, setCheckProgressText] = useState("Preparando verificação...");
+  const checkProgressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
+  const hasPreviousTaxCalculation = useMemo(() => {
+    const status = String(paymentStatus?.status || "").trim();
+    const tipoImposto = String(paymentStatus?.tipo_imposto || invoice?.TIPO_IMPOSTO || "").trim();
+    const valor = Number(paymentStatus?.valor || 0);
+    return Boolean(status || tipoImposto || valor > 0);
+  }, [paymentStatus, invoice?.TIPO_IMPOSTO]);
 
   useEffect(() => {
     setIsClient(true);
@@ -87,8 +98,27 @@ export default function NotaFiscalDetailsPage() {
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl);
       }
+
+      if (checkProgressIntervalRef.current) {
+        clearInterval(checkProgressIntervalRef.current);
+        checkProgressIntervalRef.current = null;
+      }
     };
   }, [pdfUrl]);
+
+  const readCachedDestinationMap = () => {
+    if (typeof window === "undefined" || !chaveNfe) return {} as Record<string, DestinacaoMercadoria>;
+
+    try {
+      const raw = window.localStorage.getItem(DESTINATION_CACHE_KEY);
+      if (!raw) return {};
+      const parsedCache = JSON.parse(raw);
+      const map = parsedCache?.[chaveNfe]?.items || {};
+      return map as Record<string, DestinacaoMercadoria>;
+    } catch {
+      return {};
+    }
+  };
 
   useEffect(() => {
     if (!chaveNfe) {
@@ -206,15 +236,53 @@ export default function NotaFiscalDetailsPage() {
   useEffect(() => {
     const nextSelected = new Set<number>();
     const nextDestinations: Record<number, DestinacaoMercadoria> = {};
+    const cachedDestinationMap = readCachedDestinationMap();
+
     (parsed?.items || []).forEach((item, index) => {
       nextSelected.add(index);
       const isStItem = item.icmsSt > 0 || item.cst.endsWith("10") || item.cst.endsWith("60");
-      nextDestinations[index] = isStItem ? "COMERCIALIZACAO" : "USO_CONSUMO";
+      const cacheKey = `${item.nItem}|${item.codigo || ""}`;
+      const cachedDestination = cachedDestinationMap[cacheKey];
+      nextDestinations[index] = cachedDestination || (isStItem ? "COMERCIALIZACAO" : "USO_CONSUMO");
     });
+
     setSelectedItems(nextSelected);
     setDestinations(nextDestinations);
     setFiscalCheckResult(null);
   }, [parsed?.items]);
+
+  const startProgressFeedback = (itemsCount: number) => {
+    if (checkProgressIntervalRef.current) {
+      clearInterval(checkProgressIntervalRef.current);
+      checkProgressIntervalRef.current = null;
+    }
+
+    setCheckProgress(5);
+    setCheckProgressText(`Verificando ${itemsCount} item(ns)...`);
+    setProgressModalOpen(true);
+
+    const step = Math.max(1, Math.floor(70 / Math.max(itemsCount, 1)));
+    checkProgressIntervalRef.current = setInterval(() => {
+      setCheckProgress((prev) => {
+        if (prev >= 92) return prev;
+        return Math.min(92, prev + step);
+      });
+    }, 200);
+  };
+
+  const finishProgressFeedback = (message: string) => {
+    if (checkProgressIntervalRef.current) {
+      clearInterval(checkProgressIntervalRef.current);
+      checkProgressIntervalRef.current = null;
+    }
+
+    setCheckProgressText(message);
+    setCheckProgress(100);
+
+    window.setTimeout(() => {
+      setProgressModalOpen(false);
+    }, 500);
+  };
 
   const toggleItemSelection = (index: number) => {
     setSelectedItems((prev) => {
@@ -271,6 +339,7 @@ export default function NotaFiscalDetailsPage() {
       };
     });
 
+    startProgressFeedback(selectedItems.size);
     setCheckingProducts(true);
     setError(null);
     try {
@@ -286,12 +355,111 @@ export default function NotaFiscalDetailsPage() {
 
       const data = await res.json();
       setFiscalCheckResult((data?.notas || [])[0] || null);
+      finishProgressFeedback("Conferência concluída com sucesso.");
+      setProductCheckOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao verificar cadastro do produto.";
       setError(message);
+      if (checkProgressIntervalRef.current) {
+        clearInterval(checkProgressIntervalRef.current);
+        checkProgressIntervalRef.current = null;
+      }
+      setProgressModalOpen(false);
     } finally {
       setCheckingProducts(false);
     }
+  };
+
+  const generateErrorsPdfReport = () => {
+    if (!fiscalCheckResult) {
+      alert("Execute a verificação antes de gerar o relatório.");
+      return;
+    }
+
+    const itensComErro = fiscalCheckResult.itens.filter((item) => item.divergencias.length > 0);
+    if (itensComErro.length === 0) {
+      alert("Nenhum erro encontrado para gerar relatório.");
+      return;
+    }
+
+    const escapeHtml = (value: string) =>
+      String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const generatedAt = new Date().toLocaleString("pt-BR");
+    const rows = itensComErro
+      .map((item) => {
+        const divergencias = item.divergencias
+          .map((div) => `<li>${escapeHtml(normalizeValidationMessage(div))}</li>`)
+          .join("");
+
+        return `
+          <section class="item-block">
+            <h3>Item ${item.item} - Código fornecedor: ${escapeHtml(item.codProdFornecedor || "-")}</h3>
+            ${item.codigoProduto ? `<p><strong>Código do Produto:</strong> ${escapeHtml(item.codigoProduto)}</p>` : ""}
+            <ul>${divergencias}</ul>
+          </section>
+        `;
+      })
+      .join("");
+
+    const html = `
+      <!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8" />
+          <title>Relatório de Erros - Conferência de Produto</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            h1 { margin: 0 0 8px; font-size: 20px; }
+            .meta { margin-bottom: 16px; color: #4b5563; font-size: 13px; }
+            .item-block { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+            .item-block h3 { margin: 0 0 8px; font-size: 15px; }
+            .item-block ul { margin: 8px 0 0; padding-left: 18px; }
+            .item-block li { margin-bottom: 6px; color: #b91c1c; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório de Erros da Conferência de Cadastro de Produto</h1>
+          <p class="meta"><strong>NF-e:</strong> ${escapeHtml(chaveNfe)} | <strong>Gerado em:</strong> ${escapeHtml(generatedAt)}</p>
+          ${rows}
+          <script>window.onload = () => window.print();</script>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+    if (!printWindow) {
+      alert("Não foi possível abrir a janela de impressão.");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const handleOpenTaxCalculation = () => {
+    if (!invoice?.CHAVE_NFE) {
+      alert("NF inválida para iniciar cálculo.");
+      return;
+    }
+
+    if (hasPreviousTaxCalculation) {
+      const shouldContinue = window.confirm(
+        "Esta NF já possui cálculo/análise anterior. A nova análise irá substituir a feita anteriormente. Deseja continuar?"
+      );
+
+      if (!shouldContinue) {
+        return;
+      }
+    }
+
+    router.push(`/compras/notaFiscal/notaFiscal?calcChave=${encodeURIComponent(invoice.CHAVE_NFE)}`);
   };
 
   const headerData = useMemo(() => {
@@ -346,10 +514,23 @@ export default function NotaFiscalDetailsPage() {
         {invoice?.XML_COMPLETO && (
           <div className="flex items-center gap-2">
             <button
+              onClick={handleOpenTaxCalculation}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              <FaCalculator /> Calcular Imposto
+            </button>
+            <button
               onClick={() => setProductCheckOpen(true)}
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
               <FaSearch /> Verificação do Produto
+            </button>
+            <button
+              onClick={generateErrorsPdfReport}
+              disabled={!fiscalCheckResult || fiscalCheckResult.itens.every((item) => item.divergencias.length === 0)}
+              className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FaFilePdf /> Relatório de Erros (PDF)
             </button>
             <button
               onClick={generatePreviewPdf}
@@ -730,6 +911,23 @@ export default function NotaFiscalDetailsPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isClient && progressModalOpen && createPortal(
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-100 bg-white p-5 shadow-2xl">
+            <h3 className="text-base font-semibold text-gray-900">Verificação em andamento</h3>
+            <p className="mt-1 text-sm text-gray-600">{checkProgressText}</p>
+            <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-gray-200">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-200"
+                style={{ width: `${checkProgress}%` }}
+              />
+            </div>
+            <p className="mt-2 text-right text-xs font-semibold text-gray-600">{checkProgress}%</p>
           </div>
         </div>,
         document.body
