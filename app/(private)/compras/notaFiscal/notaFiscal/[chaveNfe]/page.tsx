@@ -22,7 +22,9 @@ type DestinacaoMercadoria = "COMERCIALIZACAO" | "USO_CONSUMO";
 type FiscalCheckItemResult = {
   item: number;
   codProdFornecedor: string;
+  codigoProduto?: string;
   statusConferencia: "OK" | "DIVERGENTE";
+  conformidades?: string[];
   divergencias: string[];
 };
 
@@ -71,7 +73,7 @@ export default function NotaFiscalDetailsPage() {
   const [destinations, setDestinations] = useState<Record<number, DestinacaoMercadoria>>({});
   const [headerDestination, setHeaderDestination] = useState<DestinacaoMercadoria | "">("");
   const [fiscalCheckResult, setFiscalCheckResult] = useState<FiscalCheckResult | null>(null);
-  const [selectedErrorItem, setSelectedErrorItem] = useState<FiscalCheckItemResult | null>(null);
+  const [selectedDetailItem, setSelectedDetailItem] = useState<FiscalCheckItemResult | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
@@ -313,6 +315,16 @@ export default function NotaFiscalDetailsPage() {
     return map;
   }, [fiscalCheckResult]);
 
+  const normalizeValidationMessage = (message: string) => {
+    return message
+      .replace(/PIS_CODIGO/g, "Código do Pis")
+      .replace(/COFINS_CODIGO/g, "Código do Cofins")
+      .replace(
+        "Produto do fornecedor não vinculado na Stage_Produtos_Fornecedor_NFE para o FOR_CODIGO identificado.",
+        "Produto do fornecedor não foi relacionado ao nosso código interno no Sistema Celta. Por Favor Verifique!"
+      );
+  };
+
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -430,14 +442,22 @@ export default function NotaFiscalDetailsPage() {
                               {!checkItem ? (
                                 <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-600">Sem análise</span>
                               ) : checkItem.statusConferencia === "OK" ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-[11px] font-semibold text-green-700"><FaCheckCircle /> OK</span>
+                                <button
+                                  onClick={() => setSelectedDetailItem(checkItem)}
+                                  className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-[11px] font-semibold text-green-700 hover:bg-green-200"
+                                >
+                                  <FaCheckCircle /> OK ({checkItem.conformidades?.length || 0})
+                                </button>
                               ) : (
                                 <button
-                                  onClick={() => setSelectedErrorItem(checkItem)}
+                                  onClick={() => setSelectedDetailItem(checkItem)}
                                   className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-200"
                                 >
                                   <FaExclamationTriangle /> Erro ({checkItem.divergencias.length})
                                 </button>
+                              )}
+                              {checkItem?.codigoProduto && (
+                                <p className="mt-1 text-[11px] font-semibold text-gray-700">Código do Produto: {checkItem.codigoProduto}</p>
                               )}
                             </td>
                             <td className="px-2 py-2 text-xs text-gray-700">
@@ -668,13 +688,13 @@ export default function NotaFiscalDetailsPage() {
         document.body
       )}
 
-      {isClient && selectedErrorItem && createPortal(
+      {isClient && selectedDetailItem && createPortal(
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-2xl rounded-xl border border-gray-100 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">Detalhes do Erro de Conferência</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Detalhes da Conferência</h3>
               <button
-                onClick={() => setSelectedErrorItem(null)}
+                onClick={() => setSelectedDetailItem(null)}
                 className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
               >
                 Fechar
@@ -682,13 +702,33 @@ export default function NotaFiscalDetailsPage() {
             </div>
             <div className="max-h-[70vh] space-y-3 overflow-y-auto p-5">
               <p className="text-sm text-gray-700">
-                Item {selectedErrorItem.item} - Cód. fornecedor: {selectedErrorItem.codProdFornecedor}
+                Item {selectedDetailItem.item} - Cód. fornecedor: {selectedDetailItem.codProdFornecedor}
               </p>
-              <ul className="list-disc space-y-2 pl-5 text-sm text-red-700">
-                {selectedErrorItem.divergencias.map((div, idx) => (
-                  <li key={`detail-error-${idx}`}>{div}</li>
-                ))}
-              </ul>
+              {selectedDetailItem.codigoProduto && (
+                <p className="text-sm font-semibold text-gray-800">Código do Produto: {selectedDetailItem.codigoProduto}</p>
+              )}
+
+              {(selectedDetailItem.conformidades || []).length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-green-700">Validações corretas</p>
+                  <ul className="list-disc space-y-2 pl-5 text-sm text-green-700">
+                    {(selectedDetailItem.conformidades || []).map((ok, idx) => (
+                      <li key={`detail-ok-${idx}`}>{normalizeValidationMessage(ok)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {selectedDetailItem.divergencias.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-red-700">Pendências encontradas</p>
+                  <ul className="list-disc space-y-2 pl-5 text-sm text-red-700">
+                    {selectedDetailItem.divergencias.map((div, idx) => (
+                      <li key={`detail-error-${idx}`}>{normalizeValidationMessage(div)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>,
