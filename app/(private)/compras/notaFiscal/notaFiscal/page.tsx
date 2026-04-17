@@ -28,6 +28,13 @@ const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
 const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
 
+type DestinacaoMercadoria = "COMERCIALIZACAO" | "USO_CONSUMO";
+type ImpostoEscolhido = "ST" | "DIFAL" | "TRIBUTADA";
+type CachedFiscalSelection = {
+  destinacaoMercadoria: DestinacaoMercadoria;
+  impostoEscolhido: ImpostoEscolhido;
+};
+
 const toInputDate = (date: Date) => {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -70,12 +77,20 @@ const persistItemDestinations = (rows: StCalculationResult[]) => {
       const codProd = String(row.codProd || "").trim();
       const itemKey = `${nItem}|${codProd}`;
 
+      const destinacaoMercadoria = row.destinacaoMercadoria as DestinacaoMercadoria;
+      const impostoEscolhido = row.impostoEscolhido as ImpostoEscolhido;
+      if (!destinacaoMercadoria || !impostoEscolhido) return;
+
       if (!current[chave]) {
         current[chave] = { updatedAt: new Date().toISOString(), items: {} };
       }
 
       current[chave].updatedAt = new Date().toISOString();
-      current[chave].items[itemKey] = row.destinacaoMercadoria;
+      const selection: CachedFiscalSelection = {
+        destinacaoMercadoria,
+        impostoEscolhido,
+      };
+      current[chave].items[itemKey] = selection;
     });
 
     window.localStorage.setItem(DESTINATION_CACHE_KEY, JSON.stringify(current));

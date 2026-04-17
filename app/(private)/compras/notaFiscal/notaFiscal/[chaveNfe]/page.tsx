@@ -18,10 +18,16 @@ type PaymentStatusByKey = {
 };
 
 type DestinacaoMercadoria = "COMERCIALIZACAO" | "USO_CONSUMO";
+type ImpostoEscolhido = "ST" | "DIFAL" | "TRIBUTADA";
+type CachedFiscalSelection = {
+  destinacaoMercadoria: DestinacaoMercadoria;
+  impostoEscolhido: ImpostoEscolhido;
+};
 
 type FiscalCheckItemResult = {
   item: number;
   codProdFornecedor: string;
+  impostoEscolhido?: ImpostoEscolhido;
   codigoProduto?: string;
   statusConferencia: "OK" | "DIVERGENTE";
   conformidades?: string[];
@@ -72,6 +78,8 @@ export default function NotaFiscalDetailsPage() {
   const [checkingProducts, setCheckingProducts] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [destinations, setDestinations] = useState<Record<number, DestinacaoMercadoria>>({});
+  const [cachedTaxTypes, setCachedTaxTypes] = useState<Record<number, ImpostoEscolhido>>({});
+  const [submittedTaxByItemKey, setSubmittedTaxByItemKey] = useState<Record<string, ImpostoEscolhido>>({});
   const [headerDestination, setHeaderDestination] = useState<DestinacaoMercadoria | "">("");
   const [fiscalCheckResult, setFiscalCheckResult] = useState<FiscalCheckResult | null>(null);
   const [selectedDetailItem, setSelectedDetailItem] = useState<FiscalCheckItemResult | null>(null);
@@ -106,15 +114,15 @@ export default function NotaFiscalDetailsPage() {
     };
   }, [pdfUrl]);
 
-  const readCachedDestinationMap = () => {
-    if (typeof window === "undefined" || !chaveNfe) return {} as Record<string, DestinacaoMercadoria>;
+  const readCachedFiscalSelectionMap = () => {
+    if (typeof window === "undefined" || !chaveNfe) return {} as Record<string, CachedFiscalSelection>;
 
     try {
       const raw = window.localStorage.getItem(DESTINATION_CACHE_KEY);
       if (!raw) return {};
       const parsedCache = JSON.parse(raw);
       const map = parsedCache?.[chaveNfe]?.items || {};
-      return map as Record<string, DestinacaoMercadoria>;
+      return map as Record<string, CachedFiscalSelection>;
     } catch {
       return {};
     }
@@ -236,18 +244,23 @@ export default function NotaFiscalDetailsPage() {
   useEffect(() => {
     const nextSelected = new Set<number>();
     const nextDestinations: Record<number, DestinacaoMercadoria> = {};
-    const cachedDestinationMap = readCachedDestinationMap();
+    const nextTaxTypes: Record<number, ImpostoEscolhido> = {};
+    const cachedSelectionMap = readCachedFiscalSelectionMap();
 
     (parsed?.items || []).forEach((item, index) => {
       nextSelected.add(index);
       const isStItem = item.icmsSt > 0 || item.cst.endsWith("10") || item.cst.endsWith("60");
       const cacheKey = `${item.nItem}|${item.codigo || ""}`;
-      const cachedDestination = cachedDestinationMap[cacheKey];
-      nextDestinations[index] = cachedDestination || (isStItem ? "COMERCIALIZACAO" : "USO_CONSUMO");
+      const cachedSelection = cachedSelectionMap[cacheKey];
+      nextDestinations[index] = cachedSelection?.destinacaoMercadoria || (isStItem ? "COMERCIALIZACAO" : "USO_CONSUMO");
+      if (cachedSelection?.impostoEscolhido) {
+        nextTaxTypes[index] = cachedSelection.impostoEscolhido;
+      }
     });
 
     setSelectedItems(nextSelected);
     setDestinations(nextDestinations);
+    setCachedTaxTypes(nextTaxTypes);
     setFiscalCheckResult(null);
   }, [parsed?.items]);
 
@@ -305,6 +318,20 @@ export default function NotaFiscalDetailsPage() {
     });
   };
 
+  const getImpostoLabel = (imposto?: ImpostoEscolhido) => {
+    if (imposto === "ST") return "ICMS ST";
+    if (imposto === "DIFAL") return "DIFAL";
+    if (imposto === "TRIBUTADA") return "TRIBUTADA";
+    return "-";
+  };
+
+  const getImpostoBadgeClass = (imposto?: ImpostoEscolhido) => {
+    if (imposto === "ST") return "bg-blue-100 text-blue-700";
+    if (imposto === "DIFAL") return "bg-orange-100 text-orange-700";
+    if (imposto === "TRIBUTADA") return "bg-emerald-100 text-emerald-700";
+    return "bg-gray-100 text-gray-600";
+  };
+
   const runProductCheck = async () => {
     if (!parsed?.items?.length || !invoice) return;
 
@@ -319,12 +346,18 @@ export default function NotaFiscalDetailsPage() {
       return;
     }
 
+    const nextSubmittedTaxByItemKey: Record<string, ImpostoEscolhido> = {};
     const itens = Array.from(selectedItems).map((idx) => {
       const item = parsed.items[idx];
       const destinacao = destinations[idx];
-      const impostoEscolhido = destinacao === "USO_CONSUMO"
+      const impostoFromCache = cachedTaxTypes[idx];
+      const impostoEscolhido = impostoFromCache || (destinacao === "USO_CONSUMO"
         ? (isDentroDoEstado ? "TRIBUTADA" : "DIFAL")
-        : "ST";
+        : "ST");
+
+      const compositeKey = `${item.nItem}|${item.codigo || ""}`;
+      nextSubmittedTaxByItemKey[compositeKey] = impostoEscolhido;
+      nextSubmittedTaxByItemKey[String(item.nItem)] = nextSubmittedTaxByItemKey[String(item.nItem)] || impostoEscolhido;
 
       return {
         item: item.nItem,
@@ -338,6 +371,8 @@ export default function NotaFiscalDetailsPage() {
         possuiDifal: impostoEscolhido === "DIFAL",
       };
     });
+
+    setSubmittedTaxByItemKey(nextSubmittedTaxByItemKey);
 
     startProgressFeedback(selectedItems.size);
     setCheckingProducts(true);
@@ -761,6 +796,7 @@ export default function NotaFiscalDetailsPage() {
                       <th className="w-[70px] px-2 py-2">Item</th>
                       <th className="px-2 py-2">Produto</th>
                       <th className="w-[140px] px-2 py-2">NCM/CFOP</th>
+                      <th className="w-[140px] px-2 py-2">Imposto</th>
                       <th className="w-[240px] px-2 py-2">
                         <div className="flex flex-col gap-1">
                           <span>Destinação</span>
@@ -780,6 +816,11 @@ export default function NotaFiscalDetailsPage() {
                   <tbody>
                     {parsed.items.map((item, idx) => {
                       const isSelected = selectedItems.has(idx);
+                      const destinoAtual = destinations[idx];
+                      const impostoFromCache = cachedTaxTypes[idx];
+                      const impostoAtual = impostoFromCache || (destinoAtual === "USO_CONSUMO"
+                        ? (isDentroDoEstado ? "TRIBUTADA" : "DIFAL")
+                        : "ST");
                       return (
                         <tr key={`${item.nItem}-${item.codigo}`} className={`border-t border-gray-100 ${isSelected ? "bg-blue-50/50" : ""}`}>
                           <td className="px-2 py-2 text-center">
@@ -798,6 +839,11 @@ export default function NotaFiscalDetailsPage() {
                             NCM: {item.ncm || "-"}
                             <br />
                             CFOP: {item.cfop || "-"}
+                          </td>
+                          <td className="px-2 py-2">
+                            <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-bold ${getImpostoBadgeClass(impostoAtual)}`}>
+                              {getImpostoLabel(impostoAtual)}
+                            </span>
                           </td>
                           <td className="px-2 py-2">
                             <select
@@ -840,6 +886,17 @@ export default function NotaFiscalDetailsPage() {
                   <div className="space-y-2">
                     {fiscalCheckResult.itens.map((item) => (
                       <div key={`${item.item}-${item.codProdFornecedor}`} className="rounded border border-gray-200 bg-white px-3 py-2">
+                        {(() => {
+                          const keyComposite = `${item.item}|${item.codProdFornecedor || ""}`;
+                          const impostoItem = item.impostoEscolhido || submittedTaxByItemKey[keyComposite] || submittedTaxByItemKey[String(item.item)];
+                          return (
+                            <div className="mb-2">
+                              <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-bold ${getImpostoBadgeClass(impostoItem)}`}>
+                                Imposto: {getImpostoLabel(impostoItem)}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-gray-900">Item {item.item} - Cód. fornecedor: {item.codProdFornecedor}</p>
                           {item.statusConferencia === "OK" ? (
@@ -885,6 +942,15 @@ export default function NotaFiscalDetailsPage() {
               <p className="text-sm text-gray-700">
                 Item {selectedDetailItem.item} - Cód. fornecedor: {selectedDetailItem.codProdFornecedor}
               </p>
+              {(() => {
+                const keyComposite = `${selectedDetailItem.item}|${selectedDetailItem.codProdFornecedor || ""}`;
+                const impostoItem = selectedDetailItem.impostoEscolhido || submittedTaxByItemKey[keyComposite] || submittedTaxByItemKey[String(selectedDetailItem.item)];
+                return (
+                  <p className="text-sm text-gray-800">
+                    <strong>Imposto considerado:</strong> {getImpostoLabel(impostoItem)}
+                  </p>
+                );
+              })()}
               {selectedDetailItem.codigoProduto && (
                 <p className="text-sm font-semibold text-gray-800">Código do Produto: {selectedDetailItem.codigoProduto}</p>
               )}
