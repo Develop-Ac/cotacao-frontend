@@ -98,11 +98,33 @@ export default function RootLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop collapse
 
   // Splash Screen State
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
+  const [splashInitialized, setSplashInitialized] = useState(false);
   const [mediaReady, setMediaReady] = useState(false); // To ensure fonts/styles load if needed, but mainly for consistent delay
 
   // Dados prontos apenas quando: userData existe, ability carregado E o SWR de auth finalizou (incl. revalidações)
   const isDataReady = !!userData && !isLoadingAbility && !isAuthLoading && !isAuthValidating;
+
+  useEffect(() => {
+    try {
+      const splashAlreadyShown = window.sessionStorage.getItem("private_splash_seen") === "1";
+      setShowSplash(!splashAlreadyShown);
+    } catch {
+      // Fallback: exibe splash se sessionStorage estiver indisponível.
+      setShowSplash(true);
+    } finally {
+      setSplashInitialized(true);
+    }
+  }, []);
+
+  const handleSplashFinish = React.useCallback(() => {
+    try {
+      window.sessionStorage.setItem("private_splash_seen", "1");
+    } catch {
+      // noop
+    }
+    setShowSplash(false);
+  }, []);
 
 
   const [isNavigating, setIsNavigating] = useState(false);
@@ -242,10 +264,10 @@ export default function RootLayout({
       <SidebarContext.Provider value={{ sidebarCollapsed, setSidebarCollapsed, sidebarOpen, setSidebarOpen }}>
         <ToastProvider>
           <PrivateRoute>
-            {showSplash && (
+            {splashInitialized && showSplash && (
               <SplashScreen
                 isDataReady={isDataReady}
-                onFinish={() => setShowSplash(false)}
+                onFinish={handleSplashFinish}
               />
             )}
             <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
