@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { FaArrowLeft, FaCheckCircle, FaExclamationTriangle, FaFilePdf, FaSearch, FaSync } from "react-icons/fa";
+import { createPortal } from "react-dom";
 import { serviceUrl } from "@/lib/services";
 import { NotaFiscalRow } from "@/types/icms";
 import { parseNfeXml, ParsedNfe } from "../utils/nfeXmlParser";
@@ -70,8 +71,14 @@ export default function NotaFiscalDetailsPage() {
   const [destinations, setDestinations] = useState<Record<number, DestinacaoMercadoria>>({});
   const [headerDestination, setHeaderDestination] = useState<DestinacaoMercadoria | "">("");
   const [fiscalCheckResult, setFiscalCheckResult] = useState<FiscalCheckResult | null>(null);
+  const [selectedErrorItem, setSelectedErrorItem] = useState<FiscalCheckItemResult | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -297,6 +304,15 @@ export default function NotaFiscalDetailsPage() {
     };
   }, [invoice, parsed]);
 
+  const fiscalCheckByItem = useMemo(() => {
+    const map: Record<string, FiscalCheckItemResult> = {};
+    (fiscalCheckResult?.itens || []).forEach((item) => {
+      map[`${item.item}-${item.codProdFornecedor}`] = item;
+      map[`${item.item}`] = map[`${item.item}`] || item;
+    });
+    return map;
+  }, [fiscalCheckResult]);
+
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -388,6 +404,7 @@ export default function NotaFiscalDetailsPage() {
                       <tr>
                         <th className="px-2 py-2 w-[60px]">Item</th>
                         <th className="px-2 py-2 w-[240px]">Produto</th>
+                        <th className="px-2 py-2 w-[170px]">Conferência Cadastro</th>
                         <th className="px-2 py-2 w-[120px]">NCM/CFOP</th>
                         <th className="px-2 py-2 text-right w-[90px]">Qtd</th>
                         <th className="px-2 py-2 text-right w-[110px]">Unitário</th>
@@ -400,28 +417,45 @@ export default function NotaFiscalDetailsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(parsed?.items || []).map((item) => (
-                        <tr key={`${item.nItem}-${item.codigo}`} className="border-t border-gray-100">
-                          <td className="px-2 py-2">{item.nItem}</td>
-                          <td className="px-2 py-2">
-                            <p className="font-medium text-gray-900">{item.descricao || "-"}</p>
-                            <p className="text-xs text-gray-500">Cód: {item.codigo || "-"}</p>
-                          </td>
-                          <td className="px-2 py-2 text-xs text-gray-700">
-                            NCM: {item.ncm || "-"}
-                            <br />
-                            CFOP: {item.cfop || "-"}
-                          </td>
-                          <td className="px-2 py-2 text-right">{item.quantidade.toLocaleString("pt-BR")}</td>
-                          <td className="px-2 py-2 text-right">{money(item.valorUnitario)}</td>
-                          <td className="px-2 py-2 text-right font-semibold">{money(item.valorTotal)}</td>
-                          <td className="px-2 py-2 text-right">{money(item.icmsProprio)}</td>
-                          <td className="px-2 py-2 text-right">{money(item.icmsSt)}</td>
-                          <td className="px-2 py-2 text-right">{money(item.ipi)}</td>
-                          <td className="px-2 py-2 text-right">{money(item.pis)}</td>
-                          <td className="px-2 py-2 text-right">{money(item.cofins)}</td>
-                        </tr>
-                      ))}
+                      {(parsed?.items || []).map((item) => {
+                        const checkItem = fiscalCheckByItem[`${item.nItem}-${item.codigo}`] || fiscalCheckByItem[`${item.nItem}`] || null;
+                        return (
+                          <tr key={`${item.nItem}-${item.codigo}`} className="border-t border-gray-100">
+                            <td className="px-2 py-2">{item.nItem}</td>
+                            <td className="px-2 py-2">
+                              <p className="font-medium text-gray-900">{item.descricao || "-"}</p>
+                              <p className="text-xs text-gray-500">Cód: {item.codigo || "-"}</p>
+                            </td>
+                            <td className="px-2 py-2">
+                              {!checkItem ? (
+                                <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-600">Sem análise</span>
+                              ) : checkItem.statusConferencia === "OK" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-[11px] font-semibold text-green-700"><FaCheckCircle /> OK</span>
+                              ) : (
+                                <button
+                                  onClick={() => setSelectedErrorItem(checkItem)}
+                                  className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-200"
+                                >
+                                  <FaExclamationTriangle /> Erro ({checkItem.divergencias.length})
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-xs text-gray-700">
+                              NCM: {item.ncm || "-"}
+                              <br />
+                              CFOP: {item.cfop || "-"}
+                            </td>
+                            <td className="px-2 py-2 text-right">{item.quantidade.toLocaleString("pt-BR")}</td>
+                            <td className="px-2 py-2 text-right">{money(item.valorUnitario)}</td>
+                            <td className="px-2 py-2 text-right font-semibold">{money(item.valorTotal)}</td>
+                            <td className="px-2 py-2 text-right">{money(item.icmsProprio)}</td>
+                            <td className="px-2 py-2 text-right">{money(item.icmsSt)}</td>
+                            <td className="px-2 py-2 text-right">{money(item.ipi)}</td>
+                            <td className="px-2 py-2 text-right">{money(item.pis)}</td>
+                            <td className="px-2 py-2 text-right">{money(item.cofins)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -499,8 +533,8 @@ export default function NotaFiscalDetailsPage() {
         </>
       )}
 
-      {productCheckOpen && parsed && (
-        <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/50 p-4">
+      {isClient && productCheckOpen && parsed && createPortal(
+        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 p-4">
           <div className="mx-auto my-8 w-full max-w-6xl rounded-xl border border-gray-100 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h3 className="text-lg font-semibold text-gray-900">Verificação de Cadastro do Produto</h3>
@@ -630,7 +664,35 @@ export default function NotaFiscalDetailsPage() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {isClient && selectedErrorItem && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-gray-100 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Detalhes do Erro de Conferência</h3>
+              <button
+                onClick={() => setSelectedErrorItem(null)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Fechar
+              </button>
+            </div>
+            <div className="max-h-[70vh] space-y-3 overflow-y-auto p-5">
+              <p className="text-sm text-gray-700">
+                Item {selectedErrorItem.item} - Cód. fornecedor: {selectedErrorItem.codProdFornecedor}
+              </p>
+              <ul className="list-disc space-y-2 pl-5 text-sm text-red-700">
+                {selectedErrorItem.divergencias.map((div, idx) => (
+                  <li key={`detail-error-${idx}`}>{div}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
