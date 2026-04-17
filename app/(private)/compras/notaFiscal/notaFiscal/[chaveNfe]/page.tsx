@@ -500,8 +500,8 @@ export default function NotaFiscalDetailsPage() {
       )}
 
       {productCheckOpen && parsed && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-6xl rounded-xl border border-gray-100 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/50 p-4">
+          <div className="mx-auto my-8 w-full max-w-6xl rounded-xl border border-gray-100 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h3 className="text-lg font-semibold text-gray-900">Verificação de Cadastro do Produto</h3>
               <button
@@ -513,7 +513,7 @@ export default function NotaFiscalDetailsPage() {
               </button>
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="max-h-[80vh] space-y-4 overflow-y-auto p-5">
               <p className="text-sm text-gray-600">
                 Selecione a destinação por item. Para uso e consumo: dentro do estado o imposto não é obrigatório; fora do estado será aplicado DIFAL automaticamente.
               </p>
