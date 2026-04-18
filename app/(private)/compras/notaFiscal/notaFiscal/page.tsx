@@ -838,12 +838,6 @@ export default function NotaFiscalList() {
                                 ) : (
                                   <span className="text-xs text-gray-400 italic">Pendente</span>
                                 )}
-
-                                {rowStatus?.guiaGerada ? (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700 border border-yellow-200">
-                                    Guia Gerada
-                                  </span>
-                                ) : null}
                               </div>
                             </td>
                             <td className="py-3 px-4 text-right align-top pt-4">
@@ -855,6 +849,12 @@ export default function NotaFiscalList() {
                                 ) : (
                                   <span className="text-sm text-gray-400 font-medium">-</span>
                                 )}
+
+                                {rowStatus?.guiaGerada ? (
+                                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700 border border-yellow-200">
+                                    Guia Gerada
+                                  </span>
+                                ) : null}
                               </div>
                             </td>
                             <td className="py-3 px-4 align-top pt-4">

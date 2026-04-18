@@ -355,6 +355,65 @@ export default function NotaFiscalDetailsPage() {
     }
   };
 
+  const handleDownloadGuia = async () => {
+    if (!chaveNfe || !guiaInfo) return;
+
+    try {
+      const res = await fetch(`${SERVICE_URL}/icms/guia/${chaveNfe}/download`, {
+        method: "GET",
+      });
+
+      if (!res.ok) {
+        throw new Error("Falha ao baixar a guia anexada.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = guiaInfo.original_file_name || `guia-${chaveNfe}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Falha ao baixar a guia anexada.";
+      showNotice("Erro", message);
+    }
+  };
+
+  const handleRemoveGuia = async () => {
+    if (!chaveNfe || !guiaInfo) return;
+
+    const confirmed = await askConfirmation(
+      "Remover Guia Anexada",
+      "Deseja remover a guia anexada desta NF? Esta ação permitirá anexar uma nova guia.",
+      "Sim, remover"
+    );
+
+    if (!confirmed) return;
+
+    setUploadingGuia(true);
+    try {
+      const res = await fetch(`${SERVICE_URL}/icms/guia/${chaveNfe}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error("Falha ao remover guia anexada.");
+      }
+
+      setGuiaInfo(null);
+      void refreshPaymentStatus();
+      showNotice("Sucesso", "Guia removida com sucesso.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Falha ao remover guia anexada.";
+      showNotice("Erro", message);
+    } finally {
+      setUploadingGuia(false);
+    }
+  };
+
   const generatePreviewPdf = async () => {
     if (!invoice?.XML_COMPLETO) {
       setError("XML não disponível para gerar pré-visualização do PDF.");
@@ -1068,13 +1127,31 @@ export default function NotaFiscalDetailsPage() {
                         }
                       }}
                     />
-                    <button
-                      onClick={() => guiaFileInputRef.current?.click()}
-                      disabled={uploadingGuia}
-                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-                    >
-                      {uploadingGuia ? <FaSync className="animate-spin" /> : <FaFilePdf />} {uploadingGuia ? "Enviando..." : "Anexar Guia PDF"}
-                    </button>
+                    {guiaInfo ? (
+                      <>
+                        <button
+                          onClick={handleDownloadGuia}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          <FaFilePdf /> Download Guia
+                        </button>
+                        <button
+                          onClick={() => void handleRemoveGuia()}
+                          disabled={uploadingGuia}
+                          className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                        >
+                          {uploadingGuia ? <FaSync className="animate-spin" /> : <FaFilePdf />} {uploadingGuia ? "Removendo..." : "Remover Guia Anexada"}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => guiaFileInputRef.current?.click()}
+                        disabled={uploadingGuia}
+                        className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                      >
+                        {uploadingGuia ? <FaSync className="animate-spin" /> : <FaFilePdf />} {uploadingGuia ? "Enviando..." : "Anexar Guia PDF"}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1113,11 +1190,6 @@ export default function NotaFiscalDetailsPage() {
                       {guiaInfo.fe_cte_confere === false && guiaInfo.aviso ? (
                         <p className="mt-2 inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-semibold text-yellow-700">{guiaInfo.aviso}</p>
                       ) : null}
-                    </div>
-
-                    <div className="rounded-lg border border-gray-100 p-3">
-                      <p className="text-xs text-gray-500">Caminho no MinIO</p>
-                      <p className="break-all text-xs font-mono text-gray-800">{`${guiaInfo.bucket}/${guiaInfo.path}`}</p>
                     </div>
                   </div>
                 )}
