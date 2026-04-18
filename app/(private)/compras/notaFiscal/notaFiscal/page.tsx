@@ -27,6 +27,8 @@ const LAUNCHED_SYNC_ENDPOINT = `${SERVICE_URL}/icms/nfe-lancadas/sync`;
 const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
 const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
+const LIST_STATE_KEY = "nf_list_state_v1";
+const LIST_LAST_VIEWED_KEY = "nf_last_viewed_chave_v1";
 
 type DestinacaoMercadoria = "COMERCIALIZACAO" | "USO_CONSUMO";
 type ImpostoEscolhido = "ST" | "DIFAL" | "TRIBUTADA";
@@ -137,6 +139,8 @@ export default function NotaFiscalList() {
   const [autoCalcHandledKey, setAutoCalcHandledKey] = useState<string>("");
   const [pendingCalcChave, setPendingCalcChave] = useState<string>("");
   const [pendingCalcSkipReplaceConfirm, setPendingCalcSkipReplaceConfirm] = useState(false);
+  const [returnFocusChave, setReturnFocusChave] = useState<string>("");
+  const [stateRestored, setStateRestored] = useState(false);
 
   // Filters
   const [dataSource, setDataSource] = useState<'DATABASE' | 'UPLOAD'>('DATABASE');
@@ -185,6 +189,73 @@ export default function NotaFiscalList() {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const rawState = window.sessionStorage.getItem(LIST_STATE_KEY);
+      if (rawState) {
+        const parsed = JSON.parse(rawState);
+        if (parsed && typeof parsed === "object") {
+          if (parsed.pageSize === 10 || parsed.pageSize === 20 || parsed.pageSize === 50) {
+            setPageSize(parsed.pageSize);
+          }
+          if (typeof parsed.page === "number" && parsed.page > 0) {
+            setPage(parsed.page);
+          }
+          if (parsed.dataSource === "DATABASE" || parsed.dataSource === "UPLOAD") {
+            setDataSource(parsed.dataSource);
+          }
+          if (typeof parsed.showLaunched === "boolean") {
+            setShowLaunched(parsed.showLaunched);
+          }
+          if (parsed.dateRange && typeof parsed.dateRange === "object") {
+            if (typeof parsed.dateRange.start === "string" && typeof parsed.dateRange.end === "string") {
+              setDateRange({ start: parsed.dateRange.start, end: parsed.dateRange.end });
+            }
+          }
+          if (typeof parsed.filterNumero === "string") setFilterNumero(parsed.filterNumero);
+          if (typeof parsed.filterEmitente === "string") setFilterEmitente(parsed.filterEmitente);
+          if (typeof parsed.filterImposto === "string") setFilterImposto(parsed.filterImposto);
+          if (parsed.filterEstado === "TODOS" || parsed.filterEstado === "DENTRO" || parsed.filterEstado === "FORA") {
+            setFilterEstado(parsed.filterEstado);
+          }
+          if (parsed.filterModelo === "55" || parsed.filterModelo === "TODOS") {
+            setFilterModelo(parsed.filterModelo);
+          }
+        }
+      }
+
+      const lastViewed = String(window.sessionStorage.getItem(LIST_LAST_VIEWED_KEY) || "").trim();
+      if (lastViewed) {
+        setReturnFocusChave(lastViewed);
+      }
+    } catch {
+      // Non-blocking: if state restore fails, screen continues with defaults.
+    } finally {
+      setStateRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !stateRestored) return;
+
+    const stateToPersist = {
+      page,
+      pageSize,
+      dataSource,
+      showLaunched,
+      dateRange,
+      filterNumero,
+      filterEmitente,
+      filterImposto,
+      filterEstado,
+      filterModelo,
+    };
+
+    window.sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(stateToPersist));
+  }, [stateRestored, page, pageSize, dataSource, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado, filterModelo]);
 
   // ---------- CARREGAMENTO ----------
   const fetchAll = useCallback(async () => {
@@ -251,8 +322,19 @@ export default function NotaFiscalList() {
 
   // carrega ao montar
   useEffect(() => {
+    if (!stateRestored) return;
     fetchAll();
-  }, [fetchAll]);
+  }, [stateRestored, fetchAll]);
+
+  const compareInvoiceOrder = useCallback((a: NotaFiscalRow, b: NotaFiscalRow) => {
+    const dateA = new Date(a.DATA_EMISSAO || 0).getTime();
+    const dateB = new Date(b.DATA_EMISSAO || 0).getTime();
+    if (dateB !== dateA) return dateB - dateA;
+
+    const chaveA = String(a.CHAVE_NFE || "");
+    const chaveB = String(b.CHAVE_NFE || "");
+    return chaveB.localeCompare(chaveA);
+  }, []);
 
   // paginação no front
   const filteredItems = useMemo(() => {
@@ -317,8 +399,10 @@ export default function NotaFiscalList() {
       });
     }
 
+    filtered.sort(compareInvoiceOrder);
+
     return filtered;
-  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado, filterModelo]);
+  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado, filterModelo, compareInvoiceOrder]);
 
   const total = filteredItems.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -445,6 +529,7 @@ export default function NotaFiscalList() {
         alert('Nenhum arquivo XML com chave NF-e válida encontrado.');
         setDataSource('DATABASE');
       } else {
+        loadedItems.sort(compareInvoiceOrder);
         setItems(loadedItems);
         setSelectedChaves(new Set());
       }
@@ -586,8 +671,36 @@ export default function NotaFiscalList() {
   };
 
   const handleOpenInvoiceDetails = (row: NotaFiscalRow) => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(LIST_LAST_VIEWED_KEY, row.CHAVE_NFE);
+    }
     router.push(`/compras/notaFiscal/notaFiscal/${row.CHAVE_NFE}`);
   };
+
+  useEffect(() => {
+    if (!returnFocusChave || viewState !== 'LIST') return;
+
+    const itemIndex = filteredItems.findIndex((item) => item.CHAVE_NFE === returnFocusChave);
+    if (itemIndex < 0) return;
+
+    const targetPage = Math.floor(itemIndex / pageSize) + 1;
+    if (page !== targetPage) {
+      setPage(targetPage);
+      return;
+    }
+
+    setSelectedChaves(new Set([returnFocusChave]));
+
+    const rowEl = document.querySelector(`[data-nf-chave="${returnFocusChave}"]`) as HTMLElement | null;
+    if (rowEl) {
+      rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(LIST_LAST_VIEWED_KEY);
+    }
+    setReturnFocusChave("");
+  }, [returnFocusChave, viewState, filteredItems, pageSize, page]);
 
   const handleSyncLaunchedInvoices = async () => {
     try {
@@ -925,6 +1038,7 @@ export default function NotaFiscalList() {
                         return (
                           <tr
                             key={row.CHAVE_NFE ?? idx}
+                            data-nf-chave={row.CHAVE_NFE}
                             onClick={() => handleOpenInvoiceDetails(row)}
                             className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark cursor-pointer ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}
                             title="Clique para abrir detalhes da nota"
