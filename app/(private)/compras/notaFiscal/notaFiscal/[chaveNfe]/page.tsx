@@ -7,7 +7,9 @@ import { FaArrowLeft, FaCalculator, FaCheckCircle, FaExclamationTriangle, FaFile
 import { createPortal } from "react-dom";
 import { serviceUrl } from "@/lib/services";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import { NotaFiscalRow } from "@/types/icms";
+import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
+import UnmatchedSelection from "../components/UnmatchedSelection";
+import StCalculationResults from "../components/StCalculationResults";
 import { parseNfeXml, ParsedNfe } from "../utils/nfeXmlParser";
 
 type PaymentStatusByKey = {
@@ -57,6 +59,7 @@ type ModalDialogState = {
 
 const SERVICE_URL = serviceUrl("calculadoraSt");
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
+const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
 
 const money = (value?: number | null) =>
@@ -80,6 +83,7 @@ export default function NotaFiscalDetailsPage() {
 
   const [loading, setLoading] = useState(true);
   const [loadingPdf, setLoadingPdf] = useState(false);
+  const [calculatingTax, setCalculatingTax] = useState(false);
   const [invoice, setInvoice] = useState<NotaFiscalRow | null>(null);
   const [parsed, setParsed] = useState<ParsedNfe | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusByKey | null>(null);
@@ -94,6 +98,9 @@ export default function NotaFiscalDetailsPage() {
   const [headerDestination, setHeaderDestination] = useState<DestinacaoMercadoria | "">("");
   const [fiscalCheckResult, setFiscalCheckResult] = useState<FiscalCheckResult | null>(null);
   const [selectedDetailItem, setSelectedDetailItem] = useState<FiscalCheckItemResult | null>(null);
+  const [taxFlowState, setTaxFlowState] = useState<"DETAIL" | "PRE_EVAL" | "RESULTS">("DETAIL");
+  const [preEvaluationItems, setPreEvaluationItems] = useState<StCalculationResult[] | null>(null);
+  const [taxResults, setTaxResults] = useState<StCalculationResult[] | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [checkProgress, setCheckProgress] = useState(0);
@@ -145,6 +152,56 @@ export default function NotaFiscalDetailsPage() {
       return map as Record<string, CachedFiscalSelection>;
     } catch {
       return {};
+    }
+  };
+
+  const persistItemDestinations = (rows: StCalculationResult[]) => {
+    if (typeof window === "undefined" || rows.length === 0) return;
+
+    try {
+      const raw = window.localStorage.getItem(DESTINATION_CACHE_KEY);
+      const current = raw ? JSON.parse(raw) : {};
+
+      rows.forEach((row) => {
+        const chave = String(row.chaveNfe || "").trim();
+        if (!chave || !row.destinacaoMercadoria || !row.impostoEscolhido) return;
+
+        const nItem = Number(row.item ?? 0);
+        const codProd = String(row.codProd || "").trim();
+        const itemKey = `${nItem}|${codProd}`;
+
+        if (!current[chave]) {
+          current[chave] = { updatedAt: new Date().toISOString(), items: {} };
+        }
+
+        current[chave].updatedAt = new Date().toISOString();
+        current[chave].items[itemKey] = {
+          destinacaoMercadoria: row.destinacaoMercadoria,
+          impostoEscolhido: row.impostoEscolhido,
+        };
+      });
+
+      window.localStorage.setItem(DESTINATION_CACHE_KEY, JSON.stringify(current));
+    } catch {
+      // cache non-blocking
+    }
+  };
+
+  const refreshPaymentStatus = async () => {
+    if (!invoice?.CHAVE_NFE) return;
+
+    try {
+      const statusRes = await fetch(`${SERVICE_URL}/icms/payment-status/${invoice.CHAVE_NFE}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      if (statusRes.ok) {
+        const statusData: PaymentStatusByKey = await statusRes.json();
+        setPaymentStatus(statusData);
+      }
+    } catch {
+      // keep existing status in UI on refresh failure
     }
   };
 
@@ -533,7 +590,7 @@ export default function NotaFiscalDetailsPage() {
   };
 
   const handleOpenTaxCalculation = async () => {
-    if (!invoice?.CHAVE_NFE) {
+    if (!invoice?.CHAVE_NFE || !invoice.XML_COMPLETO) {
       showNotice("Aviso", "NF inválida para iniciar cálculo.");
       return;
     }
@@ -550,7 +607,54 @@ export default function NotaFiscalDetailsPage() {
       }
     }
 
-    setProductCheckOpen(true);
+    setCalculatingTax(true);
+    setError(null);
+    try {
+      const res = await fetch(CALCULATE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ xmls: [invoice.XML_COMPLETO] }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Erro ao executar pré-avaliação do imposto.");
+      }
+
+      const allData: StCalculationResult[] = await res.json();
+      setTaxResults(null);
+      setPreEvaluationItems(allData);
+      setTaxFlowState("PRE_EVAL");
+      setProductCheckOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao executar pré-avaliação do imposto.";
+      showNotice("Erro", message);
+    } finally {
+      setCalculatingTax(false);
+    }
+  };
+
+  const handleConfirmTaxPreEvaluation = (
+    selectedIndices: Set<number>,
+    taxTypes: Record<number, ImpostoEscolhido>,
+    destinationsFromSelection: Record<number, DestinacaoMercadoria>,
+  ) => {
+    if (!preEvaluationItems) return;
+
+    const finalized = preEvaluationItems.reduce((acc, item, idx) => {
+      if (selectedIndices.has(idx)) {
+        acc.push({
+          ...item,
+          impostoEscolhido: taxTypes[idx],
+          destinacaoMercadoria: destinationsFromSelection[idx],
+        });
+      }
+      return acc;
+    }, [] as StCalculationResult[]);
+
+    persistItemDestinations(finalized);
+    setPreEvaluationItems(null);
+    setTaxResults(finalized);
+    setTaxFlowState("RESULTS");
   };
 
   const headerData = useMemo(() => {
@@ -603,6 +707,37 @@ export default function NotaFiscalDetailsPage() {
         onCancel={() => closeDialog(false)}
       />
 
+      {taxFlowState === "PRE_EVAL" && preEvaluationItems && (
+        <UnmatchedSelection
+          unmatchedItems={preEvaluationItems}
+          onConfirm={handleConfirmTaxPreEvaluation}
+          onCancel={() => {
+            setPreEvaluationItems(null);
+            setTaxFlowState("DETAIL");
+          }}
+        />
+      )}
+
+      {taxFlowState === "RESULTS" && taxResults && invoice && (
+        <StCalculationResults
+          results={taxResults}
+          originalItems={[invoice]}
+          selectedInvoices={new Set([invoice.CHAVE_NFE])}
+          onBack={() => {
+            setTaxResults(null);
+            setTaxFlowState("DETAIL");
+          }}
+          onSuccess={() => {
+            setTaxResults(null);
+            setTaxFlowState("DETAIL");
+            void refreshPaymentStatus();
+          }}
+        />
+      )}
+
+      {taxFlowState === "DETAIL" && (
+      <>
+
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -623,9 +758,10 @@ export default function NotaFiscalDetailsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleOpenTaxCalculation}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              disabled={calculatingTax}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
             >
-              <FaCalculator /> Calcular Imposto
+              {calculatingTax ? <FaSync className="animate-spin" /> : <FaCalculator />} {calculatingTax ? "Calculando..." : "Calcular Imposto"}
             </button>
             <button
               onClick={() => setProductCheckOpen(true)}
@@ -841,6 +977,8 @@ export default function NotaFiscalDetailsPage() {
             )}
           </div>
         </>
+      )}
+      </>
       )}
 
       {isClient && productCheckOpen && parsed && createPortal(
