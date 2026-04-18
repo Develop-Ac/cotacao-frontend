@@ -4,18 +4,13 @@ import {
   FaSync,
   FaCaretDown,
   FaFilePdf,
-  FaCalculator,
-  FaCheckSquare,
-  FaSquare,
   FaSearch,
   FaFilter
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { serviceUrl } from "@/lib/services";
-import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
-import StCalculationResults from "./components/StCalculationResults";
-import UnmatchedSelection from "./components/UnmatchedSelection";
+import { NotaFiscalRow } from "@/types/icms";
 
 // ===============================
 // Constants
@@ -24,18 +19,9 @@ const COMPRAS_BASE = serviceUrl("compras");
 const SERVICE_URL = serviceUrl("calculadoraSt");
 const API_BASE = `${SERVICE_URL}/icms/nfe-distribuicao`;
 const LAUNCHED_SYNC_ENDPOINT = `${SERVICE_URL}/icms/nfe-lancadas/sync`;
-const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
-const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
 const LIST_STATE_KEY = "nf_list_state_v1";
 const LIST_LAST_VIEWED_KEY = "nf_last_viewed_chave_v1";
-
-type DestinacaoMercadoria = "COMERCIALIZACAO" | "USO_CONSUMO";
-type ImpostoEscolhido = "ST" | "DIFAL" | "TRIBUTADA";
-type CachedFiscalSelection = {
-  destinacaoMercadoria: DestinacaoMercadoria;
-  impostoEscolhido: ImpostoEscolhido;
-};
 
 const toInputDate = (date: Date) => {
   const yyyy = date.getFullYear();
@@ -64,43 +50,6 @@ const extractVnfFromXml = (xml: string) => {
   return parseDecimal(match?.[1]);
 };
 
-const persistItemDestinations = (rows: StCalculationResult[]) => {
-  if (typeof window === "undefined" || rows.length === 0) return;
-
-  try {
-    const raw = window.localStorage.getItem(DESTINATION_CACHE_KEY);
-    const current = raw ? JSON.parse(raw) : {};
-
-    rows.forEach((row) => {
-      const chave = String(row.chaveNfe || "").trim();
-      if (!chave || !row.destinacaoMercadoria) return;
-
-      const nItem = Number(row.item ?? 0);
-      const codProd = String(row.codProd || "").trim();
-      const itemKey = `${nItem}|${codProd}`;
-
-      const destinacaoMercadoria = row.destinacaoMercadoria as DestinacaoMercadoria;
-      const impostoEscolhido = row.impostoEscolhido as ImpostoEscolhido;
-      if (!destinacaoMercadoria || !impostoEscolhido) return;
-
-      if (!current[chave]) {
-        current[chave] = { updatedAt: new Date().toISOString(), items: {} };
-      }
-
-      current[chave].updatedAt = new Date().toISOString();
-      const selection: CachedFiscalSelection = {
-        destinacaoMercadoria,
-        impostoEscolhido,
-      };
-      current[chave].items[itemKey] = selection;
-    });
-
-    window.localStorage.setItem(DESTINATION_CACHE_KEY, JSON.stringify(current));
-  } catch {
-    // Non-blocking cache used only to propagate choices to detail screen.
-  }
-};
-
 export default function NotaFiscalList() {
   const router = useRouter();
 
@@ -125,20 +74,8 @@ export default function NotaFiscalList() {
     errorMessage?: string;
   } | null>(null);
 
-  // Selection
-  const [selectedChaves, setSelectedChaves] = useState<Set<string>>(new Set());
-  const [analyzing, setAnalyzing] = useState(false);
-  const [results, setResults] = useState<StCalculationResult[] | null>(null);
-
   // Persistence State
   const [statusMap, setStatusMap] = useState<Record<string, { status: string, valor: number }>>({});
-
-  // Flow State
-  const [viewState, setViewState] = useState<'LIST' | 'UNMATCHED_SELECTION' | 'RESULTS'>('LIST');
-  const [tempResults, setTempResults] = useState<{ matched: StCalculationResult[], unmatched: StCalculationResult[] } | null>(null);
-  const [autoCalcHandledKey, setAutoCalcHandledKey] = useState<string>("");
-  const [pendingCalcChave, setPendingCalcChave] = useState<string>("");
-  const [pendingCalcSkipReplaceConfirm, setPendingCalcSkipReplaceConfirm] = useState(false);
   const [returnFocusChave, setReturnFocusChave] = useState<string>("");
   const [stateRestored, setStateRestored] = useState(false);
 
@@ -418,15 +355,6 @@ export default function NotaFiscalList() {
 
   const pageSizes: (10 | 20 | 50)[] = [10, 20, 50];
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const search = new URLSearchParams(window.location.search);
-    const chave = String(search.get("calcChave") || "").trim();
-    const skipReplaceConfirm = String(search.get("replaceConfirmed") || "") === "1";
-    setPendingCalcChave(chave);
-    setPendingCalcSkipReplaceConfirm(skipReplaceConfirm);
-  }, []);
-
   // Helper para data
   const fmtDate = (iso?: string | null) => {
     if (!iso) return "-";
@@ -443,33 +371,6 @@ export default function NotaFiscalList() {
     if (xml.includes('<det') && xml.includes('<prod')) return 'COMPLETO';
     return 'RESUMO';
   };
-
-  // --- SELETION LOGIC ---
-  const toggleSelect = (chave: string) => {
-    const next = new Set(selectedChaves);
-    if (next.has(chave)) next.delete(chave);
-    else next.add(chave);
-    setSelectedChaves(next);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedChaves.size === paged.length && paged.length > 0) {
-      setSelectedChaves(new Set());
-    } else {
-      const next = new Set<string>();
-      paged.forEach(r => next.add(r.CHAVE_NFE));
-      setSelectedChaves(next);
-    }
-  };
-
-  const isAllSelected = paged.length > 0 && paged.every(r => selectedChaves.has(r.CHAVE_NFE));
-
-  const hasPreviousCalculation = useCallback((row: NotaFiscalRow) => {
-    const savedStatus = statusMap[row.CHAVE_NFE];
-    const hasSavedStatus = Boolean(savedStatus && ((savedStatus.status || "").trim() || Number(savedStatus.valor || 0) > 0));
-    const hasTipoImposto = Boolean(String(row.TIPO_IMPOSTO || "").trim());
-    return hasSavedStatus || hasTipoImposto;
-  }, [statusMap]);
 
   // --- UPLOAD LOGIC ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -531,7 +432,6 @@ export default function NotaFiscalList() {
       } else {
         loadedItems.sort(compareInvoiceOrder);
         setItems(loadedItems);
-        setSelectedChaves(new Set());
       }
     } catch (err) {
       console.error('Erro ao carregar arquivos XML:', err);
@@ -540,105 +440,6 @@ export default function NotaFiscalList() {
       setLoading(false);
       e.target.value = '';
     }
-  };
-
-  // --- CALCULATION LOGIC ---
-  const handleCalculate = useCallback(async (overrideSelectedChaves?: Set<string>, skipReplaceConfirm = false) => {
-    const selectedSet = overrideSelectedChaves || selectedChaves;
-    if (selectedSet.size === 0) {
-      alert("Selecione ao menos uma NF para calcular.");
-      return;
-    }
-
-    setAnalyzing(true);
-    try {
-      const selectedRows = items.filter(r => selectedSet.has(r.CHAVE_NFE));
-      const xmls = selectedRows.map(r => r.XML_COMPLETO).filter(Boolean) as string[];
-
-      if (selectedRows.length === 0) {
-        alert("Nenhuma nota selecionada foi encontrada na lista atual.");
-        return;
-      }
-
-      if (xmls.length === 0) {
-        alert("Nenhum XML disponível para as notas selecionadas.");
-        return;
-      }
-
-      const alreadyAnalyzed = selectedRows.filter(hasPreviousCalculation);
-      if (alreadyAnalyzed.length > 0 && !skipReplaceConfirm) {
-        const shouldContinue = window.confirm(
-          `Há ${alreadyAnalyzed.length} NF(s) com cálculo/análise anterior. A nova análise irá substituir a feita anteriormente. Deseja continuar?`
-        );
-        if (!shouldContinue) {
-          return;
-        }
-      }
-
-      const res = await fetch(CALCULATE_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({ xmls })
-      });
-
-      if (!res.ok) throw new Error("Erro ao calcular.");
-
-      const allData: StCalculationResult[] = await res.json();
-
-      // We no longer bypass items that matched. EVERY item goes to selection.
-      setTempResults({ matched: [], unmatched: allData });
-      setViewState('UNMATCHED_SELECTION');
-
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao calcular.");
-    } finally {
-      setAnalyzing(false);
-    }
-  }, [selectedChaves, items, hasPreviousCalculation]);
-
-  useEffect(() => {
-    if (!pendingCalcChave || loading || viewState !== 'LIST') return;
-    if (autoCalcHandledKey === pendingCalcChave) return;
-
-    const row = items.find((item) => item.CHAVE_NFE === pendingCalcChave);
-    if (!row) return;
-
-    const selected = new Set<string>([pendingCalcChave]);
-    setSelectedChaves(selected);
-    setAutoCalcHandledKey(pendingCalcChave);
-    void handleCalculate(selected, pendingCalcSkipReplaceConfirm);
-  }, [pendingCalcChave, pendingCalcSkipReplaceConfirm, loading, viewState, autoCalcHandledKey, items, handleCalculate]);
-
-  const handleConfirmUnmatched = (
-    selectedIndices: Set<number>,
-    taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>,
-    destinations: Record<number, 'COMERCIALIZACAO' | 'USO_CONSUMO'>,
-  ) => {
-    if (!tempResults) return;
-
-    // tempResults.unmatched arrays holds ALL items now (we passed allData into it)
-    const finalized = tempResults.unmatched.reduce((acc, item, idx) => {
-      if (selectedIndices.has(idx)) {
-        acc.push({
-          ...item,
-          impostoEscolhido: taxTypes[idx],
-          destinacaoMercadoria: destinations[idx],
-        });
-      }
-      return acc;
-    }, [] as StCalculationResult[]);
-
-    persistItemDestinations(finalized);
-
-    setResults(finalized);
-    setViewState('RESULTS');
-  };
-
-  const handleBackToList = () => {
-    setResults(null);
-    setTempResults(null);
-    setViewState('LIST');
   };
 
   // --- DOWNLOAD PDF LOGIC ---
@@ -678,7 +479,7 @@ export default function NotaFiscalList() {
   };
 
   useEffect(() => {
-    if (!returnFocusChave || viewState !== 'LIST') return;
+    if (!returnFocusChave) return;
 
     const itemIndex = filteredItems.findIndex((item) => item.CHAVE_NFE === returnFocusChave);
     if (itemIndex < 0) return;
@@ -689,8 +490,6 @@ export default function NotaFiscalList() {
       return;
     }
 
-    setSelectedChaves(new Set([returnFocusChave]));
-
     const rowEl = document.querySelector(`[data-nf-chave="${returnFocusChave}"]`) as HTMLElement | null;
     if (rowEl) {
       rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -700,7 +499,7 @@ export default function NotaFiscalList() {
       window.sessionStorage.removeItem(LIST_LAST_VIEWED_KEY);
     }
     setReturnFocusChave("");
-  }, [returnFocusChave, viewState, filteredItems, pageSize, page]);
+  }, [returnFocusChave, filteredItems, pageSize, page]);
 
   const handleSyncLaunchedInvoices = async () => {
     try {
@@ -817,9 +616,7 @@ export default function NotaFiscalList() {
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-      {/* Header visible only in LIST or maybe always? keeping explicit for now */}
-      {viewState === 'LIST' && (
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <div>
             <h3 className="text-2xl font-semibold mb-1 text-black dark:text-white">Notas Fiscais de Entrada</h3>
             <p className="text-sm text-gray-500">Conciliação de Notas Fiscais e Cálculo de Guia Complementar</p>
@@ -852,17 +649,6 @@ export default function NotaFiscalList() {
               </button>
             </div>
 
-            {selectedChaves.size > 0 && (
-              <button
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all active:scale-95"
-                onClick={() => void handleCalculate()}
-                disabled={analyzing}
-              >
-                <FaCalculator size={16} />
-                <span>Calcular ({selectedChaves.size})</span>
-              </button>
-            )}
-
             <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-600 dark:text-gray-300 mr-4">
               <div className="relative">
                 <input
@@ -886,13 +672,11 @@ export default function NotaFiscalList() {
               <FaSync className={loading ? "animate-spin" : ""} size={18} />
             </button>
           </div>
-        </div>
-      )}
+      </div>
 
       <div id="list">
         <div className="w-full">
-          {viewState === 'LIST' && (
-            <>
+          <>
               {/* FILTERS BAR */}
               <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-3 mb-6 border border-gray-100 dark:border-strokedark overflow-hidden">
                 <div className="flex flex-nowrap items-center gap-2 w-full">
@@ -1013,11 +797,6 @@ export default function NotaFiscalList() {
                   <table className="text-left border-collapse table-fixed min-w-full">
                     <thead className="sticky top-[0px] z-20 shadow-sm bg-gray-50 dark:bg-meta-4 text-gray-600 dark:text-gray-300 text-xs uppercase font-semibold">
                       <tr>
-                        <th className="py-4 px-4 w-[50px] text-center border-b border-gray-200 dark:border-strokedark">
-                          <button onClick={toggleSelectAll} className="text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">
-                            {isAllSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
-                          </button>
-                        </th>
                         <th className="w-[140px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Status Cálculo</th>
                         <th className="w-[120px] py-4 px-4 text-right border-b border-gray-200 dark:border-strokedark">Valor Guia</th>
                         <th className="w-[200px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Nota Fiscal / Chave</th>
@@ -1031,7 +810,7 @@ export default function NotaFiscalList() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-strokedark text-sm">
                       {paged.map((row, idx) => {
-                        const isSelected = selectedChaves.has(row.CHAVE_NFE);
+                        const isReturnFocused = row.CHAVE_NFE === returnFocusChave;
                         const numNota = row.CHAVE_NFE ? row.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "N/A";
                         const xmlType = getXmlType(row);
 
@@ -1040,20 +819,9 @@ export default function NotaFiscalList() {
                             key={row.CHAVE_NFE ?? idx}
                             data-nf-chave={row.CHAVE_NFE}
                             onClick={() => handleOpenInvoiceDetails(row)}
-                            className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark cursor-pointer ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}
+                            className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark cursor-pointer ${isReturnFocused ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}
                             title="Clique para abrir detalhes da nota"
                           >
-                            <td className="py-3 px-4 text-center align-top pt-4">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleSelect(row.CHAVE_NFE);
-                                }}
-                                className={`transition-colors ${isSelected ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}
-                              >
-                                {isSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
-                              </button>
-                            </td>
                             <td className="py-3 px-4 align-top pt-4">
                               <div className="flex flex-col gap-1.5 items-start">
                                 {statusMap[row.CHAVE_NFE] ? (
@@ -1149,7 +917,7 @@ export default function NotaFiscalList() {
                       })}
                       {!loading && paged.length === 0 && (
                         <tr>
-                          <td colSpan={10} className="py-12 px-4 text-center text-gray-500">
+                          <td colSpan={9} className="py-12 px-4 text-center text-gray-500">
                             <div className="flex flex-col items-center justify-center">
                               <div className="bg-gray-100 dark:bg-meta-4/50 p-4 rounded-full mb-3">
                                 <FaSearch size={24} className="text-gray-400" />
@@ -1163,7 +931,7 @@ export default function NotaFiscalList() {
                         </tr>
                       )}
                       {loading && (
-                        <tr><td colSpan={10} className="py-10 px-4 text-center text-gray-500">
+                        <tr><td colSpan={9} className="py-10 px-4 text-center text-gray-500">
                           <div className="flex flex-col items-center justify-center gap-3">
                             <FaSync className="animate-spin text-primary" size={24} />
                             <p>Carregando notas fiscais...</p>
@@ -1182,29 +950,7 @@ export default function NotaFiscalList() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
-
-          {viewState === 'UNMATCHED_SELECTION' && tempResults && (
-            <UnmatchedSelection
-              unmatchedItems={tempResults.unmatched}
-              onConfirm={handleConfirmUnmatched}
-              onCancel={handleBackToList}
-            />
-          )}
-
-          {viewState === 'RESULTS' && results && (
-            <StCalculationResults
-              results={results}
-              originalItems={items}
-              selectedInvoices={selectedChaves}
-              onBack={handleBackToList}
-              onSuccess={() => {
-                handleBackToList();
-                fetchAll();
-              }}
-            />
-          )}
+          </>
         </div>
       </div>
 
