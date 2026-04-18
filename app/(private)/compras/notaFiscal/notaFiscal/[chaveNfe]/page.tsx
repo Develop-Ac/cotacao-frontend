@@ -1264,9 +1264,9 @@ export default function NotaFiscalDetailsPage() {
                     </div>
 
                     <div className="rounded-lg border border-gray-100 p-3">
-                      <p className="text-xs text-gray-500">FE/CTE (Campo 32)</p>
+                      <p className="text-xs text-gray-500">NFE/CTE (Campo 32)</p>
                       <p className="text-sm font-semibold text-gray-900">
-                        {guiaInfo.fe_cte || "-"} {guiaInfo.numero_nf_extraido ? `(extraído: ${guiaInfo.numero_nf_extraido})` : ""}
+                        {guiaInfo.fe_cte || "-"}
                       </p>
                       {guiaInfo.fe_cte_confere === false && guiaInfo.aviso ? (
                         <p className="mt-2 inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-semibold text-yellow-700">{guiaInfo.aviso}</p>
