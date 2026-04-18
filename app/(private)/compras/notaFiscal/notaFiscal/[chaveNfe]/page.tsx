@@ -18,6 +18,19 @@ type PaymentStatusByKey = {
   valor: number | null;
   tipo_imposto: string | null;
   data_pagamento: string | null;
+  itens_conciliacao?: Array<{
+    n_item: number;
+    cod_prod_fornecedor: string | null;
+    pro_codigo: string | null;
+    destinacao_mercadoria: DestinacaoMercadoria | null;
+    imposto_escolhido: ImpostoEscolhido | null;
+    possui_icms_st: boolean | null;
+    possui_difal: boolean | null;
+    ncm_xml: string | null;
+    cst_nota: string | null;
+    status_conferencia: "OK" | "DIVERGENTE" | null;
+    updated_at: string | null;
+  }>;
   guia_gerada?: boolean;
   guia?: GuiaByNfe | null;
 };
@@ -80,6 +93,18 @@ const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
 const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
 const NO_RELATIONSHIP_WARNING = "Produto do fornecedor não foi relacionado ao nosso código interno no Sistema Celta. Por Favor Verifique!";
+
+const normalizeProductCode = (code?: string | null) => String(code || "").trim().replace(/^0+/, "");
+
+const buildItemKeys = (itemNumber: number, productCode?: string | null) => {
+  const rawCode = String(productCode || "").trim();
+  const normalizedCode = normalizeProductCode(productCode);
+  const keys = [`${itemNumber}|${rawCode}`, String(itemNumber)];
+  if (normalizedCode && normalizedCode !== rawCode) {
+    keys.unshift(`${itemNumber}|${normalizedCode}`);
+  }
+  return keys;
+};
 
 const money = (value?: number | null) =>
   (value ?? 0).toLocaleString("pt-BR", {
@@ -191,18 +216,19 @@ export default function NotaFiscalDetailsPage() {
         if (!chave || !row.destinacaoMercadoria || !row.impostoEscolhido) return;
 
         const nItem = Number(row.item ?? 0);
-        const codProd = String(row.codProd || "").trim();
-        const itemKey = `${nItem}|${codProd}`;
+        const itemKeys = buildItemKeys(nItem, row.codProd);
 
         if (!current[chave]) {
           current[chave] = { updatedAt: new Date().toISOString(), items: {} };
         }
 
         current[chave].updatedAt = new Date().toISOString();
-        current[chave].items[itemKey] = {
-          destinacaoMercadoria: row.destinacaoMercadoria,
-          impostoEscolhido: row.impostoEscolhido,
-        };
+        itemKeys.forEach((itemKey) => {
+          current[chave].items[itemKey] = {
+            destinacaoMercadoria: row.destinacaoMercadoria,
+            impostoEscolhido: row.impostoEscolhido,
+          };
+        });
       });
 
       window.localStorage.setItem(DESTINATION_CACHE_KEY, JSON.stringify(current));
@@ -466,6 +492,55 @@ export default function NotaFiscalDetailsPage() {
     }
   }, [invoice?.XML_COMPLETO]);
 
+  const taxResultByItemKey = useMemo(() => {
+    const map: Record<string, ImpostoEscolhido> = {};
+    (taxResults || []).forEach((row) => {
+      if (!row.impostoEscolhido) return;
+      const itemNum = Number(row.item ?? 0);
+      buildItemKeys(itemNum, row.codProd).forEach((key) => {
+        map[key] = row.impostoEscolhido as ImpostoEscolhido;
+      });
+    });
+    return map;
+  }, [taxResults]);
+
+  const persistedFiscalByItemKey = useMemo(() => {
+    const map: Record<string, CachedFiscalSelection> = {};
+    (paymentStatus?.itens_conciliacao || []).forEach((item) => {
+      if (!item?.n_item || !item?.imposto_escolhido || !item?.destinacao_mercadoria) return;
+      const impostoEscolhido = item.imposto_escolhido as ImpostoEscolhido;
+      const destinacaoMercadoria = item.destinacao_mercadoria as DestinacaoMercadoria;
+      buildItemKeys(Number(item.n_item), item.cod_prod_fornecedor || "").forEach((key) => {
+        map[key] = {
+          impostoEscolhido,
+          destinacaoMercadoria,
+        };
+      });
+    });
+    return map;
+  }, [paymentStatus?.itens_conciliacao]);
+
+  const resolveImpostoByItem = (itemNumber: number, productCode?: string | null, destinacaoAtual?: DestinacaoMercadoria) => {
+    const keys = buildItemKeys(itemNumber, productCode);
+    const fromSubmitted = keys.map((key) => submittedTaxByItemKey[key]).find(Boolean);
+    if (fromSubmitted) return fromSubmitted;
+
+    const fromPersisted = keys.map((key) => persistedFiscalByItemKey[key]?.impostoEscolhido).find(Boolean);
+    if (fromPersisted) return fromPersisted;
+
+    const fromTaxResult = keys.map((key) => taxResultByItemKey[key]).find(Boolean);
+    if (fromTaxResult) return fromTaxResult;
+
+    const cachedSelectionMap = readCachedFiscalSelectionMap();
+    const fromCache = keys.map((key) => cachedSelectionMap[key]?.impostoEscolhido).find(Boolean);
+    if (fromCache) return fromCache;
+
+    if (destinacaoAtual === "USO_CONSUMO") {
+      return isDentroDoEstado ? "TRIBUTADA" : "DIFAL";
+    }
+    return "ST";
+  };
+
   useEffect(() => {
     const nextSelected = new Set<number>();
     const nextDestinations: Record<number, DestinacaoMercadoria> = {};
@@ -475,11 +550,19 @@ export default function NotaFiscalDetailsPage() {
     (parsed?.items || []).forEach((item, index) => {
       nextSelected.add(index);
       const isStItem = item.icmsSt > 0 || item.cst.endsWith("10") || item.cst.endsWith("60");
-      const cacheKey = `${item.nItem}|${item.codigo || ""}`;
-      const cachedSelection = cachedSelectionMap[cacheKey];
-      nextDestinations[index] = cachedSelection?.destinacaoMercadoria || (isStItem ? "COMERCIALIZACAO" : "USO_CONSUMO");
-      if (cachedSelection?.impostoEscolhido) {
-        nextTaxTypes[index] = cachedSelection.impostoEscolhido;
+      const cachedSelection = buildItemKeys(item.nItem, item.codigo)
+        .map((key) => cachedSelectionMap[key])
+        .find(Boolean);
+
+      const persistedSelection = buildItemKeys(item.nItem, item.codigo)
+        .map((key) => persistedFiscalByItemKey[key])
+        .find(Boolean);
+
+      nextDestinations[index] = persistedSelection?.destinacaoMercadoria || cachedSelection?.destinacaoMercadoria || (isStItem ? "COMERCIALIZACAO" : "USO_CONSUMO");
+
+      const impostoAnterior = resolveImpostoByItem(item.nItem, item.codigo, nextDestinations[index]);
+      if (impostoAnterior) {
+        nextTaxTypes[index] = impostoAnterior;
       }
     });
 
@@ -487,7 +570,7 @@ export default function NotaFiscalDetailsPage() {
     setDestinations(nextDestinations);
     setCachedTaxTypes(nextTaxTypes);
     setFiscalCheckResult(null);
-  }, [parsed?.items]);
+  }, [parsed?.items, taxResultByItemKey, submittedTaxByItemKey, persistedFiscalByItemKey, isDentroDoEstado]);
 
   const startProgressFeedback = (itemsCount: number) => {
     if (checkProgressIntervalRef.current) {
@@ -610,13 +693,11 @@ export default function NotaFiscalDetailsPage() {
       const item = parsed.items[idx];
       const destinacao = destinations[idx];
       const impostoFromCache = cachedTaxTypes[idx];
-      const impostoEscolhido = impostoFromCache || (destinacao === "USO_CONSUMO"
-        ? (isDentroDoEstado ? "TRIBUTADA" : "DIFAL")
-        : "ST");
+      const impostoEscolhido = impostoFromCache || resolveImpostoByItem(item.nItem, item.codigo, destinacao);
 
-      const compositeKey = `${item.nItem}|${item.codigo || ""}`;
-      nextSubmittedTaxByItemKey[compositeKey] = impostoEscolhido;
-      nextSubmittedTaxByItemKey[String(item.nItem)] = nextSubmittedTaxByItemKey[String(item.nItem)] || impostoEscolhido;
+      buildItemKeys(item.nItem, item.codigo).forEach((compositeKey) => {
+        nextSubmittedTaxByItemKey[compositeKey] = impostoEscolhido;
+      });
 
       return {
         item: item.nItem,
@@ -1282,9 +1363,7 @@ export default function NotaFiscalDetailsPage() {
                       const isSelected = selectedItems.has(idx);
                       const destinoAtual = destinations[idx];
                       const impostoFromCache = cachedTaxTypes[idx];
-                      const impostoAtual = impostoFromCache || (destinoAtual === "USO_CONSUMO"
-                        ? (isDentroDoEstado ? "TRIBUTADA" : "DIFAL")
-                        : "ST");
+                      const impostoAtual = impostoFromCache || resolveImpostoByItem(item.nItem, item.codigo, destinoAtual);
                       return (
                         <tr key={`${item.nItem}-${item.codigo}`} className={`border-t border-gray-100 ${isSelected ? "bg-blue-50/50" : ""}`}>
                           <td className="px-2 py-2 text-center">

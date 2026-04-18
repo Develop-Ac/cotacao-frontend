@@ -207,12 +207,33 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 }
             })();
 
+            const itens = activeItemsForInvoice.map((item) => {
+                const dentroEstado = String(item.chaveNfe || '').startsWith('51');
+                const destino = item.destinacaoMercadoria || (item.impostoEscolhido === 'ST' ? 'COMERCIALIZACAO' : 'USO_CONSUMO');
+                const impostoEscolhido = item.impostoEscolhido || (destino === 'USO_CONSUMO'
+                    ? (dentroEstado ? 'TRIBUTADA' : 'DIFAL')
+                    : 'ST');
+
+                return {
+                    item: Number(item.item || 0),
+                    codProdFornecedor: String(item.codProd || ''),
+                    impostoEscolhido,
+                    destinacaoMercadoria: destino,
+                    ncmNota: item.ncmNota,
+                    cfop: item.cfop,
+                    cstNota: item.cstNota,
+                    possuiIcmsSt: Boolean(item.possuiIcmsSt),
+                    possuiDifal: impostoEscolhido === 'DIFAL',
+                };
+            }).filter((row) => row.item > 0);
+
             return {
                 chaveNfe: chave,
                 observacoes: status,
                 valor: Number(totalValue.toFixed(2)),
                 tipo_imposto: tipoImposto,
-                usuario: user?.nome || 'Sistema'
+                usuario: user?.nome || 'Sistema',
+                itens,
             };
         });
 
