@@ -61,6 +61,7 @@ const SERVICE_URL = serviceUrl("calculadoraSt");
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
 const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
 const DESTINATION_CACHE_KEY = "nf_item_destinations_v1";
+const NO_RELATIONSHIP_WARNING = "Produto do fornecedor não foi relacionado ao nosso código interno no Sistema Celta. Por Favor Verifique!";
 
 const money = (value?: number | null) =>
   (value ?? 0).toLocaleString("pt-BR", {
@@ -684,8 +685,15 @@ export default function NotaFiscalDetailsPage() {
       .replace(/COFINS_CODIGO/g, "Código do Cofins")
       .replace(
         "Produto do fornecedor não vinculado na Stage_Produtos_Fornecedor_NFE para o FOR_CODIGO identificado.",
-        "Produto do fornecedor não foi relacionado ao nosso código interno no Sistema Celta. Por Favor Verifique!"
+        NO_RELATIONSHIP_WARNING
       );
+  };
+
+  const isOnlyNoRelationshipWarning = (item: FiscalCheckItemResult | null) => {
+    if (!item || !item.divergencias.length) return false;
+    return item.divergencias.every(
+      (div) => normalizeValidationMessage(div).trim().toLowerCase() === NO_RELATIONSHIP_WARNING.toLowerCase()
+    );
   };
 
   return (
@@ -873,6 +881,13 @@ export default function NotaFiscalDetailsPage() {
                                   className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-[11px] font-semibold text-green-700 hover:bg-green-200"
                                 >
                                   <FaCheckCircle /> OK ({checkItem.conformidades?.length || 0})
+                                </button>
+                              ) : isOnlyNoRelationshipWarning(checkItem) ? (
+                                <button
+                                  onClick={() => setSelectedDetailItem(checkItem)}
+                                  className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-[11px] font-semibold text-yellow-700 hover:bg-yellow-200"
+                                >
+                                  <FaExclamationTriangle /> Sem Relacionamento
                                 </button>
                               ) : (
                                 <button
@@ -1113,6 +1128,8 @@ export default function NotaFiscalDetailsPage() {
                           <p className="text-sm font-medium text-gray-900">Item {item.item} - Cód. fornecedor: {item.codProdFornecedor}</p>
                           {item.statusConferencia === "OK" ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700"><FaCheckCircle /> OK</span>
+                          ) : isOnlyNoRelationshipWarning(item) ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-xs font-bold text-yellow-700"><FaExclamationTriangle /> Sem Relacionamento</span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700"><FaExclamationTriangle /> Divergente</span>
                           )}
