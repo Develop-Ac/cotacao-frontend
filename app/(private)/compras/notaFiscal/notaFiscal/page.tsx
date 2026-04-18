@@ -75,7 +75,7 @@ export default function NotaFiscalList() {
   } | null>(null);
 
   // Persistence State
-  const [statusMap, setStatusMap] = useState<Record<string, { status: string, valor: number }>>({});
+  const [statusMap, setStatusMap] = useState<Record<string, { status: string, valor: number, guiaGerada?: boolean, guiaPath?: string }>>({});
   const [returnFocusChave, setReturnFocusChave] = useState<string>("");
   const [stateRestored, setStateRestored] = useState(false);
 
@@ -811,6 +811,8 @@ export default function NotaFiscalList() {
                     <tbody className="divide-y divide-gray-100 dark:divide-strokedark text-sm">
                       {paged.map((row, idx) => {
                         const isReturnFocused = row.CHAVE_NFE === returnFocusChave;
+                        const rowStatus = statusMap[row.CHAVE_NFE];
+                        const rowStatusText = String(rowStatus?.status || "").trim();
                         const numNota = row.CHAVE_NFE ? row.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "N/A";
                         const xmlType = getXmlType(row);
 
@@ -824,23 +826,31 @@ export default function NotaFiscalList() {
                           >
                             <td className="py-3 px-4 align-top pt-4">
                               <div className="flex flex-col gap-1.5 items-start">
-                                {statusMap[row.CHAVE_NFE] ? (
-                                  <span title={statusMap[row.CHAVE_NFE].status} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border cursor-help 
-                                            ${statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30' :
-                                      statusMap[row.CHAVE_NFE].status.includes('Tributado') ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30' : 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/10'}`}>
-                                    {statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? <><div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>Tem Guia</> :
-                                      statusMap[row.CHAVE_NFE].status.includes('Tributado') ? <><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>Tributado</> : <><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>Verificado</>}
+                                {rowStatus ? (
+                                  <span title={rowStatusText || 'Guia Anexada'} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border cursor-help 
+                                            ${rowStatusText.includes('Tem Guia') ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30' :
+                                      rowStatusText.includes('Tributado') ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30' :
+                                        rowStatusText ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/10' : 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20'}`}>
+                                    {rowStatusText.includes('Tem Guia') ? <><div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>Tem Guia</> :
+                                      rowStatusText.includes('Tributado') ? <><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>Tributado</> :
+                                        rowStatusText ? <><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>Verificado</> : <><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>Guia Anexada</>}
                                   </span>
                                 ) : (
                                   <span className="text-xs text-gray-400 italic">Pendente</span>
                                 )}
+
+                                {rowStatus?.guiaGerada ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700 border border-yellow-200">
+                                    Guia Gerada
+                                  </span>
+                                ) : null}
                               </div>
                             </td>
                             <td className="py-3 px-4 text-right align-top pt-4">
                               <div className="flex flex-col items-end">
-                                {statusMap[row.CHAVE_NFE] && statusMap[row.CHAVE_NFE].valor > 0 ? (
+                                {rowStatus && rowStatus.valor > 0 ? (
                                   <span className="text-sm font-mono text-red-600 dark:text-red-400 font-bold">
-                                    R$ {statusMap[row.CHAVE_NFE].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    R$ {rowStatus.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   </span>
                                 ) : (
                                   <span className="text-sm text-gray-400 font-medium">-</span>

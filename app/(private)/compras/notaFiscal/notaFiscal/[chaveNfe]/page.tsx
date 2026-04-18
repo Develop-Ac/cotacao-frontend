@@ -18,6 +18,24 @@ type PaymentStatusByKey = {
   valor: number | null;
   tipo_imposto: string | null;
   data_pagamento: string | null;
+  guia_gerada?: boolean;
+  guia?: GuiaByNfe | null;
+};
+
+type GuiaByNfe = {
+  chaveNfe: string;
+  guia_gerada: boolean;
+  bucket: string;
+  path: string;
+  original_file_name: string;
+  numero_documento: string | null;
+  data_vencimento: string | null;
+  valor: number | null;
+  fe_cte: string | null;
+  numero_nf_extraido: string | null;
+  fe_cte_confere: boolean | null;
+  aviso: string | null;
+  uploaded_at: string;
 };
 
 type DestinacaoMercadoria = "COMERCIALIZACAO" | "USO_CONSUMO";
@@ -85,10 +103,13 @@ export default function NotaFiscalDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [calculatingTax, setCalculatingTax] = useState(false);
+  const [uploadingGuia, setUploadingGuia] = useState(false);
+  const [loadingGuia, setLoadingGuia] = useState(false);
   const [invoice, setInvoice] = useState<NotaFiscalRow | null>(null);
   const [parsed, setParsed] = useState<ParsedNfe | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusByKey | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [guiaInfo, setGuiaInfo] = useState<GuiaByNfe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [productCheckOpen, setProductCheckOpen] = useState(false);
   const [checkingProducts, setCheckingProducts] = useState(false);
@@ -116,6 +137,7 @@ export default function NotaFiscalDetailsPage() {
   });
   const checkProgressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dialogResolverRef = useRef<((value: boolean) => void) | null>(null);
+  const guiaFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
   const hasPreviousTaxCalculation = useMemo(() => {
@@ -266,6 +288,71 @@ export default function NotaFiscalDetailsPage() {
 
     fetchData();
   }, [chaveNfe]);
+
+  const fetchGuiaInfo = async () => {
+    if (!chaveNfe) return;
+
+    setLoadingGuia(true);
+    try {
+      const res = await fetch(`${SERVICE_URL}/icms/guia/${chaveNfe}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        setGuiaInfo(null);
+        return;
+      }
+
+      const data = await res.json();
+      setGuiaInfo(data);
+    } catch {
+      setGuiaInfo(null);
+    } finally {
+      setLoadingGuia(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchGuiaInfo();
+  }, [chaveNfe]);
+
+  const handleUploadGuia = async (file: File) => {
+    if (!chaveNfe) return;
+    if (!file.type.toLowerCase().includes("pdf")) {
+      showNotice("Aviso", "Envie um arquivo PDF da guia.");
+      return;
+    }
+
+    const body = new FormData();
+    body.append("file", file);
+
+    setUploadingGuia(true);
+    try {
+      const res = await fetch(`${SERVICE_URL}/icms/guia/${chaveNfe}/upload`, {
+        method: "POST",
+        body,
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || "Falha ao enviar guia.");
+      }
+
+      const data = await res.json();
+      setGuiaInfo(data);
+      void refreshPaymentStatus();
+      showNotice("Sucesso", "Guia anexada com sucesso.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Falha ao anexar guia.";
+      showNotice("Erro", message);
+    } finally {
+      setUploadingGuia(false);
+      if (guiaFileInputRef.current) {
+        guiaFileInputRef.current.value = "";
+      }
+    }
+  };
 
   const generatePreviewPdf = async () => {
     if (!invoice?.XML_COMPLETO) {
@@ -956,6 +1043,77 @@ export default function NotaFiscalDetailsPage() {
                     <p className="font-semibold text-gray-900">{money(paymentStatus?.valor)}</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-gray-900">Guia da NF</h2>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={guiaFileInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          void handleUploadGuia(file);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => guiaFileInputRef.current?.click()}
+                      disabled={uploadingGuia}
+                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {uploadingGuia ? <FaSync className="animate-spin" /> : <FaFilePdf />} {uploadingGuia ? "Enviando..." : "Anexar Guia PDF"}
+                    </button>
+                  </div>
+                </div>
+
+                {loadingGuia && <p className="text-sm text-gray-500">Carregando guia vinculada...</p>}
+
+                {!loadingGuia && !guiaInfo && (
+                  <p className="text-sm text-gray-500">Nenhuma guia anexada para esta NF.</p>
+                )}
+
+                {!loadingGuia && guiaInfo && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-lg border border-gray-100 p-3">
+                        <p className="text-xs text-gray-500">Arquivo</p>
+                        <p className="text-sm font-semibold text-gray-900">{guiaInfo.original_file_name || "-"}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-100 p-3">
+                        <p className="text-xs text-gray-500">Documento (Campo 23)</p>
+                        <p className="text-sm font-semibold text-gray-900">{guiaInfo.numero_documento || "-"}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-100 p-3">
+                        <p className="text-xs text-gray-500">Vencimento (Campo 22)</p>
+                        <p className="text-sm font-semibold text-gray-900">{guiaInfo.data_vencimento ? formatDate(guiaInfo.data_vencimento) : "-"}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-100 p-3">
+                        <p className="text-xs text-gray-500">Valor (Campo 31)</p>
+                        <p className="text-sm font-semibold text-gray-900">{money(guiaInfo.valor ?? 0)}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-100 p-3">
+                      <p className="text-xs text-gray-500">FE/CTE (Campo 32)</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {guiaInfo.fe_cte || "-"} {guiaInfo.numero_nf_extraido ? `(extraído: ${guiaInfo.numero_nf_extraido})` : ""}
+                      </p>
+                      {guiaInfo.fe_cte_confere === false && guiaInfo.aviso ? (
+                        <p className="mt-2 inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-semibold text-yellow-700">{guiaInfo.aviso}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-lg border border-gray-100 p-3">
+                      <p className="text-xs text-gray-500">Caminho no MinIO</p>
+                      <p className="break-all text-xs font-mono text-gray-800">{`${guiaInfo.bucket}/${guiaInfo.path}`}</p>
+                    </div>
+                  </div>
+                )}
               </div>
           </div>
 
