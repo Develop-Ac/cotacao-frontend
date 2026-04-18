@@ -362,8 +362,19 @@ export default function NotaFiscalDetailsPage() {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || "Falha ao enviar guia.");
+        let message = "Falha ao enviar guia.";
+        try {
+          const data = await res.json();
+          if (Array.isArray(data?.message)) {
+            message = data.message.join(", ");
+          } else if (typeof data?.message === "string" && data.message.trim()) {
+            message = data.message;
+          }
+        } catch {
+          const text = await res.text().catch(() => "");
+          if (text.trim()) message = text;
+        }
+        throw new Error(message);
       }
 
       const data = await res.json();
