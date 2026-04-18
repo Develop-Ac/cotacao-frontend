@@ -140,6 +140,7 @@ export default function NotaFiscalDetailsPage() {
   const guiaFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
+  const hasGuiaAnexada = Boolean(guiaInfo?.guia_gerada || guiaInfo?.path);
   const hasPreviousTaxCalculation = useMemo(() => {
     const status = String(paymentStatus?.status || "").trim();
     const tipoImposto = String(paymentStatus?.tipo_imposto || invoice?.TIPO_IMPOSTO || "").trim();
@@ -678,6 +679,11 @@ export default function NotaFiscalDetailsPage() {
   };
 
   const handleOpenTaxCalculation = async () => {
+    if (hasGuiaAnexada) {
+      showNotice("Aviso", "Não é permitido recalcular o imposto quando já existe guia anexada para esta NF.");
+      return;
+    }
+
     if (!invoice?.CHAVE_NFE || !invoice.XML_COMPLETO) {
       showNotice("Aviso", "NF inválida para iniciar cálculo.");
       return;
@@ -853,7 +859,8 @@ export default function NotaFiscalDetailsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleOpenTaxCalculation}
-              disabled={calculatingTax}
+              disabled={calculatingTax || hasGuiaAnexada}
+              title={hasGuiaAnexada ? "Recalculo bloqueado: já existe guia anexada para esta NF" : "Calcular imposto"}
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
             >
               {calculatingTax ? <FaSync className="animate-spin" /> : <FaCalculator />} {calculatingTax ? "Calculando..." : "Calcular Imposto"}
