@@ -173,6 +173,18 @@ export default function NotaFiscalDetailsPage() {
     return Boolean(status || tipoImposto || valor > 0);
   }, [paymentStatus, invoice?.TIPO_IMPOSTO]);
 
+  const canShowGuiaSection = useMemo(() => {
+    const normalize = (value: string | null | undefined) =>
+      String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+
+    return normalize(paymentStatus?.status) === "tem guia complementar";
+  }, [paymentStatus?.status]);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -1203,6 +1215,7 @@ export default function NotaFiscalDetailsPage() {
                 </div>
               </div>
 
+              {canShowGuiaSection && (
               <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold text-gray-900">Guia da NF</h2>
@@ -1286,6 +1299,7 @@ export default function NotaFiscalDetailsPage() {
                   </div>
                 )}
               </div>
+              )}
           </div>
 
           <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
