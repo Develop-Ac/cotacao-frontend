@@ -847,14 +847,14 @@ export default function NotaFiscalList() {
                                 )}
 
                                 <span
-                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold border whitespace-nowrap ${
                                     rowProductStatus === 'OK'
-                                      ? 'bg-green-50 text-green-700 border-green-200'
+                                      ? 'bg-green-50 text-green-700 border-green-200 text-[10px]'
                                       : rowProductStatus === 'ERRO'
-                                        ? 'bg-red-50 text-red-700 border-red-200'
+                                        ? 'bg-red-50 text-red-700 border-red-200 text-[10px]'
                                         : rowProductStatus === 'SEM_RELACIONAMENTO'
-                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                          : 'bg-gray-50 text-gray-600 border-gray-200'
+                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200 text-[9px]'
+                                          : 'bg-gray-50 text-gray-600 border-gray-200 text-[10px]'
                                   }`}
                                   title="Status da conferência dos produtos"
                                 >
