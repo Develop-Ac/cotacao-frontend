@@ -954,14 +954,23 @@ export default function NotaFiscalDetailsPage() {
     const map: Record<string, FiscalCheckItemResult> = {};
     (paymentStatus?.itens_conciliacao || []).forEach((item) => {
       const impostoEscolhido = item.imposto_escolhido || undefined;
-      const cstRule = getCstRuleByImposto(impostoEscolhido);
+      const conformidadesPersistidas: string[] = [];
+      if (item.status_conferencia === "OK") {
+        if (impostoEscolhido === "ST") {
+          conformidadesPersistidas.push("ST_CODIGO correto para item com ICMS ST: ST0-X.");
+        }
+        if (impostoEscolhido === "TRIBUTADA") {
+          conformidadesPersistidas.push("Situação tributária correta para item Tributado: ST_CODIGO=IGI.");
+        }
+      }
+
       const row: FiscalCheckItemResult = {
         item: Number(item.n_item || 0),
         codProdFornecedor: String(item.cod_prod_fornecedor || ""),
         impostoEscolhido,
         codigoProduto: item.pro_codigo || undefined,
         statusConferencia: item.status_conferencia === "OK" ? "OK" : "DIVERGENTE",
-        conformidades: item.status_conferencia === "OK" && cstRule ? [`${cstRule.title}: ${cstRule.expected} (validado)`] : [],
+        conformidades: conformidadesPersistidas,
         divergencias: Array.isArray(item.divergencias_json) ? item.divergencias_json : [],
       };
 
@@ -994,7 +1003,62 @@ export default function NotaFiscalDetailsPage() {
   }, [paymentStatus?.status_conferencia_produtos]);
 
   const normalizeValidationMessage = (message: string) => {
-    return message
+    const raw = String(message || "").trim();
+    if (!raw) return "";
+
+    const cstStInvalid = raw.match(/ST_CODIGO inválido para item com ICMS ST: esperado\s+([^\s.]+)\s+e encontrado\s+([^.]+)\./i);
+    if (cstStInvalid) {
+      const expected = String(cstStInvalid[1] || "ST0-X").trim();
+      const found = String(cstStInvalid[2] || "vazio").trim();
+      return `Código da Sit. Tributária: Encontrado ${found}, modificar para ${expected}.`;
+    }
+
+    const cstTribInvalid = raw.match(/Situação tributária inválida para item Tributado: esperado ST_CODIGO=([^\s.]+) e encontrado ([^.]+)\./i);
+    if (cstTribInvalid) {
+      const expected = String(cstTribInvalid[1] || "IGI").trim();
+      const found = String(cstTribInvalid[2] || "vazio").trim();
+      return `Código da Sit. Tributária: Encontrado ${found}, modificar para ${expected}.`;
+    }
+
+    const cstStOk = raw.match(/ST_CODIGO correto para item com ICMS ST:\s*([^\s.]+)\./i);
+    if (cstStOk) {
+      const code = String(cstStOk[1] || "ST0-X").trim();
+      return `Código da Sit. Tributária: ${code} está Correto.`;
+    }
+
+    const cstTribOk = raw.match(/Situação tributária correta para item Tributado:\s*ST_CODIGO=([^\s.]+)\./i);
+    if (cstTribOk) {
+      const code = String(cstTribOk[1] || "IGI").trim();
+      return `Código da Sit. Tributária: ${code} está Correto.`;
+    }
+
+    const pisInvalid = raw.match(/Código do Pis inválido(?: para uso e consumo)?: esperado\s+([^\s.]+)\s+e encontrado\s+([^.]+)\./i);
+    if (pisInvalid) {
+      const expected = String(pisInvalid[1] || "").trim();
+      const found = String(pisInvalid[2] || "vazio").trim();
+      return `Código do Pis inválido: encontrado ${found}, modificar para ${expected}.`;
+    }
+
+    const pisOk = raw.match(/Código do Pis correto(?: para uso e consumo)?:\s*([^\s.]+)\./i);
+    if (pisOk) {
+      const code = String(pisOk[1] || "").trim();
+      return `Código do Pis inválido: ${code} está Correto.`;
+    }
+
+    const cofinsInvalid = raw.match(/Código do Cofins inválido(?: para uso e consumo)?: esperado\s+([^\s.]+)\s+e encontrado\s+([^.]+)\./i);
+    if (cofinsInvalid) {
+      const expected = String(cofinsInvalid[1] || "").trim();
+      const found = String(cofinsInvalid[2] || "vazio").trim();
+      return `Código do Cofins inválido: encontrado ${found}, modificar para ${expected}.`;
+    }
+
+    const cofinsOk = raw.match(/Código do Cofins correto(?: para uso e consumo)?:\s*([^\s.]+)\./i);
+    if (cofinsOk) {
+      const code = String(cofinsOk[1] || "").trim();
+      return `Código do Cofins inválido: ${code} está Correto.`;
+    }
+
+    return raw
       .replace(/PIS_CODIGO/g, "Código do Pis")
       .replace(/COFINS_CODIGO/g, "Código do Cofins")
       .replace(
@@ -1562,9 +1626,18 @@ export default function NotaFiscalDetailsPage() {
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700"><FaExclamationTriangle /> Divergente</span>
                           )}
                         </div>
+                        {item.codigoProduto && (
+                          <p className="mt-1 text-xs font-semibold text-gray-700">Código do Produto: {item.codigoProduto}</p>
+                        )}
+                        <p className="mt-2 text-xs font-semibold text-gray-800">Conferência do Produto:</p>
+                        {(item.conformidades || []).length > 0 && (
+                          <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-green-700">
+                            {(item.conformidades || []).map((ok, idx) => <li key={`${item.item}-ok-${idx}`}>{normalizeValidationMessage(ok)}</li>)}
+                          </ul>
+                        )}
                         {item.divergencias.length > 0 && (
                           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-red-700">
-                            {item.divergencias.map((div, idx) => <li key={`${item.item}-div-${idx}`}>{div}</li>)}
+                            {item.divergencias.map((div, idx) => <li key={`${item.item}-div-${idx}`}>{normalizeValidationMessage(div)}</li>)}
                           </ul>
                         )}
                       </div>
@@ -1619,10 +1692,11 @@ export default function NotaFiscalDetailsPage() {
               {selectedDetailItem.codigoProduto && (
                 <p className="text-sm font-semibold text-gray-800">Código do Produto: {selectedDetailItem.codigoProduto}</p>
               )}
+              <p className="text-sm font-semibold text-gray-800">Conferência do Produto:</p>
 
               {(selectedDetailItem.conformidades || []).length > 0 && (
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-green-700">Validações corretas</p>
+                  <p className="mb-2 text-sm font-semibold text-green-700">Resultado</p>
                   <ul className="list-disc space-y-2 pl-5 text-sm text-green-700">
                     {(selectedDetailItem.conformidades || []).map((ok, idx) => (
                       <li key={`detail-ok-${idx}`}>{normalizeValidationMessage(ok)}</li>
@@ -1633,7 +1707,7 @@ export default function NotaFiscalDetailsPage() {
 
               {selectedDetailItem.divergencias.length > 0 && (
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-red-700">Pendências encontradas</p>
+                  <p className="mb-2 text-sm font-semibold text-red-700">Ajustes necessários</p>
                   <ul className="list-disc space-y-2 pl-5 text-sm text-red-700">
                     {selectedDetailItem.divergencias.map((div, idx) => (
                       <li key={`detail-error-${idx}`}>{normalizeValidationMessage(div)}</li>
