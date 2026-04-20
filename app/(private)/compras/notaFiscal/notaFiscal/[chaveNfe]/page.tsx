@@ -80,6 +80,11 @@ type FiscalCheckResult = {
   warnings?: string[];
 };
 
+type ConferenceMessage = {
+  text: string;
+  type: "ok" | "error";
+};
+
 type ModalDialogState = {
   isOpen: boolean;
   title: string;
@@ -718,6 +723,31 @@ export default function NotaFiscalDetailsPage() {
     return null;
   };
 
+  const hasCstValidationMessage = (message: string) => {
+    const raw = String(message || "");
+    return /ST_CODIGO inválido para item com ICMS ST/i.test(raw)
+      || /Situação tributária inválida para item Tributado/i.test(raw)
+      || /ST_CODIGO correto para item com ICMS ST/i.test(raw)
+      || /Situação tributária correta para item Tributado/i.test(raw)
+      || /Código da Sit\. Tributária:/i.test(raw);
+  };
+
+  const getConferenceConformidades = (item: FiscalCheckItemResult, imposto?: ImpostoEscolhido) => {
+    const base = [...(item.conformidades || [])];
+    const alreadyHasCst = base.some((msg) => hasCstValidationMessage(msg));
+    const hasCstDivergence = (item.divergencias || []).some((msg) => hasCstValidationMessage(msg));
+
+    if (!alreadyHasCst && !hasCstDivergence) {
+      if (imposto === "ST") {
+        base.unshift("ST_CODIGO correto para item com ICMS ST: ST0-X.");
+      } else if (imposto === "TRIBUTADA") {
+        base.unshift("Situação tributária correta para item Tributado: ST_CODIGO=IGI.");
+      }
+    }
+
+    return base;
+  };
+
   const runProductCheck = async () => {
     if (!parsed?.items?.length || !invoice) return;
 
@@ -1042,7 +1072,7 @@ export default function NotaFiscalDetailsPage() {
     const pisOk = raw.match(/Código do Pis correto(?: para uso e consumo)?:\s*([^\s.]+)\./i);
     if (pisOk) {
       const code = String(pisOk[1] || "").trim();
-      return `Código do Pis inválido: ${code} está Correto.`;
+      return `Código do Pis: ${code} está correto.`;
     }
 
     const cofinsInvalid = raw.match(/Código do Cofins inválido(?: para uso e consumo)?: esperado\s+([^\s.]+)\s+e encontrado\s+([^.]+)\./i);
@@ -1055,7 +1085,7 @@ export default function NotaFiscalDetailsPage() {
     const cofinsOk = raw.match(/Código do Cofins correto(?: para uso e consumo)?:\s*([^\s.]+)\./i);
     if (cofinsOk) {
       const code = String(cofinsOk[1] || "").trim();
-      return `Código do Cofins inválido: ${code} está Correto.`;
+      return `Código do Cofins: ${code} está correto.`;
     }
 
     return raw
@@ -1065,6 +1095,20 @@ export default function NotaFiscalDetailsPage() {
         "Produto do fornecedor não vinculado na Stage_Produtos_Fornecedor_NFE para o FOR_CODIGO identificado.",
         NO_RELATIONSHIP_WARNING
       );
+  };
+
+  const getConferenceMessages = (item: FiscalCheckItemResult, imposto?: ImpostoEscolhido): ConferenceMessage[] => {
+    const conformidadesConferencia = getConferenceConformidades(item, imposto)
+      .map((msg) => normalizeValidationMessage(msg))
+      .filter(Boolean)
+      .map((text) => ({ text, type: "ok" as const }));
+
+    const divergenciasConferencia = (item.divergencias || [])
+      .map((msg) => normalizeValidationMessage(msg))
+      .filter(Boolean)
+      .map((text) => ({ text, type: "error" as const }));
+
+    return [...conformidadesConferencia, ...divergenciasConferencia];
   };
 
   const isOnlyNoRelationshipWarning = (item: FiscalCheckItemResult | null) => {
@@ -1600,7 +1644,7 @@ export default function NotaFiscalDetailsPage() {
                         {(() => {
                           const keyComposite = `${item.item}|${item.codProdFornecedor || ""}`;
                           const impostoItem = item.impostoEscolhido || submittedTaxByItemKey[keyComposite] || submittedTaxByItemKey[String(item.item)];
-                          const cstRule = getCstRuleByImposto(impostoItem);
+                          const conferenceMessages = getConferenceMessages(item, impostoItem);
                           return (
                             <div className="mb-2 space-y-1">
                               <div>
@@ -1608,11 +1652,19 @@ export default function NotaFiscalDetailsPage() {
                                   Imposto: {getImpostoLabel(impostoItem)}
                                 </span>
                               </div>
-                              {cstRule ? (
-                                <p className="text-[11px] font-medium text-gray-700">
-                                  {cstRule.title}: {cstRule.expected}
-                                </p>
-                              ) : null}
+                              {item.codigoProduto && (
+                                <p className="text-xs font-semibold text-gray-700">Código do Produto: {item.codigoProduto}</p>
+                              )}
+                              <p className="mt-1 text-xs font-semibold text-gray-800">Conferência do Produto:</p>
+                              {conferenceMessages.length > 0 && (
+                                <ul className="mt-1 list-disc space-y-1 pl-5 text-xs">
+                                  {conferenceMessages.map((entry, idx) => (
+                                    <li key={`${item.item}-msg-${idx}`} className={entry.type === "ok" ? "text-green-700" : "text-red-700"}>
+                                      {entry.text}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
                           );
                         })()}
@@ -1626,20 +1678,6 @@ export default function NotaFiscalDetailsPage() {
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700"><FaExclamationTriangle /> Divergente</span>
                           )}
                         </div>
-                        {item.codigoProduto && (
-                          <p className="mt-1 text-xs font-semibold text-gray-700">Código do Produto: {item.codigoProduto}</p>
-                        )}
-                        <p className="mt-2 text-xs font-semibold text-gray-800">Conferência do Produto:</p>
-                        {(item.conformidades || []).length > 0 && (
-                          <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-green-700">
-                            {(item.conformidades || []).map((ok, idx) => <li key={`${item.item}-ok-${idx}`}>{normalizeValidationMessage(ok)}</li>)}
-                          </ul>
-                        )}
-                        {item.divergencias.length > 0 && (
-                          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-red-700">
-                            {item.divergencias.map((div, idx) => <li key={`${item.item}-div-${idx}`}>{normalizeValidationMessage(div)}</li>)}
-                          </ul>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -1675,46 +1713,28 @@ export default function NotaFiscalDetailsPage() {
               {(() => {
                 const keyComposite = `${selectedDetailItem.item}|${selectedDetailItem.codProdFornecedor || ""}`;
                 const impostoItem = selectedDetailItem.impostoEscolhido || submittedTaxByItemKey[keyComposite] || submittedTaxByItemKey[String(selectedDetailItem.item)];
-                const cstRule = getCstRuleByImposto(impostoItem);
+                const conferenceMessages = getConferenceMessages(selectedDetailItem, impostoItem);
                 return (
                   <div className="space-y-1">
                     <p className="text-sm text-gray-800">
                       <strong>Imposto considerado:</strong> {getImpostoLabel(impostoItem)}
                     </p>
-                    {cstRule ? (
-                      <p className="text-sm text-gray-700">
-                        <strong>{cstRule.title}:</strong> {cstRule.expected}
-                      </p>
-                    ) : null}
+                    {selectedDetailItem.codigoProduto && (
+                      <p className="text-sm font-semibold text-gray-800">Código do Produto: {selectedDetailItem.codigoProduto}</p>
+                    )}
+                    <p className="text-sm font-semibold text-gray-800">Conferência do Produto:</p>
+                    {conferenceMessages.length > 0 && (
+                      <ul className="list-disc space-y-2 pl-5 text-sm">
+                        {conferenceMessages.map((entry, idx) => (
+                          <li key={`detail-msg-${idx}`} className={entry.type === "ok" ? "text-green-700" : "text-red-700"}>
+                            {entry.text}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 );
               })()}
-              {selectedDetailItem.codigoProduto && (
-                <p className="text-sm font-semibold text-gray-800">Código do Produto: {selectedDetailItem.codigoProduto}</p>
-              )}
-              <p className="text-sm font-semibold text-gray-800">Conferência do Produto:</p>
-
-              {(selectedDetailItem.conformidades || []).length > 0 && (
-                <div>
-                  <p className="mb-2 text-sm font-semibold text-green-700">Resultado</p>
-                  <ul className="list-disc space-y-2 pl-5 text-sm text-green-700">
-                    {(selectedDetailItem.conformidades || []).map((ok, idx) => (
-                      <li key={`detail-ok-${idx}`}>{normalizeValidationMessage(ok)}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {selectedDetailItem.divergencias.length > 0 && (
-                <div>
-                  <p className="mb-2 text-sm font-semibold text-red-700">Ajustes necessários</p>
-                  <ul className="list-disc space-y-2 pl-5 text-sm text-red-700">
-                    {selectedDetailItem.divergencias.map((div, idx) => (
-                      <li key={`detail-error-${idx}`}>{normalizeValidationMessage(div)}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           </div>
         </div>,
