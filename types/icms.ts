@@ -20,6 +20,7 @@ export type StCalculationResult = {
     item: number;
     codProd: string;
     produto: string;
+    unidadeFornecedor?: string;
     ncmNota: string;
     cfop: string;
     cstNota?: string;

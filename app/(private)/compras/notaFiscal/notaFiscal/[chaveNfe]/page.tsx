@@ -728,6 +728,8 @@ export default function NotaFiscalDetailsPage() {
       return {
         item: item.nItem,
         codProdFornecedor: item.codigo,
+        produto: item.descricao,
+        unidadeFornecedor: item.unidade,
         impostoEscolhido,
         destinacaoMercadoria: destinacao,
         ncmNota: item.ncm,

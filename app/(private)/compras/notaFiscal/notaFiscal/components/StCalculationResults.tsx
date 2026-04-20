@@ -217,6 +217,8 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 return {
                     item: Number(item.item || 0),
                     codProdFornecedor: String(item.codProd || ''),
+                    produto: String(item.produto || ''),
+                    unidadeFornecedor: String(item.unidadeFornecedor || ''),
                     impostoEscolhido,
                     destinacaoMercadoria: destino,
                     ncmNota: item.ncmNota,
