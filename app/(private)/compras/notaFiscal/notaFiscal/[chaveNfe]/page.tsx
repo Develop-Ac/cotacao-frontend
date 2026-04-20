@@ -700,6 +700,24 @@ export default function NotaFiscalDetailsPage() {
     return "bg-gray-100 text-gray-600";
   };
 
+  const getCstRuleByImposto = (imposto?: ImpostoEscolhido) => {
+    if (imposto === "ST") {
+      return {
+        title: "Regra CST (ICMS ST)",
+        expected: "ST_CODIGO deve ser ST0-X",
+      };
+    }
+
+    if (imposto === "TRIBUTADA") {
+      return {
+        title: "Regra CST (Tributado)",
+        expected: "ST_CODIGO deve ser IGI",
+      };
+    }
+
+    return null;
+  };
+
   const runProductCheck = async () => {
     if (!parsed?.items?.length || !invoice) return;
 
@@ -935,12 +953,15 @@ export default function NotaFiscalDetailsPage() {
   const fiscalCheckByItem = useMemo(() => {
     const map: Record<string, FiscalCheckItemResult> = {};
     (paymentStatus?.itens_conciliacao || []).forEach((item) => {
+      const impostoEscolhido = item.imposto_escolhido || undefined;
+      const cstRule = getCstRuleByImposto(impostoEscolhido);
       const row: FiscalCheckItemResult = {
         item: Number(item.n_item || 0),
         codProdFornecedor: String(item.cod_prod_fornecedor || ""),
-        impostoEscolhido: item.imposto_escolhido || undefined,
+        impostoEscolhido,
         codigoProduto: item.pro_codigo || undefined,
         statusConferencia: item.status_conferencia === "OK" ? "OK" : "DIVERGENTE",
+        conformidades: item.status_conferencia === "OK" && cstRule ? [`${cstRule.title}: ${cstRule.expected} (validado)`] : [],
         divergencias: Array.isArray(item.divergencias_json) ? item.divergencias_json : [],
       };
 
@@ -1515,11 +1536,19 @@ export default function NotaFiscalDetailsPage() {
                         {(() => {
                           const keyComposite = `${item.item}|${item.codProdFornecedor || ""}`;
                           const impostoItem = item.impostoEscolhido || submittedTaxByItemKey[keyComposite] || submittedTaxByItemKey[String(item.item)];
+                          const cstRule = getCstRuleByImposto(impostoItem);
                           return (
-                            <div className="mb-2">
-                              <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-bold ${getImpostoBadgeClass(impostoItem)}`}>
-                                Imposto: {getImpostoLabel(impostoItem)}
-                              </span>
+                            <div className="mb-2 space-y-1">
+                              <div>
+                                <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-bold ${getImpostoBadgeClass(impostoItem)}`}>
+                                  Imposto: {getImpostoLabel(impostoItem)}
+                                </span>
+                              </div>
+                              {cstRule ? (
+                                <p className="text-[11px] font-medium text-gray-700">
+                                  {cstRule.title}: {cstRule.expected}
+                                </p>
+                              ) : null}
                             </div>
                           );
                         })()}
@@ -1573,10 +1602,18 @@ export default function NotaFiscalDetailsPage() {
               {(() => {
                 const keyComposite = `${selectedDetailItem.item}|${selectedDetailItem.codProdFornecedor || ""}`;
                 const impostoItem = selectedDetailItem.impostoEscolhido || submittedTaxByItemKey[keyComposite] || submittedTaxByItemKey[String(selectedDetailItem.item)];
+                const cstRule = getCstRuleByImposto(impostoItem);
                 return (
-                  <p className="text-sm text-gray-800">
-                    <strong>Imposto considerado:</strong> {getImpostoLabel(impostoItem)}
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-800">
+                      <strong>Imposto considerado:</strong> {getImpostoLabel(impostoItem)}
+                    </p>
+                    {cstRule ? (
+                      <p className="text-sm text-gray-700">
+                        <strong>{cstRule.title}:</strong> {cstRule.expected}
+                      </p>
+                    ) : null}
+                  </div>
                 );
               })()}
               {selectedDetailItem.codigoProduto && (
