@@ -992,6 +992,12 @@ export default function NotaFiscalDetailsPage() {
         if (impostoEscolhido === "TRIBUTADA") {
           conformidadesPersistidas.push("Situação tributária correta para item Tributado: ST_CODIGO=IGI.");
         }
+
+        const destinacaoMercadoria = item.destinacao_mercadoria;
+        const pisCorreto = destinacaoMercadoria === "USO_CONSUMO" ? "P99" : "P01";
+        const cofinsCorreto = destinacaoMercadoria === "USO_CONSUMO" ? "C99" : "C01";
+        conformidadesPersistidas.push(`Código do Pis correto: ${pisCorreto}.`);
+        conformidadesPersistidas.push(`Código do Cofins correto: ${cofinsCorreto}.`);
       }
 
       const row: FiscalCheckItemResult = {
