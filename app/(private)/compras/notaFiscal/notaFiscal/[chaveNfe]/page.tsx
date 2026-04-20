@@ -18,6 +18,7 @@ type PaymentStatusByKey = {
   valor: number | null;
   tipo_imposto: string | null;
   data_pagamento: string | null;
+  status_conferencia_produtos?: "OK" | "ERRO" | "SEM_RELACIONAMENTO" | "PENDENTE";
   itens_conciliacao?: Array<{
     n_item: number;
     cod_prod_fornecedor: string | null;
@@ -28,6 +29,7 @@ type PaymentStatusByKey = {
     possui_difal: boolean | null;
     ncm_xml: string | null;
     cst_nota: string | null;
+    divergencias_json?: string[];
     status_conferencia: "OK" | "DIVERGENTE" | null;
     updated_at: string | null;
   }>;
@@ -137,6 +139,7 @@ export default function NotaFiscalDetailsPage() {
   const [guiaInfo, setGuiaInfo] = useState<GuiaByNfe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [productCheckOpen, setProductCheckOpen] = useState(false);
+  const [isProductsExpanded, setIsProductsExpanded] = useState(true);
   const [checkingProducts, setCheckingProducts] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [destinations, setDestinations] = useState<Record<number, DestinacaoMercadoria>>({});
@@ -741,7 +744,7 @@ export default function NotaFiscalDetailsPage() {
     setCheckingProducts(true);
     setError(null);
     try {
-      const res = await fetch(`${SERVICE_URL}/icms/fiscal-conferencia/preview`, {
+      const res = await fetch(`${SERVICE_URL}/icms/fiscal-conferencia`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notas: [{ chaveNfe: invoice.CHAVE_NFE, itens }] }),
@@ -753,6 +756,7 @@ export default function NotaFiscalDetailsPage() {
 
       const data = await res.json();
       setFiscalCheckResult((data?.notas || [])[0] || null);
+      void refreshPaymentStatus();
       finishProgressFeedback("Conferência concluída com sucesso.");
       setProductCheckOpen(false);
     } catch (err) {
@@ -928,12 +932,43 @@ export default function NotaFiscalDetailsPage() {
 
   const fiscalCheckByItem = useMemo(() => {
     const map: Record<string, FiscalCheckItemResult> = {};
+    (paymentStatus?.itens_conciliacao || []).forEach((item) => {
+      const row: FiscalCheckItemResult = {
+        item: Number(item.n_item || 0),
+        codProdFornecedor: String(item.cod_prod_fornecedor || ""),
+        impostoEscolhido: item.imposto_escolhido || undefined,
+        codigoProduto: item.pro_codigo || undefined,
+        statusConferencia: item.status_conferencia === "OK" ? "OK" : "DIVERGENTE",
+        divergencias: Array.isArray(item.divergencias_json) ? item.divergencias_json : [],
+      };
+
+      map[`${row.item}-${row.codProdFornecedor}`] = row;
+      map[`${row.item}`] = map[`${row.item}`] || row;
+    });
+
     (fiscalCheckResult?.itens || []).forEach((item) => {
       map[`${item.item}-${item.codProdFornecedor}`] = item;
       map[`${item.item}`] = map[`${item.item}`] || item;
     });
+
     return map;
-  }, [fiscalCheckResult]);
+  }, [fiscalCheckResult, paymentStatus?.itens_conciliacao]);
+
+  const conferenceStatusLabel = useMemo(() => {
+    const status = String(paymentStatus?.status_conferencia_produtos || "").toUpperCase();
+    if (status === "OK") return "OK";
+    if (status === "ERRO") return "Com Erro";
+    if (status === "SEM_RELACIONAMENTO") return "Sem Relacionamento";
+    return "Pendente";
+  }, [paymentStatus?.status_conferencia_produtos]);
+
+  const conferenceStatusClass = useMemo(() => {
+    const status = String(paymentStatus?.status_conferencia_produtos || "").toUpperCase();
+    if (status === "OK") return "bg-green-100 text-green-700";
+    if (status === "ERRO") return "bg-red-100 text-red-700";
+    if (status === "SEM_RELACIONAMENTO") return "bg-yellow-100 text-yellow-700";
+    return "bg-gray-100 text-gray-600";
+  }, [paymentStatus?.status_conferencia_produtos]);
 
   const normalizeValidationMessage = (message: string) => {
     return message
@@ -1098,9 +1133,20 @@ export default function NotaFiscalDetailsPage() {
               <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Produtos da NF</h2>
-                  <span className="text-xs text-gray-500">{parsed?.items.length || 0} itens</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500">{parsed?.items.length || 0} itens</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsProductsExpanded((prev) => !prev)}
+                      className="inline-flex items-center rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      {isProductsExpanded ? "Recolher" : "Expandir"}
+                    </button>
+                  </div>
                 </div>
 
+                {isProductsExpanded && (
+                <>
                 <div className="overflow-x-auto">
                   <table className="min-w-full table-fixed border-collapse text-left text-sm">
                     <thead className="bg-gray-50 text-xs uppercase text-gray-600">
@@ -1183,6 +1229,8 @@ export default function NotaFiscalDetailsPage() {
                     Não foi possível identificar itens no XML desta NF.
                   </p>
                 )}
+                </>
+                )}
               </div>
 
               <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -1212,6 +1260,14 @@ export default function NotaFiscalDetailsPage() {
                     <p className="text-xs text-gray-500">Valor de guia calculado</p>
                     <p className="font-semibold text-gray-900">{money(paymentStatus?.valor)}</p>
                   </div>
+                </div>
+                <div className="mt-3 rounded-lg border border-gray-100 p-3">
+                  <p className="text-xs text-gray-500">Conferência de produtos</p>
+                  <p className="mt-1">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${conferenceStatusClass}`}>
+                      {conferenceStatusLabel}
+                    </span>
+                  </p>
                 </div>
               </div>
 

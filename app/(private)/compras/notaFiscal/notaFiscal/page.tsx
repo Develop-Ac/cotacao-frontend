@@ -75,7 +75,13 @@ export default function NotaFiscalList() {
   } | null>(null);
 
   // Persistence State
-  const [statusMap, setStatusMap] = useState<Record<string, { status: string, valor: number, guiaGerada?: boolean, guiaPath?: string }>>({});
+  const [statusMap, setStatusMap] = useState<Record<string, {
+    status: string,
+    valor: number,
+    guiaGerada?: boolean,
+    guiaPath?: string,
+    status_conferencia_produtos?: 'OK' | 'ERRO' | 'SEM_RELACIONAMENTO' | 'PENDENTE',
+  }>>({});
   const [returnFocusChave, setReturnFocusChave] = useState<string>("");
   const [stateRestored, setStateRestored] = useState(false);
 
@@ -813,6 +819,7 @@ export default function NotaFiscalList() {
                         const isReturnFocused = row.CHAVE_NFE === returnFocusChave;
                         const rowStatus = statusMap[row.CHAVE_NFE];
                         const rowStatusText = String(rowStatus?.status || "").trim();
+                        const rowProductStatus = String(rowStatus?.status_conferencia_produtos || "PENDENTE").toUpperCase();
                         const numNota = row.CHAVE_NFE ? row.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "N/A";
                         const xmlType = getXmlType(row);
 
@@ -838,6 +845,27 @@ export default function NotaFiscalList() {
                                 ) : (
                                   <span className="text-xs text-gray-400 italic">Pendente</span>
                                 )}
+
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                                    rowProductStatus === 'OK'
+                                      ? 'bg-green-50 text-green-700 border-green-200'
+                                      : rowProductStatus === 'ERRO'
+                                        ? 'bg-red-50 text-red-700 border-red-200'
+                                        : rowProductStatus === 'SEM_RELACIONAMENTO'
+                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                          : 'bg-gray-50 text-gray-600 border-gray-200'
+                                  }`}
+                                  title="Status da conferência dos produtos"
+                                >
+                                  {rowProductStatus === 'OK'
+                                    ? 'Produtos OK'
+                                    : rowProductStatus === 'ERRO'
+                                      ? 'Produtos com Erro'
+                                      : rowProductStatus === 'SEM_RELACIONAMENTO'
+                                        ? 'Sem Relacionamento'
+                                        : 'Produtos Pendente'}
+                                </span>
                               </div>
                             </td>
                             <td className="py-3 px-4 text-right align-top pt-4">
