@@ -716,7 +716,7 @@ export default function NotaFiscalDetailsPage() {
     if (imposto === "TRIBUTADA") {
       return {
         title: "Regra CST (Tributado)",
-        expected: "ST_CODIGO deve ser IGI",
+        expected: "ST_CODIGO deve ser TR0-X",
       };
     }
 
@@ -741,7 +741,7 @@ export default function NotaFiscalDetailsPage() {
       if (imposto === "ST") {
         base.unshift("ST_CODIGO correto para item com ICMS ST: ST0-X.");
       } else if (imposto === "TRIBUTADA") {
-        base.unshift("Situação tributária correta para item Tributado: ST_CODIGO=IGI.");
+        base.unshift("Situação tributária correta para item Tributado: ST_CODIGO=TR0-X.");
       }
     }
 
@@ -990,7 +990,7 @@ export default function NotaFiscalDetailsPage() {
           conformidadesPersistidas.push("ST_CODIGO correto para item com ICMS ST: ST0-X.");
         }
         if (impostoEscolhido === "TRIBUTADA") {
-          conformidadesPersistidas.push("Situação tributária correta para item Tributado: ST_CODIGO=IGI.");
+          conformidadesPersistidas.push("Situação tributária correta para item Tributado: ST_CODIGO=TR0-X.");
         }
 
         const destinacaoMercadoria = item.destinacao_mercadoria;
@@ -1051,7 +1051,7 @@ export default function NotaFiscalDetailsPage() {
 
     const cstTribInvalid = raw.match(/Situação tributária inválida para item Tributado: esperado ST_CODIGO=([^\s.]+) e encontrado ([^.]+)\./i);
     if (cstTribInvalid) {
-      const expected = String(cstTribInvalid[1] || "IGI").trim();
+      const expected = String(cstTribInvalid[1] || "TR0-X").trim();
       const found = String(cstTribInvalid[2] || "vazio").trim();
       return `Código da Sit. Tributária: Encontrado ${found}, modificar para ${expected}.`;
     }
@@ -1064,7 +1064,7 @@ export default function NotaFiscalDetailsPage() {
 
     const cstTribOk = raw.match(/Situação tributária correta para item Tributado:\s*ST_CODIGO=([^\s.]+)\./i);
     if (cstTribOk) {
-      const code = String(cstTribOk[1] || "IGI").trim();
+      const code = String(cstTribOk[1] || "TR0-X").trim();
       return `Código da Sit. Tributária: ${code} está Correto.`;
     }
 
