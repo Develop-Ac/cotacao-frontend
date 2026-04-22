@@ -57,12 +57,36 @@ const getAttachmentDescriptor = (attachment: InboxEmail["attachments"][number]) 
   return { icon: MdDescription, label: "Arquivo" };
 };
 
+/**
+ * Detecta e corrige double-encoding clássico: bytes UTF-8 interpretados como Latin-1.
+ * Ex: "vocês" vira "vocÃªs" no banco. Re-decodifica apenas quando o padrão é detectado.
+ * Usa `fatal: true` como guarda — se algum byte não for UTF-8 válido, retorna original.
+ */
+const tryFixDoubleEncodedUtf8 = (str: string): string => {
+  // Ã/Â/Å seguidos de char U+0080-U+00BF = assinatura de UTF-8 misread como Latin-1
+  if (!/[\xC2\xC3\xC4\xC5][\x80-\xBF]/u.test(str)) return str;
+  try {
+    const bytes = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) {
+      bytes[i] = str.charCodeAt(i) & 0xff;
+    }
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return str;
+  }
+};
+
 const sanitizeEmailHtml = (html?: string | null): string => {
   if (!html) return "";
-  return html
+  // Corrige double-encoding antes de qualquer outra transformação
+  const fixed = tryFixDoubleEncodedUtf8(html);
+  return fixed
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
     .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+=\'[^\']*\'/gi, "");
+    .replace(/\son\w+=\'[^\']*\'/gi, "")
+    // Remove declarações de charset conflitantes — nosso wrapper já força UTF-8
+    .replace(/<meta[^>]+charset[^>]*>/gi, "")
+    .replace(/<meta[^>]+content-type[^>]*>/gi, "");
 };
 
 const normalizeInlineToken = (value?: string | null): string => {
@@ -341,7 +365,13 @@ export default function CaixaDeEntradaPage() {
           const beforeAt = contentId.split("@")[0];
           if (beforeAt) tokens.add(beforeAt);
         }
-        if (filename) tokens.add(filename);
+        if (filename) {
+          tokens.add(filename);
+          // Tenta também sem extensão: "image001.jpg" → "image001"
+          // CIDs no HTML geralmente não têm extensão: cid:image001@domain.com
+          const withoutExt = filename.replace(/\.[^.]+$/, "");
+          if (withoutExt && withoutExt !== filename) tokens.add(withoutExt);
+        }
 
         if (!tokens.size) continue;
 
