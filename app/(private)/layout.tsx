@@ -141,7 +141,7 @@ export default function RootLayout({
     expedicao: isPathActive('/expedicao'),
     qualidade: isPathActive('/qualidade'),
     sac: isPathActive('/sac'),
-    sistema: isPathActive('/usuario'),
+    sistema: isPathActive('/sistema') || isPathActive('/usuario'),
   };
 
   // ---------- Permissões: helpers ----------
@@ -171,8 +171,16 @@ export default function RootLayout({
     if (href === '/feed/profile') return true;
 
     const target = normalizePath(href);
+    if (target.startsWith('/sistema') && canOnPathPrefix(ability, 'read', '/usuario')) {
+      return true;
+    }
     return canOnPathPrefix(ability, "read", target); // read herda por prefixo
   }, [ability]);
+
+  const canViewUsuarios = React.useMemo(
+    () => canOnPathPrefix(ability, 'read', '/usuario'),
+    [ability],
+  );
 
   // Submenus completos para cada seção (sem filtro)
   const getSubmenuItems = (section: string) => {
@@ -207,7 +215,11 @@ export default function RootLayout({
       case 'Sac':
         return [{ label: 'Nova Solicitação', href: '/sac/kanban' }];
       case 'Sistema':
-        return [{ label: 'Usuários', href: '/usuario' }];
+        return [
+          { label: 'Usuários', href: '/sistema' },
+          ...(canViewUsuarios ? [{ label: 'E-mails', href: '/sistema/email' }] : []),
+          { label: 'Usuários (Legado)', href: '/usuario' },
+        ];
       default:
         return [];
     }
@@ -320,7 +332,7 @@ export default function RootLayout({
                           { id: 'Expedição', label: 'Expedição', icon: HiOutlineTruck, path: '/expedicao' }, // Note: id matches hasAccessToModule
                           { id: 'Qualidade', label: 'Qualidade', icon: HiOutlineClipboardDocumentCheck, path: '/qualidade' },
                           { id: 'Sac', label: 'Sac', icon: HiOutlineUser, path: '/sac' },
-                          { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/usuario' },
+                          { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/sistema' },
                         ].map((section) => {
                           // Special handling for section keys if they differ from ID
                           const sectionKey = section.id === 'Expedição' ? 'Expedicao' : section.id;

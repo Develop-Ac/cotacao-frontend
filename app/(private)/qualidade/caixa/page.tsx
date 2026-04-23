@@ -1,909 +1,461 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/qualidade/PageHeader";
-import { ActionButton } from "@/components/qualidade/ActionButton";
-import ConfirmationModal from "@/components/ConfirmationModal";
-import { QualidadeApi } from "@/lib/qualidade/api";
-import { Garantia, InboxEmail } from "@/lib/qualidade/types";
-import { formatDate, formatDateTime, stripHtml } from "@/lib/qualidade/formatters";
-import { getStatusDefinition } from "@/lib/qualidade/status";
-import {
-  MdArrowBack,
-  MdAttachFile,
-  MdClose,
-  MdDeleteOutline,
-  MdDescription,
-  MdDownload,
-  MdImage,
-  MdLink,
-  MdOpenInNew,
-  MdPictureAsPdf,
-  MdRefresh,
-  MdSync,
-} from "react-icons/md";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { MdAdd, MdForwardToInbox, MdLink, MdOutlineReply, MdOutlineReplyAll, MdRefresh, MdSync, MdSend } from 'react-icons/md';
+import { ActionButton } from '@/components/qualidade/ActionButton';
+import { PageHeader } from '@/components/qualidade/PageHeader';
+import { mailAccountsClient, mailLinksClient, mailMessagesClient, mailOutboundClient, mailSyncClient } from '@/lib/email-service/clients';
+import type { MailAccount, MailMessage } from '@/lib/email-service/types';
+import { QualidadeApi } from '@/lib/qualidade/api';
+import type { Garantia } from '@/lib/qualidade/types';
 
-type InboxFilter = "all" | "linked" | "unlinked";
+type InboxFilter = 'all' | 'linked' | 'unlinked';
+type ComposeMode = 'new' | 'reply' | 'replyAll' | 'forward';
 
-const buildEmailPreview = (html?: string | null): string => {
-  if (!html) return "";
+const QUALIDADE_BOX = 'QUALIDADE';
 
-  return html
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
-    .replace(/(?:v:\\*|o:\\*|w:\\*)\s*\{[^}]*\}/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;|&#160;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/\s+/g, " ")
+const stripHtml = (value?: string | null): string => {
+  if (!value) return '';
+  return value
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
     .trim();
 };
 
-const getAttachmentDescriptor = (attachment: InboxEmail["attachments"][number]) => {
-  const filename = (attachment.filename || "anexo").toLowerCase();
-  const mime = (attachment.mimeType || "").toLowerCase();
+const parseEmails = (value: string): Array<{ email: string }> =>
+  value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((email) => ({ email }));
 
-  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(filename)) {
-    return { icon: MdImage, label: "Imagem" };
+const toSubject = (mode: ComposeMode, original?: string | null): string => {
+  const base = original?.trim() ?? '';
+  if (!base) return '';
+  if (mode === 'reply' || mode === 'replyAll') {
+    return /^re:/i.test(base) ? base : `Re: ${base}`;
   }
-
-  if (mime.includes("pdf") || filename.endsWith(".pdf")) {
-    return { icon: MdPictureAsPdf, label: "PDF" };
+  if (mode === 'forward') {
+    return /^enc:/i.test(base) ? base : `Enc: ${base}`;
   }
-
-  return { icon: MdDescription, label: "Arquivo" };
-};
-
-/**
- * Detecta e corrige double-encoding clássico: bytes UTF-8 interpretados como Latin-1.
- * Ex: "vocês" vira "vocÃªs" no banco. Re-decodifica apenas quando o padrão é detectado.
- * Usa `fatal: true` como guarda — se algum byte não for UTF-8 válido, retorna original.
- */
-const tryFixDoubleEncodedUtf8 = (str: string): string => {
-  // Ã/Â/Å seguidos de char U+0080-U+00BF = assinatura de UTF-8 misread como Latin-1
-  if (!/[\xC2\xC3\xC4\xC5][\x80-\xBF]/u.test(str)) return str;
-  try {
-    const bytes = new Uint8Array(str.length);
-    for (let i = 0; i < str.length; i++) {
-      bytes[i] = str.charCodeAt(i) & 0xff;
-    }
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return str;
-  }
-};
-
-const sanitizeEmailHtml = (html?: string | null): string => {
-  if (!html) return "";
-  // Corrige double-encoding antes de qualquer outra transformação
-  const fixed = tryFixDoubleEncodedUtf8(html);
-  return fixed
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-    .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+=\'[^\']*\'/gi, "")
-    // Remove declarações de charset conflitantes — nosso wrapper já força UTF-8
-    .replace(/<meta[^>]+charset[^>]*>/gi, "")
-    .replace(/<meta[^>]+content-type[^>]*>/gi, "");
-};
-
-const normalizeInlineToken = (value?: string | null): string => {
-  if (!value) return "";
-  return value.trim().replace(/^<|>$/g, "").toLowerCase();
-};
-
-const extractCidCandidates = (cidSource: string): string[] => {
-  const normalized = normalizeInlineToken(cidSource);
-  if (!normalized) return [];
-
-  const candidates = new Set<string>();
-  candidates.add(normalized);
-
-  const beforeAt = normalized.split("@")[0];
-  if (beforeAt) candidates.add(beforeAt);
-
-  const withoutBrackets = normalized.replace(/[<>]/g, "");
-  if (withoutBrackets) candidates.add(withoutBrackets);
-
-  return Array.from(candidates);
-};
-
-const pickAttachmentStorageKey = (attachment: Record<string, unknown>): string => {
-  const candidates = [
-    attachment.objectKey,
-    attachment.object_key,
-    attachment.storageKey,
-    attachment.storage_key,
-    attachment.fileKey,
-    attachment.file_key,
-    attachment.minioKey,
-    attachment.minio_key,
-    attachment.s3Key,
-    attachment.s3_key,
-    attachment.key,
-    attachment.path,
-    attachment.path_ficheiro,
-    attachment.filePath,
-    attachment.file_path,
-    attachment.caminho,
-    attachment.url,
-    attachment.location,
-    attachment.uri,
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim();
-    }
-  }
-
-  return "";
-};
-
-const buildAttachmentDataUrl = (attachment: InboxEmail["attachments"][number]): string => {
-  const rawBase64 = attachment.contentBase64?.trim();
-  if (!rawBase64) return "";
-
-  const alreadyDataUrl = /^data:[^;]+;base64,/i.test(rawBase64);
-  if (alreadyDataUrl) return rawBase64;
-
-  const mime = attachment.mimeType?.trim() || "application/octet-stream";
-  return `data:${mime};base64,${rawBase64}`;
+  return base;
 };
 
 export default function CaixaDeEntradaPage() {
   const router = useRouter();
-  const [emails, setEmails] = useState<InboxEmail[]>([]);
+
+  const [accounts, setAccounts] = useState<MailAccount[]>([]);
+  const [messages, setMessages] = useState<MailMessage[]>([]);
+  const [filter, setFilter] = useState<InboxFilter>('all');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
-  const [filter, setFilter] = useState<InboxFilter>("all");
-  const [sort, setSort] = useState<"desc" | "asc">("desc");
-  const [mobileReading, setMobileReading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null);
+
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeMode, setComposeMode] = useState<ComposeMode>('new');
+  const [composeTo, setComposeTo] = useState('');
+  const [composeCc, setComposeCc] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [sending, setSending] = useState(false);
+
   const [garantias, setGarantias] = useState<Garantia[]>([]);
-  const [loadingGarantias, setLoadingGarantias] = useState(false);
-  const [linkingEmailId, setLinkingEmailId] = useState<number | null>(null);
-  const [selectedGarantiaId, setSelectedGarantiaId] = useState<string>("");
-  const [garantiaSearchTerm, setGarantiaSearchTerm] = useState("");
-  const [submittingLink, setSubmittingLink] = useState(false);
-  const [deletingEmailId, setDeletingEmailId] = useState<number | null>(null);
-  const [deleteConfirmEmailId, setDeleteConfirmEmailId] = useState<number | null>(null);
-  const [selectedEmailHtml, setSelectedEmailHtml] = useState("");
-  const [emailIframeHeight, setEmailIframeHeight] = useState(720);
+  const [garantiaSearch, setGarantiaSearch] = useState('');
+  const [selectedGarantiaId, setSelectedGarantiaId] = useState<string>('');
+  const [linking, setLinking] = useState(false);
+
+  const activeQualidadeAccount = useMemo(
+    () =>
+      accounts.find(
+        (account) => account.tenantKey.toUpperCase() === QUALIDADE_BOX && account.statusCode === 'ACTIVE',
+      ) ?? null,
+    [accounts],
+  );
+
+  const carregarGarantias = useCallback(async () => {
+    if (garantias.length > 0) return;
+    const list = await QualidadeApi.listarGarantias();
+    setGarantias(list);
+  }, [garantias.length]);
+
   const carregar = useCallback(async () => {
-    setUpdating(true);
+    setRefreshing(true);
     try {
-      const list = await QualidadeApi.listarEmails();
-      setEmails(list);
+      const [accountList, listAll, listUnlinked] = await Promise.all([
+        mailAccountsClient.list(),
+        mailMessagesClient.list({ page: 1, pageSize: 200 }),
+        mailMessagesClient.listUnlinked({ page: 1, pageSize: 200 }),
+      ]);
+
+      const unlinkedIds = new Set(listUnlinked.map((item) => item.id));
+      const merged = listAll
+        .map((item) => ({ ...item, __isUnlinked: unlinkedIds.has(item.id) }))
+        .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+
+      setAccounts(accountList);
+      setMessages(merged as MailMessage[]);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao carregar e-mails.");
+      setError(err instanceof Error ? err.message : 'Erro ao carregar caixa de entrada.');
     } finally {
       setLoading(false);
-      setUpdating(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    carregar();
+    void carregar();
   }, [carregar]);
 
-  const filteredEmails = useMemo(() => {
-    const filtered = emails.filter((email) => {
-      if (filter === "linked") return Boolean(email.garantiaId);
-      if (filter === "unlinked") return !email.garantiaId;
-      return true;
-    });
+  const filteredMessages = useMemo(() => {
+    const term = search.trim().toLowerCase();
 
-    return filtered.sort((a, b) => {
-      const aTime = new Date(a.dataRecebimento).getTime();
-      const bTime = new Date(b.dataRecebimento).getTime();
-      return sort === "desc" ? bTime - aTime : aTime - bTime;
+    return messages.filter((item) => {
+      if (activeQualidadeAccount && item.accountId !== activeQualidadeAccount.id) {
+        return false;
+      }
+
+      const isUnlinked = (item as MailMessage & { __isUnlinked?: boolean }).__isUnlinked;
+      if (filter === 'unlinked' && !isUnlinked) return false;
+      if (filter === 'linked' && isUnlinked) return false;
+
+      if (!term) return true;
+
+      const content = `${item.subject ?? ''} ${item.fromAddress ?? ''} ${stripHtml(item.bodyText || item.bodyHtml)}`.toLowerCase();
+      return content.includes(term);
     });
-  }, [emails, filter, sort]);
+  }, [messages, filter, search, activeQualidadeAccount]);
 
   useEffect(() => {
-    if (filteredEmails.length === 0) {
-      setSelectedEmailId(null);
-      setMobileReading(false);
+    if (filteredMessages.length === 0) {
+      setSelectedMessageId(null);
       return;
     }
+    setSelectedMessageId((current) => (filteredMessages.some((item) => item.id === current) ? current : filteredMessages[0].id));
+  }, [filteredMessages]);
 
-    setSelectedEmailId((current) => {
-      const isStillAvailable = filteredEmails.some((email) => email.id === current);
-      return isStillAvailable ? current : filteredEmails[0].id;
-    });
-  }, [filteredEmails]);
-
-  const selectedEmail = useMemo(
-    () => filteredEmails.find((email) => email.id === selectedEmailId) ?? null,
-    [filteredEmails, selectedEmailId],
+  const selectedMessage = useMemo(
+    () => filteredMessages.find((item) => item.id === selectedMessageId) ?? null,
+    [filteredMessages, selectedMessageId],
   );
 
   const filteredGarantias = useMemo(() => {
-    const term = garantiaSearchTerm.trim().toLowerCase();
+    const term = garantiaSearch.trim().toLowerCase();
     if (!term) return garantias;
-
-    return garantias.filter((garantia) => {
-      const garantiaId = garantia.id.toString().toLowerCase();
-      const notaInterna = (garantia.notaInterna ?? "").toLowerCase();
-      const fornecedor = (garantia.nomeFornecedor ?? "").toLowerCase();
-      const fornecedorId = String(garantia.erpFornecedorId ?? "").toLowerCase();
-
-      return (
-        garantiaId.includes(term) ||
-        notaInterna.includes(term) ||
-        fornecedor.includes(term) ||
-        fornecedorId.includes(term)
-      );
+    return garantias.filter((item) => {
+      const text = `${item.id} ${item.notaInterna ?? ''} ${item.nomeFornecedor ?? ''}`.toLowerCase();
+      return text.includes(term);
     });
-  }, [garantiaSearchTerm, garantias]);
+  }, [garantias, garantiaSearch]);
 
-  const resolveAttachmentUrl = useCallback(async (attachment: InboxEmail["attachments"][number]) => {
-    const storageKey = pickAttachmentStorageKey(attachment as unknown as Record<string, unknown>);
-    if (storageKey) {
-      return QualidadeApi.gerarLinkArquivo(storageKey);
+  const openComposer = (mode: ComposeMode) => {
+    if (!activeQualidadeAccount) {
+      setError('Nao existe conta ativa para a caixa QUALIDADE. Configure em Sistema > E-mails.');
+      return;
     }
 
-    if (attachment.url?.trim()) {
-      const trimmedUrl = attachment.url.trim();
-      if (/^https?:\/\//i.test(trimmedUrl)) {
-        return trimmedUrl;
-      }
+    const current = selectedMessage;
+    setComposeMode(mode);
+
+    if (!current || mode === 'new') {
+      setComposeTo('');
+      setComposeCc('');
+      setComposeSubject('');
+      setComposeBody('');
+      setComposeOpen(true);
+      return;
     }
 
-    const dataUrl = buildAttachmentDataUrl(attachment);
-    if (dataUrl) {
-      return dataUrl;
+    const to = current.fromAddress?.trim() ?? '';
+    const subject = toSubject(mode, current.subject);
+
+    setComposeTo(to);
+    setComposeCc('');
+    setComposeSubject(subject);
+    setComposeBody(
+      mode === 'forward'
+        ? `\n\n---------- Mensagem encaminhada ----------\nDe: ${current.fromAddress ?? ''}\nAssunto: ${current.subject ?? ''}\n\n${stripHtml(
+            current.bodyText || current.bodyHtml,
+          )}`
+        : `\n\n----- Mensagem original -----\n${stripHtml(current.bodyText || current.bodyHtml)}`,
+    );
+    setComposeOpen(true);
+  };
+
+  const enviar = async () => {
+    if (!activeQualidadeAccount) {
+      setError('Nao existe conta ativa para envio.');
+      return;
     }
 
-    if (process.env.NODE_ENV !== "production") {
-      // Log temporario para identificar formatos inesperados vindos do n8n.
-      // eslint-disable-next-line no-console
-      console.debug("[caixa] anexo sem chave/caminho/base64", attachment);
+    const recipients = parseEmails(composeTo);
+    if (recipients.length === 0) {
+      setError('Informe ao menos um destinatario.');
+      return;
     }
 
-    throw new Error("Anexo sem caminho para download.");
-  }, []);
-
-  const abrirAnexo = useCallback(
-    async (attachment: InboxEmail["attachments"][number]) => {
-      const url = await resolveAttachmentUrl(attachment);
-      window.open(url, "_blank", "noopener,noreferrer");
-    },
-    [resolveAttachmentUrl],
-  );
-
-  const baixarAnexo = useCallback(
-    async (attachment: InboxEmail["attachments"][number]) => {
-      const url = await resolveAttachmentUrl(attachment);
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error("Nao foi possivel baixar o anexo.");
-      }
-
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = attachment.filename || "anexo";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(objectUrl);
-    },
-    [resolveAttachmentUrl],
-  );
-
-  const handleEmailIframeLoad = useCallback((event: React.SyntheticEvent<HTMLIFrameElement>) => {
-    const iframe = event.currentTarget as HTMLIFrameElement & { __resizeObserver?: ResizeObserver };
-    const doc = iframe.contentDocument;
-    if (!doc) return;
-
-    const updateHeight = () => {
-      const body = doc.body;
-      const html = doc.documentElement;
-      if (!body || !html) return;
-      const nextHeight = Math.max(
-        body.scrollHeight,
-        body.offsetHeight,
-        html.scrollHeight,
-        html.offsetHeight,
-      );
-      if (Number.isFinite(nextHeight) && nextHeight > 0) {
-        setEmailIframeHeight(Math.min(Math.max(nextHeight + 8, 320), 20000));
-      }
-    };
-
-    iframe.__resizeObserver?.disconnect();
-    updateHeight();
-
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => updateHeight());
-      observer.observe(doc.body);
-      observer.observe(doc.documentElement);
-      iframe.__resizeObserver = observer;
-    }
-
-    window.setTimeout(updateHeight, 200);
-    window.setTimeout(updateHeight, 800);
-  }, []);
-
-  useEffect(() => {
-    setEmailIframeHeight(720);
-  }, [selectedEmail?.id, selectedEmailHtml]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const prepareEmailHtml = async () => {
-      if (!selectedEmail?.corpoHtml) {
-        if (!cancelled) setSelectedEmailHtml("");
-        return;
-      }
-
-      const baseHtml = sanitizeEmailHtml(selectedEmail.corpoHtml);
-      const cidMatches = Array.from(baseHtml.matchAll(/src\s*=\s*(["'])cid:([^"']+)\1/gi));
-      if (!cidMatches.length) {
-        if (!cancelled) setSelectedEmailHtml(baseHtml);
-        return;
-      }
-
-      const attachmentUrlByToken = new Map<string, string>();
-      const attachments = selectedEmail.attachments || [];
-
-      for (const attachment of attachments) {
-        const tokens = new Set<string>();
-        const contentId = normalizeInlineToken(attachment.contentId);
-        const filename = normalizeInlineToken(attachment.filename);
-        if (contentId) {
-          tokens.add(contentId);
-          const beforeAt = contentId.split("@")[0];
-          if (beforeAt) tokens.add(beforeAt);
-        }
-        if (filename) {
-          tokens.add(filename);
-          // Tenta também sem extensão: "image001.jpg" → "image001"
-          // CIDs no HTML geralmente não têm extensão: cid:image001@domain.com
-          const withoutExt = filename.replace(/\.[^.]+$/, "");
-          if (withoutExt && withoutExt !== filename) tokens.add(withoutExt);
-        }
-
-        if (!tokens.size) continue;
-
-        let url: string;
-        try {
-          url = await resolveAttachmentUrl(attachment);
-        } catch {
-          continue;
-        }
-
-        for (const token of tokens) {
-          if (!attachmentUrlByToken.has(token)) {
-            attachmentUrlByToken.set(token, url);
-          }
-        }
-      }
-
-      const rewritten = baseHtml.replace(/src\s*=\s*(["'])cid:([^"']+)\1/gi, (full, quote: string, cidValue: string) => {
-        const candidates = extractCidCandidates(cidValue);
-        for (const candidate of candidates) {
-          const mappedUrl = attachmentUrlByToken.get(candidate);
-          if (mappedUrl) {
-            return `src=${quote}${mappedUrl}${quote}`;
-          }
-        }
-        return full;
+    setSending(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await mailOutboundClient.send({
+        accountId: activeQualidadeAccount.id,
+        threadId: selectedMessage?.threadId ?? undefined,
+        parentMessageId: composeMode === 'new' ? undefined : selectedMessage?.id,
+        recipients,
+        cc: parseEmails(composeCc),
+        subject: composeSubject.trim(),
+        bodyText: composeBody,
       });
 
-      if (!cancelled) setSelectedEmailHtml(rewritten);
-    };
-
-    void prepareEmailHtml();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [resolveAttachmentUrl, selectedEmail]);
+      setSuccess('E-mail enfileirado para envio com sucesso.');
+      setComposeOpen(false);
+      await carregar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao enviar e-mail.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const sincronizar = async () => {
+    if (!activeQualidadeAccount) {
+      setError('Nao existe conta ativa para sincronizar.');
+      return;
+    }
+
     setSyncing(true);
     setError(null);
     try {
-      await QualidadeApi.sincronizarEmails();
+      await mailSyncClient.requestSync(activeQualidadeAccount.id, { forceFullResync: false });
+      setSuccess('Sincronizacao solicitada. Atualize em alguns segundos.');
       await carregar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao sincronizar e-mails.");
+      setError(err instanceof Error ? err.message : 'Erro ao solicitar sincronizacao.');
     } finally {
       setSyncing(false);
     }
   };
 
-  const abrirEmail = (emailId: number) => {
-    setSelectedEmailId(emailId);
-    setMobileReading(true);
-  };
-
-  const carregarGarantias = useCallback(async () => {
-    if (garantias.length > 0 || loadingGarantias) return;
-    setLoadingGarantias(true);
-    try {
-      const list = await QualidadeApi.listarGarantias();
-      const sorted = [...list].sort((a, b) => {
-        const aTime = new Date(a.dataCriacao).getTime();
-        const bTime = new Date(b.dataCriacao).getTime();
-        return bTime - aTime;
-      });
-      setGarantias(sorted);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao carregar garantias para vinculo.");
-    } finally {
-      setLoadingGarantias(false);
-    }
-  }, [garantias.length, loadingGarantias]);
-
-  const abrirVinculo = async (emailId: number) => {
-    setLinkingEmailId(emailId);
-    setSelectedGarantiaId("");
-    setGarantiaSearchTerm("");
-    await carregarGarantias();
-  };
-
-  const confirmarVinculo = async () => {
-    if (!linkingEmailId || !selectedGarantiaId) {
-      setError("Selecione uma garantia para vincular.");
+  const vincularGarantia = async () => {
+    if (!selectedMessage || !selectedGarantiaId) {
+      setError('Selecione uma garantia para vinculo manual.');
       return;
     }
 
-    setSubmittingLink(true);
+    setLinking(true);
     setError(null);
     try {
-      await QualidadeApi.vincularEmail(linkingEmailId, Number(selectedGarantiaId));
-      setLinkingEmailId(null);
-      setSelectedGarantiaId("");
+      await mailLinksClient.createManual({
+        targetType: 'MESSAGE',
+        targetId: selectedMessage.id,
+        entityType: 'GARANTIA',
+        entityId: selectedGarantiaId,
+      });
+      setSuccess('Vinculo manual registrado com sucesso.');
       await carregar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao vincular e-mail.");
+      setError(err instanceof Error ? err.message : 'Erro ao vincular garantia.');
     } finally {
-      setSubmittingLink(false);
-    }
-  };
-
-  const excluirSemVinculo = async (emailId: number) => {
-    setDeletingEmailId(emailId);
-    setError(null);
-    try {
-      await QualidadeApi.excluirEmailSemVinculo(emailId);
-      setDeleteConfirmEmailId(null);
-      await carregar();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao excluir e-mail.");
-    } finally {
-      setDeletingEmailId(null);
+      setLinking(false);
     }
   };
 
   return (
-    <div className="flex min-h-0 flex-col gap-4 p-4 lg:p-6">
-      <ConfirmationModal
-        isOpen={deleteConfirmEmailId !== null}
-        title="Excluir e-mail"
-        message="Excluir este e-mail sem vinculo? Esta acao nao pode ser desfeita."
-        onConfirm={() => {
-          if (deleteConfirmEmailId === null) return;
-          void excluirSemVinculo(deleteConfirmEmailId);
-        }}
-        onCancel={() => {
-          if (deletingEmailId === null) setDeleteConfirmEmailId(null);
-        }}
-        isLoading={deletingEmailId !== null}
-        confirmText="Excluir"
-        cancelText="Cancelar"
-      />
-
-      <PageHeader title="Inbox de Garantias" subtitle="Integração direta com qualidade@ac" onBack={() => router.back()}>
-        <ActionButton
-          label="Sincronizar"
-          variant="ghost"
-          icon={<MdSync size={18} />}
-          onClick={sincronizar}
-          loading={syncing}
-        />
-        <ActionButton
-          label="Atualizar"
-          variant="ghost"
-          icon={<MdRefresh size={18} />}
-          onClick={carregar}
-          loading={updating}
-        />
+    <div className="flex min-h-0 flex-col p-4 lg:p-6 gap-4">
+      <PageHeader
+        title="Qualidade > Caixa"
+        subtitle="Operacao da inbox integrada ao email-service."
+        onBack={() => router.back()}
+      >
+        <ActionButton label="Atualizar" variant="ghost" icon={<MdRefresh size={18} />} loading={refreshing} onClick={() => void carregar()} />
+        <ActionButton label="Sincronizar" variant="ghost" icon={<MdSync size={18} />} loading={syncing} onClick={() => void sincronizar()} />
       </PageHeader>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark flex flex-col min-h-[592px] max-h-[calc(100vh-9.5rem)] overflow-hidden">
-          <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-strokedark flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="inline-flex rounded-lg border border-gray-200 dark:border-strokedark overflow-hidden w-full lg:w-auto">
-            <button
-              type="button"
-              onClick={() => setFilter("all")}
-              className={`px-3 py-2 text-sm font-medium transition ${
-                filter === "all"
-                  ? "bg-sky-50 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5"
-              }`}
-            >
-              Todas
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilter("linked")}
-              className={`px-3 py-2 text-sm font-medium transition border-l border-gray-200 dark:border-strokedark ${
-                filter === "linked"
-                  ? "bg-sky-50 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5"
-              }`}
-            >
-              Com garantia
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilter("unlinked")}
-              className={`px-3 py-2 text-sm font-medium transition border-l border-gray-200 dark:border-strokedark ${
-                filter === "unlinked"
-                  ? "bg-sky-50 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5"
-              }`}
-            >
-              Nao vinculados
-            </button>
-          </div>
+      {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {success && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div>}
 
-          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-            <span>Ordenar:</span>
+      <div className="rounded-xl border border-gray-200 bg-white p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <ActionButton label="Novo e-mail" icon={<MdAdd size={18} />} onClick={() => openComposer('new')} />
+          <ActionButton label="Responder" variant="ghost" icon={<MdOutlineReply size={18} />} onClick={() => openComposer('reply')} disabled={!selectedMessage} />
+          <ActionButton label="Responder todos" variant="ghost" icon={<MdOutlineReplyAll size={18} />} onClick={() => openComposer('replyAll')} disabled={!selectedMessage} />
+          <ActionButton label="Reencaminhar" variant="ghost" icon={<MdForwardToInbox size={18} />} onClick={() => openComposer('forward')} disabled={!selectedMessage} />
+
+          <div className="ml-auto flex gap-2">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar assunto/remetente"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
             <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as "desc" | "asc")}
-              className="rounded-md border border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark-2 px-2 py-1 text-sm"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value as InboxFilter)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="desc">Mais recentes</option>
-              <option value="asc">Mais antigos</option>
+              <option value="all">Todos</option>
+              <option value="linked">Vinculados</option>
+              <option value="unlinked">Nao vinculados</option>
             </select>
-          </label>
+          </div>
         </div>
-
-        {error && <p className="shrink-0 px-4 py-2 text-sm text-red-600">{error}</p>}
-
-        {loading ? (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-            {Array.from({ length: 5 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="h-20 rounded-xl border border-gray-200 dark:border-strokedark bg-gray-100 dark:bg-boxdark-2 animate-pulse"
-              />
-            ))}
-          </div>
-        ) : filteredEmails.length === 0 ? (
-          <div className="flex-1 min-h-0 flex items-center justify-center text-center p-8">
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">Nenhum e-mail encontrado</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ajuste o filtro ou clique em sincronizar para atualizar a caixa.</p>
-          </div>
-        ) : (
-          <div className="flex-1 min-h-0 grid h-full lg:grid-cols-[380px_minmax(0,1fr)] overflow-hidden">
-            <aside
-              className={`h-full border-r border-gray-200 dark:border-strokedark overflow-y-auto ${mobileReading ? "hidden lg:block" : "block"}`}
-            >
-              <ul className="divide-y divide-gray-200 dark:divide-strokedark">
-                {filteredEmails.map((email) => {
-                  const active = email.id === selectedEmailId;
-                  const preview = buildEmailPreview(email.corpoHtml);
-                  const garantiaLabel = email.notaInterna?.trim() ? email.notaInterna : String(email.garantiaId ?? "");
-                  const senderInitial = (email.remetente || "?").trim().charAt(0).toUpperCase();
-                  return (
-                    <li
-                      key={email.id}
-                      className={`border-l-4 transition-colors duration-200 ${
-                        active
-                          ? "border-sky-600 bg-sky-50 dark:bg-sky-500/10"
-                          : "border-transparent hover:bg-gray-50 dark:hover:bg-white/5"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => abrirEmail(email.id)}
-                        className="w-full px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-xs font-semibold text-gray-700 dark:border-strokedark dark:bg-boxdark-2 dark:text-gray-200">
-                            {senderInitial}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{email.remetente}</p>
-                              <span className="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">
-                                {formatDateTime(email.dataRecebimento)}
-                              </span>
-                            </div>
-                            <p className="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-100">
-                              {email.assunto || "(sem assunto)"}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                              {preview || "Sem conteudo exibivel."}
-                            </p>
-                            <div className="mt-2 flex items-center gap-2 text-xs">
-                              <span
-                                className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${
-                                  email.garantiaId
-                                    ? "border-lime-200 bg-lime-100 text-lime-700 dark:border-lime-800 dark:bg-lime-900/20 dark:text-lime-300"
-                                    : "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300"
-                                }`}
-                              >
-                                {email.garantiaId ? `Garantia #${garantiaLabel}` : "Nao vinculado"}
-                              </span>
-
-                              {email.attachments.length > 0 && (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2 py-0.5 font-medium text-gray-600 dark:border-strokedark dark:bg-boxdark-2 dark:text-gray-300">
-                                  <MdAttachFile size={12} /> {email.attachments.length}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-
-                      {!email.garantiaId && (
-                        <div className="px-4 pb-3 flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => abrirVinculo(email.id)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-700 dark:text-sky-300 hover:text-sky-800 dark:hover:text-sky-200 transition"
-                          >
-                            <MdLink size={14} /> Vincular garantia
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmEmailId(email.id)}
-                            disabled={deletingEmailId === email.id}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition disabled:opacity-60"
-                          >
-                            <MdDeleteOutline size={14} />
-                            {deletingEmailId === email.id ? "Excluindo..." : "Excluir"}
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </aside>
-
-            <section
-              className={`relative h-full flex-col overflow-hidden transition-all duration-300 ease-out ${mobileReading ? "flex" : "hidden lg:flex"} ${
-                selectedEmail ? "opacity-100" : "opacity-60"
-              }`}
-            >
-              {!selectedEmail ? (
-                <div className="flex h-full items-center justify-center text-center p-8">
-                  <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-white">Selecione um e-mail</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Ao selecionar, o conteudo sera exibido aqui como painel de leitura.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col overflow-hidden transition-opacity duration-300">
-                  <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-2 text-gray-900 dark:border-strokedark dark:bg-boxdark dark:text-white">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => setMobileReading(false)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 lg:hidden"
-                        >
-                          <MdArrowBack size={15} /> Voltar para a lista
-                        </button>
-                        <h2 className="break-words text-base font-semibold leading-5 text-gray-900 dark:text-white">{selectedEmail.assunto || "(sem assunto)"}</h2>
-                        <div className="flex items-center justify-between gap-3 text-xs text-gray-600 dark:text-gray-300">
-                          <p className="min-w-0 truncate">
-                            De: <span className="font-medium text-gray-900 dark:text-white">{selectedEmail.remetente}</span>
-                          </p>
-                          <p className="shrink-0 text-right text-gray-500 dark:text-gray-400">Recebido em {formatDateTime(selectedEmail.dataRecebimento)}</p>
-                        </div>
-                      </div>
-                      {selectedEmail.garantiaId && (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/qualidade/${selectedEmail.garantiaId}`)}
-                          className="inline-flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30"
-                        >
-                          Ver garantia #{selectedEmail.notaInterna?.trim() || selectedEmail.garantiaId}
-                          <MdOpenInNew size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <article className="flex-1 min-h-0 overflow-hidden px-4 py-4">
-                    <div className="h-full min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white dark:border-strokedark dark:bg-boxdark">
-                      {selectedEmail.attachments.length > 0 && (
-                        <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-strokedark dark:bg-boxdark-2">
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                            {selectedEmail.attachments.map((attachment, index) => {
-                              const descriptor = getAttachmentDescriptor(attachment);
-                              const Icon = descriptor.icon;
-                              return (
-                                <div
-                                  key={`${attachment.filename}-${index}`}
-                                  className="flex min-w-0 items-center gap-2 rounded-md border border-gray-300 bg-white px-2 py-1.5 dark:border-strokedark dark:bg-boxdark"
-                                  title={attachment.filename}
-                                >
-                                  <Icon size={16} className="shrink-0 text-slate-500 dark:text-slate-300" />
-                                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-800 dark:text-gray-200">
-                                    {attachment.filename || descriptor.label}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => abrirAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao abrir anexo."))}
-                                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-strokedark dark:text-gray-200 dark:hover:bg-boxdark-2"
-                                    title={`Abrir ${attachment.filename || "anexo"}`}
-                                  >
-                                    <MdOpenInNew size={12} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => baixarAnexo(attachment).catch((err) => setError(err instanceof Error ? err.message : "Erro ao baixar anexo."))}
-                                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-strokedark dark:text-gray-200 dark:hover:bg-boxdark-2"
-                                    title={`Baixar ${attachment.filename || "anexo"}`}
-                                  >
-                                    <MdDownload size={12} />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="p-3">
-                        {selectedEmailHtml ? (
-                          <iframe
-                            title={`email-${selectedEmail.id}`}
-                            sandbox="allow-same-origin"
-                            scrolling="no"
-                            onLoad={handleEmailIframeLoad}
-                            style={{ height: `${emailIframeHeight}px` }}
-                            className="block w-full bg-white"
-                            srcDoc={`
-                              <html>
-                                <head>
-                                  <meta charset="utf-8" />
-                                  <style>
-                                    body {
-                                      margin: 0;
-                                      padding: 16px;
-                                      font-family: Segoe UI, Arial, sans-serif;
-                                      color: #1f2937;
-                                      line-height: 1.5;
-                                      word-break: break-word;
-                                      overflow: hidden;
-                                    }
-                                    img { max-width: 100%; height: auto; }
-                                    table { max-width: 100%; }
-                                  </style>
-                                </head>
-                                <body>${selectedEmailHtml}</body>
-                              </html>
-                            `}
-                          />
-                        ) : (
-                          <p className="text-sm leading-6 text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words">
-                            {stripHtml(selectedEmail.corpoHtml) || "Sem conteudo exibivel."}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                </div>
-              )}
-            </section>
-          </div>
-        )}
       </div>
 
-      {linkingEmailId && (
-        <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="w-full max-w-6xl rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Vincular e-mail a garantia</h3>
-              <button
-                type="button"
-                onClick={() => setLinkingEmailId(null)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <MdClose size={18} />
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <p className="text-sm text-gray-600 dark:text-gray-300">Selecione a garantia para vincular este e-mail.</p>
-              <input
-                type="text"
-                value={garantiaSearchTerm}
-                onChange={(event) => setGarantiaSearchTerm(event.target.value)}
-                placeholder="Buscar por numero, nota, fornecedor ou fornecedor ID"
-                className="w-full rounded-md border border-gray-300 dark:border-strokedark bg-white dark:bg-boxdark-2 px-3 py-2 text-sm"
-                disabled={loadingGarantias || submittingLink}
-              />
-              <div className="max-h-[52vh] overflow-auto pr-1 pt-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 px-1 pb-1">
-                  {filteredGarantias.map((garantia) => {
-                    const isSelected = selectedGarantiaId === garantia.id.toString();
-                    const status = getStatusDefinition(garantia.status);
-                    const statusLabel = status?.label ?? "Status desconhecido";
-                    const statusColor = status?.color ?? "#6B7280";
-                    const statusBackground = status?.background ?? "rgba(107,114,128,0.15)";
+      <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr_420px] gap-4 min-h-[62vh]">
+        <section className="rounded-xl border border-gray-200 bg-white overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b text-sm font-semibold">Mensagens</div>
+          <div className="overflow-y-auto">
+            {loading ? (
+              <p className="p-4 text-sm text-gray-500">Carregando...</p>
+            ) : filteredMessages.length === 0 ? (
+              <p className="p-4 text-sm text-gray-500">Nenhuma mensagem encontrada.</p>
+            ) : (
+              filteredMessages.map((item) => {
+                const selected = item.id === selectedMessageId;
+                const preview = stripHtml(item.bodyText || item.bodyHtml).slice(0, 90);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedMessageId(item.id)}
+                    className={`w-full border-b px-4 py-3 text-left hover:bg-gray-50 ${selected ? 'bg-blue-50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-500">{new Date(item.receivedAt).toLocaleString('pt-BR')}</span>
+                      <span className="text-[11px] font-semibold text-gray-500">#{item.id}</span>
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-gray-900 truncate">{item.subject || '(Sem assunto)'}</p>
+                    <p className="text-xs text-gray-500 truncate">{item.fromAddress || 'Remetente nao informado'}</p>
+                    <p className="mt-1 text-xs text-gray-600 line-clamp-2">{preview || 'Sem conteudo textual.'}</p>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </section>
 
-                    return (
-                      <button
-                        key={garantia.id}
-                        type="button"
-                        onClick={() => setSelectedGarantiaId(garantia.id.toString())}
-                        className={`text-left rounded-lg border p-3 transition ${
-                          isSelected
-                            ? "border-sky-500 ring-2 ring-sky-200 dark:ring-sky-900 shadow-[0_10px_24px_-8px_rgba(2,132,199,0.65)]"
-                            : "border-gray-200 dark:border-strokedark hover:border-sky-400"
-                        }`}
-                        disabled={submittingLink}
-                      >
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Fornecedor</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{garantia.nomeFornecedor || "--"}</p>
+        <section className="rounded-xl border border-gray-200 bg-white overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b text-sm font-semibold">Leitura da thread/mensagem</div>
+          {!selectedMessage ? (
+            <p className="p-4 text-sm text-gray-500">Selecione uma mensagem para leitura.</p>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">{selectedMessage.subject || '(Sem assunto)'}</h2>
+                <p className="text-sm text-gray-500 mt-1">De: {selectedMessage.fromAddress || 'Nao informado'}</p>
+                <p className="text-xs text-gray-500">Recebido em: {new Date(selectedMessage.receivedAt).toLocaleString('pt-BR')}</p>
+              </div>
 
-                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Garantia</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                          Garantia #{garantia.notaInterna || garantia.id}
-                        </p>
-
-                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Abertura</p>
-                        <p className="text-sm text-gray-800 dark:text-gray-100">{formatDate(garantia.dataCriacao)}</p>
-
-                        <div className="mt-3">
-                          <span
-                            className="inline-flex max-w-full items-center rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-wide whitespace-normal break-words leading-4"
-                            style={{ borderColor: statusColor, color: statusColor, backgroundColor: statusBackground }}
-                            title={statusLabel}
-                          >
-                            {statusLabel}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
+              <div className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700 bg-gray-50">
+                <p className="font-semibold mb-2">Vinculo manual com garantia</p>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    value={garantiaSearch}
+                    onChange={(event) => setGarantiaSearch(event.target.value)}
+                    placeholder="Buscar garantia por id, NI ou fornecedor"
+                    className="min-w-[240px] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    onFocus={() => void carregarGarantias()}
+                  />
+                  <select
+                    value={selectedGarantiaId}
+                    onChange={(event) => setSelectedGarantiaId(event.target.value)}
+                    className="min-w-[260px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    onFocus={() => void carregarGarantias()}
+                  >
+                    <option value="">Selecione uma garantia</option>
+                    {filteredGarantias.slice(0, 200).map((item) => (
+                      <option key={item.id} value={String(item.id)}>
+                        {item.id} - NI {item.notaInterna || '-'} - {item.nomeFornecedor || 'Fornecedor'}
+                      </option>
+                    ))}
+                  </select>
+                  <ActionButton
+                    label="Vincular"
+                    variant="ghost"
+                    icon={<MdLink size={16} />}
+                    loading={linking}
+                    onClick={() => void vincularGarantia()}
+                  />
                 </div>
               </div>
-              {loadingGarantias && <p className="text-xs text-gray-500">Carregando garantias...</p>}
-              {!loadingGarantias && filteredGarantias.length === 0 && (
-                <p className="text-xs text-gray-500">Nenhuma garantia encontrada para o filtro informado.</p>
-              )}
+
+              <div className="rounded-lg border border-gray-200 p-4">
+                {selectedMessage.bodyHtml ? (
+                  <div
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: selectedMessage.bodyHtml }}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm text-gray-700">{selectedMessage.bodyText || 'Sem conteudo.'}</p>
+                )}
+              </div>
             </div>
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-strokedark flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setLinkingEmailId(null)}
-                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmarVinculo}
-                disabled={!selectedGarantiaId || submittingLink}
-                className="px-3 py-1.5 text-sm rounded-md bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-60"
-              >
-                {submittingLink ? "Vinculando..." : "Vincular"}
-              </button>
+          )}
+        </section>
+
+        <aside className="rounded-xl border border-gray-200 bg-white overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b text-sm font-semibold">Composer</div>
+          {!composeOpen ? (
+            <div className="p-4 text-sm text-gray-500 space-y-2">
+              <p>Abra o composer por uma das acoes rapidas:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Novo e-mail</li>
+                <li>Responder</li>
+                <li>Responder a todos</li>
+                <li>Reencaminhar</li>
+              </ul>
             </div>
-          </div>
-        </div>
-      )}
+          ) : (
+            <div className="p-4 space-y-3 overflow-y-auto">
+              <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                Modo: {composeMode === 'new' ? 'Novo e-mail' : composeMode === 'reply' ? 'Responder' : composeMode === 'replyAll' ? 'Responder a todos' : 'Reencaminhar'}
+              </span>
+
+              <label className="block text-sm space-y-1">
+                <span className="font-medium">Para</span>
+                <input value={composeTo} onChange={(event) => setComposeTo(event.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              </label>
+
+              <label className="block text-sm space-y-1">
+                <span className="font-medium">CC</span>
+                <input value={composeCc} onChange={(event) => setComposeCc(event.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              </label>
+
+              <label className="block text-sm space-y-1">
+                <span className="font-medium">Assunto</span>
+                <input value={composeSubject} onChange={(event) => setComposeSubject(event.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              </label>
+
+              <label className="block text-sm space-y-1">
+                <span className="font-medium">Mensagem</span>
+                <textarea
+                  value={composeBody}
+                  onChange={(event) => setComposeBody(event.target.value)}
+                  rows={14}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </label>
+
+              <div className="flex flex-wrap gap-2">
+                <ActionButton label="Enviar" icon={<MdSend size={18} />} loading={sending} onClick={() => void enviar()} />
+                <ActionButton label="Fechar" variant="ghost" onClick={() => setComposeOpen(false)} />
+              </div>
+            </div>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }
