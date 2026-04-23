@@ -172,6 +172,12 @@ export default function NotaFiscalDetailsPage() {
   const dialogResolverRef = useRef<((value: boolean) => void) | null>(null);
   const guiaFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Manual reconciliation state (for items without supplier link)
+  const [manualCodigoInterno, setManualCodigoInterno] = useState("");
+  const [manualCheckResult, setManualCheckResult] = useState<FiscalCheckItemResult | null>(null);
+  const [isCheckingManual, setIsCheckingManual] = useState(false);
+  const [isSavingManual, setIsSavingManual] = useState(false);
+
   const isDentroDoEstado = useMemo(() => chaveNfe.startsWith("51"), [chaveNfe]);
   const hasGuiaAnexada = Boolean(guiaInfo?.guia_gerada || guiaInfo?.path);
   const hasPreviousTaxCalculation = useMemo(() => {
@@ -819,6 +825,119 @@ export default function NotaFiscalDetailsPage() {
       setProgressModalOpen(false);
     } finally {
       setCheckingProducts(false);
+    }
+  };
+
+  const handleManualCheck = async () => {
+    if (!invoice || !selectedDetailItem) return;
+    const codigo = manualCodigoInterno.trim();
+    if (!codigo) {
+      showNotice("Aviso", "Informe o código interno do produto.");
+      return;
+    }
+
+    const parsed_item = parsed?.items.find((i) => i.nItem === selectedDetailItem.item);
+    const destinacaoIdx = parsed?.items.findIndex((i) => i.nItem === selectedDetailItem.item) ?? -1;
+    const destinacao = destinacaoIdx >= 0 ? destinations[destinacaoIdx] : null;
+    const imposto = selectedDetailItem.impostoEscolhido ?? resolveImpostoByItem(selectedDetailItem.item, selectedDetailItem.codProdFornecedor, destinacao ?? undefined);
+
+    setIsCheckingManual(true);
+    setManualCheckResult(null);
+    try {
+      const res = await fetch(`${SERVICE_URL}/icms/fiscal-conferencia/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notas: [{
+            chaveNfe: invoice.CHAVE_NFE,
+            itens: [{
+              item: selectedDetailItem.item,
+              codProdFornecedor: selectedDetailItem.codProdFornecedor,
+              produto: parsed_item?.descricao,
+              unidadeFornecedor: parsed_item?.unidade,
+              ncmNota: parsed_item?.ncm,
+              cfop: parsed_item?.cfop,
+              cstNota: parsed_item?.cst,
+              impostoEscolhido: imposto,
+              destinacaoMercadoria: destinacao ?? "COMERCIALIZACAO",
+              possuiIcmsSt: parsed_item ? (parsed_item.icmsSt > 0 || parsed_item.cst.endsWith("10") || parsed_item.cst.endsWith("60")) : false,
+              possuiDifal: imposto === "DIFAL",
+              codigoInternoManual: codigo,
+            }],
+          }],
+        }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao consultar produto.");
+      const data = await res.json();
+      const resultItem = (data?.notas?.[0]?.itens ?? [])[0] ?? null;
+      setManualCheckResult(resultItem);
+    } catch (err) {
+      showNotice("Erro", err instanceof Error ? err.message : "Erro ao consultar produto.");
+    } finally {
+      setIsCheckingManual(false);
+    }
+  };
+
+  const handleManualSave = async () => {
+    if (!invoice || !selectedDetailItem || !manualCheckResult) return;
+    const codigo = manualCodigoInterno.trim();
+    if (!codigo) return;
+
+    const parsed_item = parsed?.items.find((i) => i.nItem === selectedDetailItem.item);
+    const destinacaoIdx = parsed?.items.findIndex((i) => i.nItem === selectedDetailItem.item) ?? -1;
+    const destinacao = destinacaoIdx >= 0 ? destinations[destinacaoIdx] : null;
+    const imposto = selectedDetailItem.impostoEscolhido ?? resolveImpostoByItem(selectedDetailItem.item, selectedDetailItem.codProdFornecedor, destinacao ?? undefined);
+
+    setIsSavingManual(true);
+    try {
+      const res = await fetch(`${SERVICE_URL}/icms/fiscal-conferencia`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notas: [{
+            chaveNfe: invoice.CHAVE_NFE,
+            itens: [{
+              item: selectedDetailItem.item,
+              codProdFornecedor: selectedDetailItem.codProdFornecedor,
+              produto: parsed_item?.descricao,
+              unidadeFornecedor: parsed_item?.unidade,
+              ncmNota: parsed_item?.ncm,
+              cfop: parsed_item?.cfop,
+              cstNota: parsed_item?.cst,
+              impostoEscolhido: imposto,
+              destinacaoMercadoria: destinacao ?? "COMERCIALIZACAO",
+              possuiIcmsSt: parsed_item ? (parsed_item.icmsSt > 0 || parsed_item.cst.endsWith("10") || parsed_item.cst.endsWith("60")) : false,
+              possuiDifal: imposto === "DIFAL",
+              codigoInternoManual: codigo,
+            }],
+          }],
+        }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao salvar conciliação.");
+      const data = await res.json();
+      const savedItem = (data?.notas?.[0]?.itens ?? [])[0] ?? null;
+
+      // Update the fiscalCheckResult with the saved item
+      if (savedItem) {
+        setFiscalCheckResult((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            itens: prev.itens.map((i) => i.item === savedItem.item ? savedItem : i),
+          };
+        });
+        setSelectedDetailItem(savedItem);
+        setManualCheckResult(null);
+        setManualCodigoInterno("");
+      }
+      void refreshPaymentStatus();
+      showNotice("Sucesso", `Conciliação manual do item ${selectedDetailItem.item} salva com sucesso.`);
+    } catch (err) {
+      showNotice("Erro", err instanceof Error ? err.message : "Erro ao salvar conciliação.");
+    } finally {
+      setIsSavingManual(false);
     }
   };
 
@@ -1706,7 +1825,11 @@ export default function NotaFiscalDetailsPage() {
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h3 className="text-lg font-semibold text-gray-900">Detalhes da Conferência</h3>
               <button
-                onClick={() => setSelectedDetailItem(null)}
+                onClick={() => {
+                  setSelectedDetailItem(null);
+                  setManualCodigoInterno("");
+                  setManualCheckResult(null);
+                }}
                 className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
               >
                 Fechar
@@ -1720,23 +1843,87 @@ export default function NotaFiscalDetailsPage() {
                 const keyComposite = `${selectedDetailItem.item}|${selectedDetailItem.codProdFornecedor || ""}`;
                 const impostoItem = selectedDetailItem.impostoEscolhido || submittedTaxByItemKey[keyComposite] || submittedTaxByItemKey[String(selectedDetailItem.item)];
                 const conferenceMessages = getConferenceMessages(selectedDetailItem, impostoItem);
+                const showManualSection = isOnlyNoRelationshipWarning(selectedDetailItem);
                 return (
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-800">
-                      <strong>Imposto considerado:</strong> {getImpostoLabel(impostoItem)}
-                    </p>
-                    {selectedDetailItem.codigoProduto && (
-                      <p className="text-sm font-semibold text-gray-800">Código do Produto: {selectedDetailItem.codigoProduto}</p>
-                    )}
-                    <p className="text-sm font-semibold text-gray-800">Conferência do Produto:</p>
-                    {conferenceMessages.length > 0 && (
-                      <ul className="list-disc space-y-2 pl-5 text-sm">
-                        {conferenceMessages.map((entry, idx) => (
-                          <li key={`detail-msg-${idx}`} className={entry.type === "ok" ? "text-green-700" : "text-red-700"}>
-                            {entry.text}
-                          </li>
-                        ))}
-                      </ul>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-800">
+                        <strong>Imposto considerado:</strong> {getImpostoLabel(impostoItem)}
+                      </p>
+                      {selectedDetailItem.codigoProduto && (
+                        <p className="text-sm font-semibold text-gray-800">Código do Produto: {selectedDetailItem.codigoProduto}</p>
+                      )}
+                      <p className="text-sm font-semibold text-gray-800">Conferência do Produto:</p>
+                      {conferenceMessages.length > 0 && (
+                        <ul className="list-disc space-y-2 pl-5 text-sm">
+                          {conferenceMessages.map((entry, idx) => (
+                            <li key={`detail-msg-${idx}`} className={entry.type === "ok" ? "text-green-700" : "text-red-700"}>
+                              {entry.text}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {showManualSection && (
+                      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 space-y-3">
+                        <p className="text-sm font-semibold text-yellow-800">
+                          Relacionamento Manual
+                        </p>
+                        <p className="text-xs text-yellow-700">
+                          Este produto não possui vínculo automático. Informe o código interno para consultar e salvar a conciliação manualmente.
+                        </p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={manualCodigoInterno}
+                            onChange={(e) => {
+                              setManualCodigoInterno(e.target.value);
+                              setManualCheckResult(null);
+                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter") void handleManualCheck(); }}
+                            placeholder="Código interno do produto"
+                            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            disabled={isCheckingManual || isSavingManual}
+                          />
+                          <button
+                            onClick={() => void handleManualCheck()}
+                            disabled={isCheckingManual || isSavingManual || !manualCodigoInterno.trim()}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            <FaSearch />
+                            {isCheckingManual ? "Consultando..." : "Consultar"}
+                          </button>
+                        </div>
+
+                        {manualCheckResult && (
+                          <div className="space-y-2">
+                            <div className="rounded-md border border-gray-200 bg-white p-3 space-y-1">
+                              {manualCheckResult.codigoProduto && (
+                                <p className="text-sm font-semibold text-gray-800">
+                                  Produto encontrado: {manualCheckResult.codigoProduto}
+                                </p>
+                              )}
+                              <p className="text-xs font-semibold text-gray-600 mt-1">Resultado da conferência:</p>
+                              <ul className="list-disc space-y-1 pl-4 text-xs">
+                                {getConferenceMessages(manualCheckResult, impostoItem).map((entry, idx) => (
+                                  <li key={`manual-msg-${idx}`} className={entry.type === "ok" ? "text-green-700" : "text-red-700"}>
+                                    {entry.text}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <button
+                              onClick={() => void handleManualSave()}
+                              disabled={isSavingManual}
+                              className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+                            >
+                              <FaCheckCircle />
+                              {isSavingManual ? "Salvando..." : "Salvar Conciliação Manual"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
