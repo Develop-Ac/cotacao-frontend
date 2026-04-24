@@ -493,19 +493,16 @@ export default function Tela() {
         if (localizacaoFiltro) {
             switch (localizacaoFiltro) {
                 case "PISO_A":
-                    passaLocalizacao = localizacao.startsWith("A");
+                    passaLocalizacao = localizacao.startsWith("A") || localizacao.startsWith("BOX");
                     break;
                 case "PISO_B":
-                    passaLocalizacao = localizacao.startsWith("B");
+                    passaLocalizacao = localizacao.startsWith("B") && !localizacao.startsWith("BOX");
                     break;
                 case "PISO_C":
                     passaLocalizacao = localizacao.startsWith("C");
                     break;
                 case "BOX":
                     passaLocalizacao = localizacao.startsWith("BOX");
-                    break;
-                case "A-BOX":
-                    passaLocalizacao = localizacao.startsWith("A-BOX");
                     break;
                 case "A-BOQUETA":
                     passaLocalizacao = localizacao.startsWith("A-BOQUETA");
@@ -973,7 +970,6 @@ export default function Tela() {
                                                                 { label: "PISO C", value: "PISO_C" },
                                                                 { label: "VITRINE", value: "VITRINE" },
                                                                 { label: "BOX", value: "BOX" },
-                                                                { label: "A-BOX", value: "A-BOX" },
                                                                 { label: "A-BOQUETA", value: "A-BOQUETA" },
                                                                 { label: "A-CX ESCADA", value: "A-CX ESCADA" },
                                                                 { label: "VENDA CASADA", value: "VENDA CASADA" }
