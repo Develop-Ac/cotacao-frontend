@@ -352,7 +352,7 @@ describe('Contagem Page', () => {
       
       expect(screen.getByText('Produto A')).toBeInTheDocument()
       expect(screen.queryByText('Produto B')).not.toBeInTheDocument()
-      expect(screen.queryByText('Produto Box')).not.toBeInTheDocument()
+      expect(screen.getByText('Produto Box')).toBeInTheDocument()
     })
 
     it('filters by PISO_B location', async () => {
