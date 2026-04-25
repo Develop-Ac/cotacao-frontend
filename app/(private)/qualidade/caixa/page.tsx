@@ -890,7 +890,7 @@ export default function CaixaDeEntradaPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 bg-slate-200 dark:bg-boxdark-2 p-4 lg:p-6">
+    <div className="flex h-full min-h-0 flex-col gap-4 bg-slate-100 dark:bg-boxdark-2 p-4 lg:p-6">
       <ConfirmationModal
         isOpen={sendConfirmOpen}
         title="Confirmar envio"
