@@ -419,6 +419,8 @@ export default function RootLayout({
                   <main
                     className={`relative flex-1 ${pathname?.startsWith('/compras/kanban') || pathname?.startsWith('/sac/kanban') || pathname === '/'
                       ? 'flex flex-col h-full min-h-0 overflow-hidden'
+                      : pathname?.startsWith('/qualidade/caixa')
+                      ? 'flex flex-col h-full min-h-0 overflow-hidden'
                       : 'w-full overflow-y-auto'
                       }`}
                   >

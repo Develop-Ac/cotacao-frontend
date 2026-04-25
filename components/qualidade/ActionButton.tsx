@@ -7,12 +7,12 @@ const baseClass =
 
 const solidClass = "bg-primary text-white hover:bg-opacity-90";
 const ghostClass =
-  "border border-primary text-primary hover:bg-primary/10 dark:hover:bg-primary/20";
+  "border border-primary text-primary hover:bg-primary/10 dark:border-strokedark dark:text-white dark:hover:bg-meta-4";
 
 const shapes: Record<"pill" | "rounded" | "square", string> = {
-  pill: "px-5 py-2.5 text-sm",
-  rounded: "px-4 py-2.5 text-sm",
-  square: "w-12 h-12",
+  pill: "px-4 py-1.5 text-sm",
+  rounded: "px-3 py-1.5 text-sm",
+  square: "w-8 h-8",
 };
 
 export interface ActionButtonProps {
@@ -25,6 +25,7 @@ export interface ActionButtonProps {
   disabled?: boolean;
   shape?: keyof typeof shapes;
   className?: string;
+  iconOnly?: boolean;
 }
 
 export const ActionButton = ({
@@ -37,27 +38,28 @@ export const ActionButton = ({
   disabled = false,
   shape = "rounded",
   className = "",
+  iconOnly = false,
 }: ActionButtonProps) => {
   const classes = [
     baseClass,
     variant === "solid" ? solidClass : ghostClass,
-    shapes[shape] ?? shapes.pill,
+    iconOnly ? "w-8 h-8 xl:w-auto xl:h-auto xl:px-3 xl:py-1.5 xl:text-sm" : (shapes[shape] ?? shapes.pill),
     className,
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <button type={type} className={classes} onClick={onClick} disabled={disabled || loading} aria-busy={loading}>
+    <button type={type} className={classes} onClick={onClick} disabled={disabled || loading} aria-busy={loading} title={label}>
       {loading ? (
         <span className="inline-flex items-center gap-2">
           <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-          {label}
+          <span className={iconOnly ? "hidden xl:inline" : ""}>{label}</span>
         </span>
       ) : (
         <span className="inline-flex items-center gap-2">
           {icon}
-          <span>{label}</span>
+          <span className={iconOnly ? "hidden xl:inline" : ""}>{label}</span>
         </span>
       )}
     </button>

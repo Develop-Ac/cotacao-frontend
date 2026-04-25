@@ -4,6 +4,22 @@ export interface PaginationParams {
   query?: string;
 }
 
+export interface MailParticipant {
+  email: string;
+  name?: string | null;
+}
+
+export interface MailAttachment {
+  id: number;
+  fileName: string;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  contentId?: string | null;
+  isInline?: boolean;
+  storageBucket?: string | null;
+  storageKey?: string | null;
+}
+
 export interface MailAccount {
   id: number;
   tenantKey: string;
@@ -54,6 +70,9 @@ export interface MailMessage {
   subject?: string | null;
   normalizedSubject?: string | null;
   fromAddress?: string | null;
+  fromName?: string | null;
+  replyToAddress?: string | null;
+  senderAddress?: string | null;
   bodyText?: string | null;
   bodyHtml?: string | null;
   parsingStatus: string;
@@ -61,6 +80,11 @@ export interface MailMessage {
   internalDate?: string | null;
   receivedAt: string;
   hasAttachments: boolean;
+  to?: MailParticipant[];
+  cc?: MailParticipant[];
+  bcc?: MailParticipant[];
+  replyTo?: MailParticipant[];
+  attachments?: MailAttachment[];
 }
 
 export interface MailThread {
@@ -78,7 +102,7 @@ export interface MailThread {
 }
 
 export interface CreateManualLinkPayload {
-  targetType: "THREAD" | "MESSAGE";
+  targetType: 'THREAD' | 'MESSAGE';
   targetId: number;
   entityType: string;
   entityId: string;
