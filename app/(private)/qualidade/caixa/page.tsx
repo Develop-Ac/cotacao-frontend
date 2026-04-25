@@ -154,6 +154,43 @@ const modeLabel = (mode: ComposeMode): string => {
   return 'Novo e-mail';
 };
 
+const SLIDE_ANIM_DURATION = 280; // ms
+
+function SlideNotification({ message, className }: { message: string | null; className: string }) {
+  const [content, setContent] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    if (message) {
+      setLeaving(false);
+      setContent(message);
+    } else if (content) {
+      setLeaving(true);
+      const t = setTimeout(() => {
+        setContent(null);
+        setLeaving(false);
+      }, SLIDE_ANIM_DURATION);
+      return () => clearTimeout(t);
+    }
+  }, [message]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!content) return null;
+
+  return (
+    <div
+      className={className}
+      style={{
+        animation: leaving
+          ? `caixa-slide-up ${SLIDE_ANIM_DURATION}ms ease forwards`
+          : `caixa-slide-down ${SLIDE_ANIM_DURATION}ms ease forwards`,
+        overflow: 'hidden',
+      }}
+    >
+      {content}
+    </div>
+  );
+}
+
 const statusTone = (tone: 'neutral' | 'success' | 'warning' | 'info'): string => {
   if (tone === 'success') return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400';
   if (tone === 'warning') return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400';
@@ -964,14 +1001,25 @@ export default function CaixaDeEntradaPage() {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700 dark:text-red-400">{error}</div>
-      )}
-      {success && (
-        <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm text-emerald-700 dark:text-emerald-400">
-          {success}
-        </div>
-      )}
+      <style>{`
+        @keyframes caixa-slide-down {
+          from { max-height: 0; opacity: 0; transform: translateY(-6px); padding-top: 0; padding-bottom: 0; }
+          to   { max-height: 80px; opacity: 1; transform: translateY(0); }
+        }
+        @keyframes caixa-slide-up {
+          from { max-height: 80px; opacity: 1; transform: translateY(0); }
+          to   { max-height: 0; opacity: 0; transform: translateY(-6px); padding-top: 0; padding-bottom: 0; }
+        }
+      `}</style>
+
+      <SlideNotification
+        message={error}
+        className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700 dark:text-red-400"
+      />
+      <SlideNotification
+        message={success}
+        className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm text-emerald-700 dark:text-emerald-400"
+      />
 
       <div className="rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2">
         <div className="flex flex-nowrap items-center gap-2">
@@ -1097,14 +1145,14 @@ export default function CaixaDeEntradaPage() {
                         {selectedReaderMessage.subject || '(Sem assunto)'}
                       </h2>
                     </div>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 break-all">
                       De: {selectedReaderMessage.fromAddress || 'Nao informado'}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 break-all">
                       Para: {joinParticipants(selectedReaderMessage.to) || 'Nao informado'}
                     </p>
                     {(selectedReaderMessage.cc?.length ?? 0) > 0 && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">CC: {joinParticipants(selectedReaderMessage.cc)}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 break-all">CC: {joinParticipants(selectedReaderMessage.cc)}</p>
                     )}
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       Recebido em: {new Date(selectedReaderMessage.receivedAt).toLocaleString('pt-BR')}
