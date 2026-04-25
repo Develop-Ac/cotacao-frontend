@@ -1068,7 +1068,7 @@ export default function CaixaDeEntradaPage() {
               <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">Leitura da thread/e-mail</span>
             </div>
             {!selectedReaderMessage?.__isUnlinked && threadDetail?.linkedEntityId && (() => {
-              const linkedGarantia = garantias.find((g) => g.id === threadDetail.linkedEntityId);
+              const linkedGarantia = garantias.find((g) => String(g.id) === threadDetail.linkedEntityId);
               return (
                 <button
                   type="button"
