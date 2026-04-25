@@ -248,7 +248,7 @@ function ThreadListItem({
   onSelect: () => void;
 }) {
   const isDraft = message.id === 'draft';
-  const preview = stripHtml(message.bodyText || message.bodyHtml).slice(0, 100);
+  const preview = stripHtml(message.bodyText || ('bodyHtml' in message ? message.bodyHtml : undefined)).slice(0, 100);
 
   return (
     <button
