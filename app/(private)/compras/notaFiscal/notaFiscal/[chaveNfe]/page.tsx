@@ -27,6 +27,7 @@ type PaymentStatusByKey = {
     imposto_escolhido: ImpostoEscolhido | null;
     possui_icms_st: boolean | null;
     possui_difal: boolean | null;
+    sem_tributacao: boolean | null;
     ncm_xml: string | null;
     cst_nota: string | null;
     divergencias_json?: string[];
@@ -65,6 +66,7 @@ type FiscalCheckItemResult = {
   codProdFornecedor: string;
   impostoEscolhido?: ImpostoEscolhido;
   codigoProduto?: string;
+  semTributacao?: boolean;
   statusConferencia: "OK" | "DIVERGENTE";
   conformidades?: string[];
   divergencias: string[];
@@ -75,6 +77,7 @@ type FiscalCheckResult = {
   flagsNota: {
     compraComercializacao: boolean;
     usoConsumo: boolean;
+    semTributacao: boolean;
   };
   itens: FiscalCheckItemResult[];
   warnings?: string[];
@@ -1124,6 +1127,7 @@ export default function NotaFiscalDetailsPage() {
         codProdFornecedor: String(item.cod_prod_fornecedor || ""),
         impostoEscolhido,
         codigoProduto: item.pro_codigo || undefined,
+        semTributacao: item.sem_tributacao ?? false,
         statusConferencia: item.status_conferencia === "OK" ? "OK" : "DIVERGENTE",
         conformidades: conformidadesPersistidas,
         divergencias: Array.isArray(item.divergencias_json) ? item.divergencias_json : [],
@@ -1762,6 +1766,11 @@ export default function NotaFiscalDetailsPage() {
                     <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
                       Uso e Consumo: {fiscalCheckResult.flagsNota.usoConsumo ? "Sim" : "Não"}
                     </span>
+                    {fiscalCheckResult.flagsNota.semTributacao && (
+                      <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-700">
+                        Sem Tributação
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-2">
                     {fiscalCheckResult.itens.map((item) => (
@@ -1776,6 +1785,11 @@ export default function NotaFiscalDetailsPage() {
                                 <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-bold ${getImpostoBadgeClass(impostoItem)}`}>
                                   Imposto: {getImpostoLabel(impostoItem)}
                                 </span>
+                                {item.semTributacao && (
+                                  <span className="ml-1 inline-flex rounded-full bg-orange-100 px-2 py-1 text-[11px] font-bold text-orange-700">
+                                    Sem Tributação
+                                  </span>
+                                )}
                               </div>
                               {item.codigoProduto && (
                                 <p className="text-xs font-semibold text-gray-700">Código do Produto: {item.codigoProduto}</p>
