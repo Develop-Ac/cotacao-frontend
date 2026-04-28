@@ -118,9 +118,12 @@ const renderMessageHtml = (message?: MailMessage | null, attachmentUrls?: Record
     }
   }
 
-  const resolved = rawHtml.replace(/src=(['"])cid:([^'"]+)\1/gi, (match, quote, contentId) => {
+  const resolved = rawHtml.replace(/src\s*=\s*(?:(["'])cid:([^"']+)\1|cid:([^\s>]+))/gi, (match, quote, quotedContentId, bareContentId) => {
+    const contentId = quotedContentId ?? bareContentId;
     const resolvedUrl = cidMap.get(normalizeContentId(contentId));
-    return resolvedUrl ? `src=${quote}${resolvedUrl}${quote}` : match;
+    if (!resolvedUrl) return match;
+    const finalQuote = quote || '"';
+    return `src=${finalQuote}${resolvedUrl}${finalQuote}`;
   });
 
   const darkStyles = darkMode ? `<style>
@@ -723,6 +726,11 @@ export default function CaixaDeEntradaPage() {
     [selectedReaderMessage, attachmentUrlCache, isDark],
   );
 
+  const selectedReaderHasAttachments = useMemo(
+    () => Boolean(selectedReaderMessage?.hasAttachments) || (selectedReaderMessage?.attachments?.length ?? 0) > 0,
+    [selectedReaderMessage],
+  );
+
   const openComposer = (mode: ComposeMode) => {
     if (!activeQualidadeAccount) {
       setError('Nao existe conta ativa para envio/sincronizacao desta caixa.');
@@ -1162,7 +1170,7 @@ export default function CaixaDeEntradaPage() {
                         label={selectedReaderMessage.__isUnlinked ? 'Nao vinculado' : 'Vinculado'}
                         tone={selectedReaderMessage.__isUnlinked ? 'warning' : 'success'}
                       />
-                      {selectedReaderMessage.hasAttachments && <EmailStatusBadge label="Com anexo" tone="info" />}
+                      {selectedReaderHasAttachments && <EmailStatusBadge label="Com anexo" tone="info" />}
                       {selectedReaderMessage.direction === 'OUTBOUND' && (
                         <EmailStatusBadge label="Enviado" tone="neutral" />
                       )}
@@ -1189,7 +1197,7 @@ export default function CaixaDeEntradaPage() {
                     )}
                   </div>
 
-                  {selectedReaderMessage.hasAttachments && (
+                  {selectedReaderHasAttachments && (
                     <div className="rounded-lg border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3 text-xs text-gray-600 dark:text-gray-300">
                       <div className="mb-2 flex items-center gap-1 font-semibold text-gray-700 dark:text-gray-200">
                         <MdAttachFile size={14} /> Anexos
