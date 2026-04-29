@@ -207,12 +207,35 @@ export default function StCalculationResults({ results, originalItems, selectedI
                 }
             })();
 
+            const itens = activeItemsForInvoice.map((item) => {
+                const dentroEstado = String(item.chaveNfe || '').startsWith('51');
+                const destino = item.destinacaoMercadoria || (item.impostoEscolhido === 'ST' ? 'COMERCIALIZACAO' : 'USO_CONSUMO');
+                const impostoEscolhido = item.impostoEscolhido || (destino === 'USO_CONSUMO'
+                    ? (dentroEstado ? 'TRIBUTADA' : 'DIFAL')
+                    : 'ST');
+
+                return {
+                    item: Number(item.item || 0),
+                    codProdFornecedor: String(item.codProd || ''),
+                    produto: String(item.produto || ''),
+                    unidadeFornecedor: String(item.unidadeFornecedor || ''),
+                    impostoEscolhido,
+                    destinacaoMercadoria: destino,
+                    ncmNota: item.ncmNota,
+                    cfop: item.cfop,
+                    cstNota: item.cstNota,
+                    possuiIcmsSt: Boolean(item.possuiIcmsSt),
+                    possuiDifal: impostoEscolhido === 'DIFAL',
+                };
+            }).filter((row) => row.item > 0);
+
             return {
                 chaveNfe: chave,
                 observacoes: status,
                 valor: Number(totalValue.toFixed(2)),
                 tipo_imposto: tipoImposto,
-                usuario: user?.nome || 'Sistema'
+                usuario: user?.nome || 'Sistema',
+                itens,
             };
         });
 
@@ -330,6 +353,7 @@ export default function StCalculationResults({ results, originalItems, selectedI
                             </th>
                             <th className="px-4 py-3">Produto</th>
                             <th className="px-4 py-3 text-center">Imposto</th>
+                            <th className="px-4 py-3 text-center">Destinação</th>
                             <th className="px-4 py-3">NCM / MVA</th>
                             <th className="px-4 py-3 text-right">Valor Prod.</th>
                             <th className="px-4 py-3 text-right">ST Destacado</th>
@@ -363,6 +387,11 @@ export default function StCalculationResults({ results, originalItems, selectedI
                                         ) : (
                                             <span className="text-blue-600">ICMS ST</span>
                                         )}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${row.destinacaoMercadoria === 'COMERCIALIZACAO' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {row.destinacaoMercadoria === 'COMERCIALIZACAO' ? 'Comercialização' : 'Uso e Consumo'}
+                                        </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="text-xs">NCM: {row.ncmNota}</div>

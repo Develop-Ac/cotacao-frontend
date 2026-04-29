@@ -98,11 +98,33 @@ export default function RootLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop collapse
 
   // Splash Screen State
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
+  const [splashInitialized, setSplashInitialized] = useState(false);
   const [mediaReady, setMediaReady] = useState(false); // To ensure fonts/styles load if needed, but mainly for consistent delay
 
   // Dados prontos apenas quando: userData existe, ability carregado E o SWR de auth finalizou (incl. revalidações)
   const isDataReady = !!userData && !isLoadingAbility && !isAuthLoading && !isAuthValidating;
+
+  useEffect(() => {
+    try {
+      const splashAlreadyShown = window.sessionStorage.getItem("private_splash_seen") === "1";
+      setShowSplash(!splashAlreadyShown);
+    } catch {
+      // Fallback: exibe splash se sessionStorage estiver indisponível.
+      setShowSplash(true);
+    } finally {
+      setSplashInitialized(true);
+    }
+  }, []);
+
+  const handleSplashFinish = React.useCallback(() => {
+    try {
+      window.sessionStorage.setItem("private_splash_seen", "1");
+    } catch {
+      // noop
+    }
+    setShowSplash(false);
+  }, []);
 
 
   const [isNavigating, setIsNavigating] = useState(false);
@@ -119,7 +141,7 @@ export default function RootLayout({
     expedicao: isPathActive('/expedicao'),
     qualidade: isPathActive('/qualidade'),
     sac: isPathActive('/sac'),
-    sistema: isPathActive('/usuario'),
+    sistema: isPathActive('/sistema') || isPathActive('/usuario'),
   };
 
   // ---------- Permissões: helpers ----------
@@ -149,8 +171,16 @@ export default function RootLayout({
     if (href === '/feed/profile') return true;
 
     const target = normalizePath(href);
+    if (target.startsWith('/sistema') && canOnPathPrefix(ability, 'read', '/usuario')) {
+      return true;
+    }
     return canOnPathPrefix(ability, "read", target); // read herda por prefixo
   }, [ability]);
+
+  const canViewUsuarios = React.useMemo(
+    () => canOnPathPrefix(ability, 'read', '/usuario'),
+    [ability],
+  );
 
   // Submenus completos para cada seção (sem filtro)
   const getSubmenuItems = (section: string) => {
@@ -161,7 +191,7 @@ export default function RootLayout({
           { label: 'Comparativo', href: '/compras/cotacao/comparativo' },
           { label: 'Pedido', href: '/compras/cotacao/pedido' },
           { label: 'Kanban', href: '/compras/kanban' },
-          { label: 'Calculo do ICMS ST', href: '/compras/notaFiscal/notaFiscal' },
+          { label: 'Notas Fiscais de Entrada', href: '/compras/notaFiscal/notaFiscal' },
           { label: 'Análise de Produtos', href: '/compras/analise' },
         ];
       case 'Oficina':
@@ -185,7 +215,11 @@ export default function RootLayout({
       case 'Sac':
         return [{ label: 'Nova Solicitação', href: '/sac/kanban' }];
       case 'Sistema':
-        return [{ label: 'Usuários', href: '/usuario' }];
+        return [
+          { label: 'Usuários', href: '/sistema' },
+          ...(canViewUsuarios ? [{ label: 'E-mails', href: '/sistema/email' }] : []),
+          { label: 'Usuários (Legado)', href: '/usuario' },
+        ];
       default:
         return [];
     }
@@ -242,10 +276,10 @@ export default function RootLayout({
       <SidebarContext.Provider value={{ sidebarCollapsed, setSidebarCollapsed, sidebarOpen, setSidebarOpen }}>
         <ToastProvider>
           <PrivateRoute>
-            {showSplash && (
+            {splashInitialized && showSplash && (
               <SplashScreen
                 isDataReady={isDataReady}
-                onFinish={() => setShowSplash(false)}
+                onFinish={handleSplashFinish}
               />
             )}
             <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900 font-outfit text-base font-normal">
@@ -298,7 +332,7 @@ export default function RootLayout({
                           { id: 'Expedição', label: 'Expedição', icon: HiOutlineTruck, path: '/expedicao' }, // Note: id matches hasAccessToModule
                           { id: 'Qualidade', label: 'Qualidade', icon: HiOutlineClipboardDocumentCheck, path: '/qualidade' },
                           { id: 'Sac', label: 'Sac', icon: HiOutlineUser, path: '/sac' },
-                          { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/usuario' },
+                          { id: 'Sistema', label: 'Sistema', icon: HiOutlineCog, path: '/sistema' },
                         ].map((section) => {
                           // Special handling for section keys if they differ from ID
                           const sectionKey = section.id === 'Expedição' ? 'Expedicao' : section.id;
