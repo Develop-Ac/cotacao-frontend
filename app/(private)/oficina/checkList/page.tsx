@@ -58,7 +58,7 @@ const OFICINA_BASE = serviceUrl("oficina");
 const API_BASE = `${OFICINA_BASE}/oficina/checklists`;
 const IMG_API_BASE = `${OFICINA_BASE}/oficina/img`;
 const UPLOADS_API_BASE = `${OFICINA_BASE}/oficina/uploads/avarias/url`;
-const UPLOADS_CHECKLIST_API_BASE = `${OFICINA_BASE}/oficina/uploads/checklist/url`;
+const UPLOADS_CHECKLIST_API_BASE = `${OFICINA_BASE}/oficina/uploads/fotos/url`;
 
 function ChecklistCard({
   item,
