@@ -72,6 +72,10 @@ export default function Login() {
       { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
       { modulo: "Feed", telas: ["/feed"] },
     ],
+    "Financeiro": [
+      { modulo: "Feed", telas: ["/feed"] },
+      { modulo: "Oficina", telas: ["/oficina/checkList"] },
+    ]
   };
 
   // Estado do modal de permissões
