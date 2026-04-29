@@ -211,6 +211,110 @@ export default function ChecklistsList() {
   const [fotosIndex, setFotosIndex] = useState(0);
   const fotosAbortRef = useRef<AbortController | null>(null);
 
+  function prevFoto() {
+    setFotosIndex((i) => (i <= 0 ? Math.max(0, fotosItems.length - 1) : i - 1));
+  }
+  function nextFoto() {
+    setFotosIndex((i) => (i >= fotosItems.length - 1 ? 0 : i + 1));
+  }
+  // ====== MODAL DE FOTOS CHECKLIST ======
+  {fotosOpen && (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center" aria-modal="true" role="dialog">
+      {/* overlay */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeFotos} />
+      {/* content */}
+      <div className="relative z-10 w-full max-w-5xl mx-4 rounded-xl bg-white dark:bg-boxdark shadow-2xl">
+        {/* header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-strokedark">
+          <div className="font-semibold text-black dark:text-white">
+            Fotos do checklist {fotosItems.length ? `(${fotosIndex + 1}/${fotosItems.length})` : ""}
+          </div>
+          <button
+            className="h-10 w-10 inline-flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+            onClick={closeFotos}
+            title="Fechar"
+          >
+            <FaTimes />
+          </button>
+        </div>
+        {/* body */}
+        <div className="p-4">
+          {fotosLoading && <div className="py-16 text-center text-gray-600">Carregando fotos...</div>}
+          {fotosError && <div className="py-16 text-center text-red-600">{fotosError}</div>}
+          {!fotosLoading && !fotosError && fotosItems.length === 0 && (
+            <div className="py-16 text-center text-gray-600">Nenhuma foto encontrada para este checklist.</div>
+          )}
+          {!fotosLoading && !fotosError && fotosItems.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+              {/* área da imagem com navegação lateral */}
+              <div className="lg:col-span-8">
+                <div className="relative w-full aspect-[4/3] bg-gray-50 dark:bg-meta-4 rounded-lg overflow-hidden flex items-center justify-center">
+                  {/* seta esquerda */}
+                  <button
+                    className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+                    onClick={prevFoto}
+                    title="Anterior"
+                  >
+                    <FaChevronLeft />
+                  </button>
+                  {/* imagem */}
+                  {fotosItems[fotosIndex]?.imageUrl ? (
+                    <img
+                      src={fotosItems[fotosIndex].imageUrl}
+                      alt="Foto checklist"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    <div className="text-gray-500">Carregando imagem...</div>
+                  )}
+                  {/* seta direita */}
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white dark:bg-boxdark shadow flex items-center justify-center hover:bg-gray-100 dark:hover:bg-meta-4 text-black dark:text-white"
+                    onClick={nextFoto}
+                    title="Próxima"
+                  >
+                    <FaChevronRight />
+                  </button>
+                </div>
+                {/* mini navegação (pontos) */}
+                {fotosItems.length > 1 && (
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    {fotosItems.map((_, i) => (
+                      <button
+                        key={i}
+                        className={`h-2.5 rounded-full transition-all ${i === fotosIndex ? "w-6 bg-blue-600" : "w-2.5 bg-gray-300"}`}
+                        onClick={() => setFotosIndex(i)}
+                        aria-label={`Ir para foto ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* ações */}
+              <div className="lg:col-span-4 flex flex-col gap-3">
+                <button
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 w-full"
+                  onClick={downloadCurrentFoto}
+                  title="Baixar esta foto"
+                  disabled={!fotosItems[fotosIndex]?.imageUrl}
+                >
+                  <FaDownload />
+                  Baixar foto
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* footer */}
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-strokedark flex items-center justify-end gap-2">
+          <button className="h-10 px-4 rounded bg-gray-200 dark:bg-meta-4 hover:bg-gray-300 dark:hover:bg-opacity-90 text-black dark:text-white" onClick={closeFotos}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
   async function openFotos(checklistId: string) {
     fotosAbortRef.current?.abort();
     const ctrl = new AbortController();
