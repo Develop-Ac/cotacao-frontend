@@ -58,18 +58,21 @@ const OFICINA_BASE = serviceUrl("oficina");
 const API_BASE = `${OFICINA_BASE}/oficina/checklists`;
 const IMG_API_BASE = `${OFICINA_BASE}/oficina/img`;
 const UPLOADS_API_BASE = `${OFICINA_BASE}/oficina/uploads/avarias/url`;
+const UPLOADS_CHECKLIST_API_BASE = `${OFICINA_BASE}/oficina/uploads/checklist/url`;
 
 function ChecklistCard({
   item,
   isAdmin,
   onView,
   onGallery,
+  onFotos,
   onPdf,
 }: {
   item: ChecklistRow;
   isAdmin: boolean;
   onView: (os: string) => void;
   onGallery: (id: string) => void;
+  onFotos: (id: string) => void;
   onPdf: (id: string) => void;
 }) {
   const fmtDateTime = (iso?: string | null) => {
@@ -141,6 +144,15 @@ function ChecklistCard({
           title="Galeria de Avarias"
         >
           <FaImages className="text-purple-500" />
+          <span className="text-[10px] font-medium uppercase">Avarias</span>
+        </button>
+
+        <button
+          onClick={() => onFotos(String(item.id))}
+          className="col-span-1 flex flex-col items-center justify-center gap-1 p-2 rounded-lg border border-gray-200 dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4 text-gray-600 dark:text-gray-300 transition-colors"
+          title="Galeria de Fotos"
+        >
+          <FaImages className="text-purple-500" />
           <span className="text-[10px] font-medium uppercase">Fotos</span>
         </button>
 
@@ -189,6 +201,104 @@ export default function ChecklistsList() {
   const [galleryItems, setGalleryItems] = useState<AvariaImage[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const galleryAbortRef = useRef<AbortController | null>(null);
+
+  // ====== FOTOS CHECKLIST ======
+  type FotoChecklist = { foto: string; imageUrl?: string };
+  const [fotosOpen, setFotosOpen] = useState(false);
+  const [fotosLoading, setFotosLoading] = useState(false);
+  const [fotosError, setFotosError] = useState<string | null>(null);
+  const [fotosItems, setFotosItems] = useState<FotoChecklist[]>([]);
+  const [fotosIndex, setFotosIndex] = useState(0);
+  const fotosAbortRef = useRef<AbortController | null>(null);
+
+  async function openFotos(checklistId: string) {
+    fotosAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    fotosAbortRef.current = ctrl;
+
+    setFotosOpen(true);
+    setFotosLoading(true);
+    setFotosError(null);
+    setFotosItems([]);
+    setFotosIndex(0);
+
+    try {
+      const res = await fetch(`${IMG_API_BASE}/${encodeURIComponent(checklistId)}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        let msg = `Erro HTTP: ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
+          if (j?.error) msg = j.error;
+        } catch { }
+        throw new Error(msg);
+      }
+      const json = await res.json();
+      const fotosArr = Array.isArray(json?.fotos) ? json.fotos : [];
+      const items: FotoChecklist[] = fotosArr.map((f: any) => ({ foto: f.foto }));
+      setFotosItems(items);
+      setFotosIndex(0);
+
+      // Buscar URLs das imagens (sequencial, respeitando abort)
+      for (let i = 0; i < items.length; i++) {
+        if (ctrl.signal.aborted) break;
+        const urlRes = await fetch(`${UPLOADS_CHECKLIST_API_BASE}?key=${encodeURIComponent(items[i].foto)}&expires=3600`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        if (urlRes.ok) {
+          const urlJson = await urlRes.json();
+          if (urlJson.ok && urlJson.url && !ctrl.signal.aborted) {
+            setFotosItems((current) =>
+              current.map((item, idx) => idx === i ? { ...item, imageUrl: urlJson.url } : item)
+            );
+          }
+        }
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        setFotosError(e?.message || "Falha ao carregar fotos");
+      }
+    } finally {
+      setFotosLoading(false);
+    }
+  }
+
+  function closeFotos() {
+    fotosAbortRef.current?.abort();
+    setFotosOpen(false);
+    setFotosItems([]);
+    setFotosIndex(0);
+    setFotosError(null);
+  }
+
+  async function downloadCurrentFoto() {
+    const cur = fotosItems[fotosIndex];
+    if (!cur?.imageUrl) return;
+    try {
+      const response = await fetch(cur.imageUrl);
+      if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `foto-checklist-${ts}-${fotosIndex + 1}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("Erro ao baixar foto:", msg);
+      alert("Erro ao baixar foto: " + msg);
+    }
+  }
 
   // ====== MODAL DE EDIÇÃO CHECKLIST ======
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -916,6 +1026,7 @@ export default function ChecklistsList() {
                 isAdmin={isAdmin}
                 onView={openViewModal}
                 onGallery={openGallery}
+                onFotos={openFotos}
                 onPdf={downloadChecklistPdf}
               />
             ))}
