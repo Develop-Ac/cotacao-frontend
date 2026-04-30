@@ -2,6 +2,8 @@ import { QUALIDADE_API_BASE, QUALIDADE_EMAIL_SYNC_URL } from "./config";
 import {
   Anexo,
   AtualizacaoPayload,
+  CopiarFornecedorConfigPayload,
+  FornecedorConfigPayload,
   FornecedorConfig,
   Garantia,
   InboxEmail,
@@ -155,6 +157,7 @@ const toGarantia = (payload: Record<string, unknown>): Garantia => {
   const timeline = buildTimeline(payload);
   return {
     id: toNumber(payload.id) ?? 0,
+    erpFornecedorId: toNumber(payload.erp_fornecedor_id ?? payload.erpFornecedorId),
     nomeFornecedor: String(payload.nome_fornecedor ?? payload.fornecedor ?? "Fornecedor"),
     emailFornecedor: payload.email_fornecedor?.toString(),
     copiasEmail: payload.copias_email?.toString(),
@@ -286,7 +289,9 @@ const toVendaDetalhes = (payload: unknown): VendaDetalhes => {
 };
 
 const toFornecedorConfig = (payload: Record<string, unknown>): FornecedorConfig => ({
+  id: toNumber(payload.id),
   erpFornecedorId: toNumber(payload.erp_fornecedor_id ?? payload.erpFornecedorId ?? payload.erpId) ?? 0,
+  nomeFornecedor: payload.nome_fornecedor?.toString() ?? payload.nomeFornecedor?.toString(),
   processoTipo: String(payload.processo_tipo ?? payload.processoTipo ?? "padrao"),
   portalLink: payload.portal_link?.toString() ?? payload.portalLink?.toString(),
   formularioPath: payload.formulario_path?.toString() ?? payload.formularioPath?.toString(),
@@ -310,8 +315,35 @@ const toInboxEmail = (payload: Record<string, unknown>): InboxEmail => ({
     ? ((payload.attachments ?? payload.anexos) as Array<Record<string, unknown>>).map((item) => ({
         filename: String(item.filename ?? item.nome ?? "Anexo"),
         url: item.url?.toString(),
+        objectKey:
+          item.object_key?.toString() ??
+          item.objectKey?.toString() ??
+          item.storage_key?.toString() ??
+          item.storageKey?.toString() ??
+          item.file_key?.toString() ??
+          item.fileKey?.toString() ??
+          item.minio_key?.toString() ??
+          item.minioKey?.toString() ??
+          item.s3_key?.toString() ??
+          item.s3Key?.toString() ??
+          item.key?.toString() ??
+          item.path_ficheiro?.toString(),
+        path:
+          item.path_ficheiro?.toString() ??
+          item.file_path?.toString() ??
+          item.filePath?.toString() ??
+          item.path?.toString() ??
+          item.caminho?.toString() ??
+          item.location?.toString() ??
+          item.uri?.toString(),
+        contentId: item.content_id?.toString() ?? item.contentId?.toString(),
+        contentBase64:
+          item.content_base64?.toString() ??
+          item.contentBase64?.toString() ??
+          item.base64?.toString() ??
+          item.content?.toString(),
         sizeBytes: toNumber(item.size_bytes ?? item.sizeBytes),
-        mimeType: item.mime_type?.toString(),
+        mimeType: item.mime_type?.toString() ?? item.mimeType?.toString() ?? item.type?.toString(),
       }))
     : [],
 });
@@ -408,11 +440,9 @@ export const QualidadeApi = {
     appendIfValue(form, "protocoloFornecedor", payload.protocoloFornecedor);
     appendIfValue(form, "nfsCompra", payload.nfsCompra);
     appendIfValue(form, "outrosMeios", payload.outrosMeios ? "true" : undefined);
-    // para compatibilidade com backends que não aceitam PUT diretamente
-    form.append("_method", "PUT");
     payload.anexos?.forEach((file) => appendAttachment(form, "anexos", file));
 
-    await apiFetch(`/garantias/${id}`, {
+    await apiFetch(`/garantias/${id}/update`, {
       method: "POST",
       body: form,
     });
@@ -447,6 +477,70 @@ export const QualidadeApi = {
     return toFornecedorConfig(data);
   },
 
+  async listarConfigsFornecedor(): Promise<FornecedorConfig[]> {
+    const res = await apiFetch("/fornecedores/config");
+    const data = await res.json();
+    const payload = Array.isArray(data) ? data : [];
+    return payload
+      .map((item: unknown) => (item && typeof item === "object" ? toFornecedorConfig(item as Record<string, unknown>) : null))
+      .filter(Boolean) as FornecedorConfig[];
+  },
+
+  async buscarFornecedorErp(erpFornecedorId: number): Promise<{ erpFornecedorId: number; nomeFornecedor: string }> {
+    const res = await apiFetch(`/fornecedores/erp/${erpFornecedorId}`);
+    const data = await res.json();
+    return {
+      erpFornecedorId: toNumber(data?.erp_fornecedor_id ?? erpFornecedorId) ?? erpFornecedorId,
+      nomeFornecedor: String(data?.nome_fornecedor ?? ""),
+    };
+  },
+
+  async criarConfigFornecedor(payload: FornecedorConfigPayload, formulario?: File) {
+    const form = new FormData();
+    appendIfValue(form, "erp_fornecedor_id", payload.erpFornecedorId);
+    appendIfValue(form, "processo_tipo", payload.processoTipo);
+    appendIfValue(form, "portal_link", payload.portalLink);
+    appendIfValue(form, "instrucoes", payload.instrucoes);
+    appendIfValue(form, "formulario_path", payload.formularioPath);
+    appendIfValue(form, "nome_formulario", payload.nomeFormulario);
+    if (formulario) {
+      form.append("formulario", formulario, formulario.name);
+    }
+
+    await apiFetch("/fornecedores/config", {
+      method: "POST",
+      body: form,
+    });
+  },
+
+  async atualizarConfigFornecedor(id: number, payload: FornecedorConfigPayload, formulario?: File) {
+    const form = new FormData();
+    appendIfValue(form, "erp_fornecedor_id", payload.erpFornecedorId);
+    appendIfValue(form, "processo_tipo", payload.processoTipo);
+    appendIfValue(form, "portal_link", payload.portalLink);
+    appendIfValue(form, "instrucoes", payload.instrucoes);
+    appendIfValue(form, "formulario_path", payload.formularioPath);
+    appendIfValue(form, "nome_formulario", payload.nomeFormulario);
+    if (formulario) {
+      form.append("formulario", formulario, formulario.name);
+    }
+
+    await apiFetch(`/fornecedores/config/${id}`, {
+      method: "PATCH",
+      body: form,
+    });
+  },
+
+  async copiarConfigFornecedor(id: number, payload: CopiarFornecedorConfigPayload) {
+    await apiFetch(`/fornecedores/config/${id}/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        novo_erp_fornecedor_id: payload.novoErpFornecedorId,
+      }),
+    });
+  },
+
   async listarEmails(): Promise<InboxEmail[]> {
     const res = await apiFetch("/emails");
     const data = await res.json();
@@ -454,6 +548,20 @@ export const QualidadeApi = {
     return payload
       .map((item: unknown) => (item && typeof item === "object" ? toInboxEmail(item as Record<string, unknown>) : null))
       .filter(Boolean) as InboxEmail[];
+  },
+
+  async vincularEmail(emailId: number, garantiaId: number) {
+    await apiFetch(`/emails/${emailId}/link`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ garantia_id: garantiaId }),
+    });
+  },
+
+  async excluirEmailSemVinculo(emailId: number) {
+    await apiFetch(`/emails/${emailId}`, {
+      method: "DELETE",
+    });
   },
 
   async sincronizarEmails() {

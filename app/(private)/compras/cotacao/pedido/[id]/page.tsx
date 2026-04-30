@@ -26,6 +26,8 @@ interface PedidoItem {
   MEDIA_MENSAL_3M?: number;
   carlos?: boolean;
   renato?: boolean;
+  min?: number;
+  max?: number;
 }
 
 interface PedidoData {
@@ -43,6 +45,15 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkboxStates, setCheckboxStates] = useState<{[key: string]: {Carlos: boolean, Renato: boolean}}>({});
+  // Valor total calculado após pedidoData estar disponível
+  let valorTotal = 0;
+  if (pedidoData?.itens) {
+    valorTotal = pedidoData.itens.reduce((acc, item) => {
+      const quantidade = Number(item.quantidade) || 0;
+      const valor = parseFloat(item.valor_unitario) || 0;
+      return acc + quantidade * valor;
+    }, 0);
+  }
 
   const updateCheckbox = async (itemId: string, field: 'Carlos' | 'Renato', value: boolean) => {
     // Atualizar estado local primeiro
@@ -162,6 +173,11 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
         <p className="text-gray-600">Fornecedor: {pedidoData.for_codigo}</p>
       </div>
 
+      {/* Valor total no topo */}
+      <div className="mb-4 flex items-center gap-8">
+        <div className="text-2xl font-bold text-primary">Valor Total: R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+      </div>
+
       {/* Tabela de itens */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
@@ -190,10 +206,7 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
                   Valor Unitário
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Média 12M
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Média 3M
+                  Min - Max
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
                   <input
@@ -248,10 +261,7 @@ export default function PedidoDetalhePage({ params }: { params: Promise<{ id: st
                     R$ {parseFloat(item.valor_unitario).toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.MEDIA_MENSAL_12M ? item.MEDIA_MENSAL_12M.toFixed(2) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.MEDIA_MENSAL_3M ? item.MEDIA_MENSAL_3M.toFixed(2) : '-'}
+                    {item.min} - {item.max}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <input 

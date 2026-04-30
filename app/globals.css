@@ -223,6 +223,10 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  a {
+    text-decoration: none;
+  }
 }
 
 @utility menu-item {
@@ -499,4 +503,8 @@ a[class*="button"] svg {
 
 .dark .kanban-btn:hover {
   background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.prose :where(a):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  text-decoration: none;
 }

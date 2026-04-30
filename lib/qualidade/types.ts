@@ -33,6 +33,7 @@ export interface TimelineEmailItem extends TimelineBase {
 
 export interface Garantia {
   id: number;
+  erpFornecedorId?: number | null;
   nomeFornecedor: string;
   emailFornecedor?: string | null;
   copiasEmail?: string | null;
@@ -66,6 +67,10 @@ export interface Garantia {
 export interface EmailAnexo {
   filename: string;
   url?: string;
+  objectKey?: string;
+  path?: string;
+  contentId?: string;
+  contentBase64?: string;
   sizeBytes?: number;
   mimeType?: string;
 }
@@ -134,11 +139,26 @@ export interface VendaDetalhes {
 }
 
 export interface FornecedorConfig {
+  id?: number;
   erpFornecedorId: number;
+  nomeFornecedor?: string | null;
   processoTipo: string;
   portalLink?: string | null;
   formularioPath?: string | null;
   nomeFormulario?: string | null;
   formularioUrl?: string | null;
   instrucoes?: string | null;
+}
+
+export interface FornecedorConfigPayload {
+  erpFornecedorId: number;
+  processoTipo: "portal" | "formulario" | "email" | "whatsapp";
+  portalLink?: string;
+  instrucoes?: string;
+  formularioPath?: string;
+  nomeFormulario?: string;
+}
+
+export interface CopiarFornecedorConfigPayload {
+  novoErpFornecedorId: number;
 }

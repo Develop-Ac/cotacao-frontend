@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MdAddCircleOutline, MdMailOutline, MdRefresh, MdSearch, MdFilterList } from "react-icons/md";
+import { MdAddCircleOutline, MdMailOutline, MdRefresh, MdSearch, MdFilterList, MdStore } from "react-icons/md";
 import { QualidadeApi } from "@/lib/qualidade/api";
 import { Garantia } from "@/lib/qualidade/types";
 import { STATUS_FLOW } from "@/lib/qualidade/status";
@@ -125,6 +125,13 @@ export default function QualidadeHome() {
             icon={<MdAddCircleOutline size={18} />}
             shape="rounded"
             onClick={() => setNovaGarantiaOpen(true)}
+          />
+          <ActionButton
+            label="Fornecedores"
+            variant="ghost"
+            icon={<MdStore size={18} />}
+            shape="rounded"
+            onClick={() => router.push("/qualidade/fornecedores-config")}
           />
           <ActionButton
             label="e-mail"

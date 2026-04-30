@@ -43,7 +43,7 @@ export default function Login() {
         ]
       },
       { modulo: "Sac", telas: ["/sac/kanban"] },
-      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/fornecedores-config", "/qualidade/caixa"] },
       { modulo: "Atacado", telas: [] },
       { modulo: "Varejo", telas: [] },
       { modulo: "Expedição", telas: ["/expedicao/dashboard", "/expedicao/aplicativo"] },
@@ -51,12 +51,12 @@ export default function Login() {
     ],
     Sac: [
       { modulo: "Sac", telas: ["/sac/kanban"] },
-      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/fornecedores-config", "/qualidade/caixa"] },
       { modulo: "Feed", telas: ["/feed"] },
     ],
     Qualidade: [
       { modulo: "Sac", telas: ["/sac/kanban"] },
-      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/caixa"] },
+      { modulo: "Qualidade", telas: ["/qualidade", "/qualidade/fornecedores-config", "/qualidade/caixa"] },
       { modulo: "Compras", telas: ["/compras/kanban"] },
       { modulo: "Feed", telas: ["/feed"] },
     ],

@@ -8,21 +8,24 @@ import AnimatedDatePicker from "@/components/AnimatedDatePicker";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import useSWR from "swr";
 
-// Simples Hook para pegar usuários (simplificado do contagem/page.tsx)
-const useUsuarios = () => {
-    const [usuarios, setUsuarios] = useState<any[]>([]);
-    useEffect(() => {
-        // Ajuste URL se necessário conforme env do usuário
-        fetch("http://sistema-service.acacessorios.local/usuarios")
-            .then(res => res.json())
-            .then(data => {
-                const arr = Array.isArray(data) ? data : [];
-                setUsuarios(arr);
-            })
-            .catch(err => console.error("Erro usuarios", err));
-    }, []);
-    return usuarios;
+type AuthMeResponse = {
+    authenticated?: boolean;
+    user?: {
+        id?: string;
+        usuario_id?: string;
+        sub?: string;
+        codigo?: string;
+    };
+};
+
+const authFetcher = async (url: string): Promise<AuthMeResponse> => {
+    const res = await fetch(url);
+    if (!res.ok) {
+        throw new Error("Não foi possível carregar o usuário autenticado");
+    }
+    return res.json();
 };
 
 export default function AuditoriaPage() {
@@ -53,11 +56,16 @@ export default function AuditoriaPage() {
     const [expandedHistory, setExpandedHistory] = useState<number | null>(null); // Toggle Histórico Inline
     const [historicoMap, setHistoricoMap] = useState<Record<number, any[]>>({}); // Cache de histórico por produto
 
-    const usuarios = useUsuarios();
+    const { data: authData } = useSWR("/api/auth/me", authFetcher, {
+        revalidateOnFocus: false,
+        shouldRetryOnError: false,
+    });
 
-    // Mock de usuário logado (pegar do contexto de auth real se existir)
-    // Vou pegar o primeiro usuário 'Estoque' que encontrar ou fixar um ID para teste se não tiver auth
-    const usuarioLogadoId = usuarios.find(u => u.setor === 'Estoque')?.id || "user_id_placeholder";
+    const usuarioLogadoId =
+        authData?.user?.id ||
+        authData?.user?.usuario_id ||
+        authData?.user?.sub ||
+        null;
 
     // 1. Fetch de Itens (Apenas pela DATA)
     const fetchItens = async () => {
@@ -99,6 +107,11 @@ export default function AuditoriaPage() {
     }, [piso, allItems]);
 
     const handleSave = async (item: AuditoriaItem) => {
+        if (!usuarioLogadoId) {
+            alert("Não foi possível identificar o usuário autenticado. Recarregue a página e tente novamente.");
+            return;
+        }
+
         const inputState = auditoriaValores[item.cod_produto] || { tipo: 'BAIXA' }; // Default Baixa se não começou
         const tipo = inputState.tipo || 'BAIXA';
         const qtd = inputState.qtd || 0;

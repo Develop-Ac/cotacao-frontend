@@ -13,6 +13,7 @@ interface ConfirmationModalProps {
     confirmText?: string;
     cancelText?: string;
     isLoading?: boolean;
+    showCancel?: boolean;
 }
 
 export default function ConfirmationModal({
@@ -23,7 +24,8 @@ export default function ConfirmationModal({
     onCancel,
     confirmText = "Confirmar",
     cancelText = "Cancelar",
-    isLoading = false
+    isLoading = false,
+    showCancel = true,
 }: ConfirmationModalProps) {
     if (!isOpen) return null;
 
@@ -56,13 +58,15 @@ export default function ConfirmationModal({
                             {message}
                         </p>
                         <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={onCancel}
-                                disabled={isLoading}
-                                className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium transition-colors disabled:opacity-50"
-                            >
-                                {cancelText}
-                            </button>
+                            {showCancel && (
+                                <button
+                                    onClick={onCancel}
+                                    disabled={isLoading}
+                                    className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {cancelText}
+                                </button>
+                            )}
                             <button
                                 onClick={onConfirm}
                                 disabled={isLoading}

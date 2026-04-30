@@ -4,17 +4,13 @@ import {
   FaSync,
   FaCaretDown,
   FaFilePdf,
-  FaCalculator,
-  FaCheckSquare,
-  FaSquare,
   FaSearch,
   FaFilter
 } from "react-icons/fa";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { serviceUrl } from "@/lib/services";
-import { NotaFiscalRow, StCalculationResult } from "@/types/icms";
-import StCalculationResults from "./components/StCalculationResults";
-import UnmatchedSelection from "./components/UnmatchedSelection";
+import { NotaFiscalRow } from "@/types/icms";
 
 // ===============================
 // Constants
@@ -22,10 +18,41 @@ import UnmatchedSelection from "./components/UnmatchedSelection";
 const COMPRAS_BASE = serviceUrl("compras");
 const SERVICE_URL = serviceUrl("calculadoraSt");
 const API_BASE = `${SERVICE_URL}/icms/nfe-distribuicao`;
-const CALCULATE_ENDPOINT = `${SERVICE_URL}/icms/calculate`;
+const LAUNCHED_SYNC_ENDPOINT = `${SERVICE_URL}/icms/nfe-lancadas/sync`;
 const DANFE_ENDPOINT = `${SERVICE_URL}/icms/danfe`;
+const LIST_STATE_KEY = "nf_list_state_v1";
+const LIST_LAST_VIEWED_KEY = "nf_last_viewed_chave_v1";
+
+const toInputDate = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const parseDecimal = (raw?: string | null) => {
+  const value = String(raw ?? "").trim();
+  if (!value) return 0;
+
+  let normalized = value;
+  if (normalized.includes(",") && normalized.includes(".")) {
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (normalized.includes(",")) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const extractVnfFromXml = (xml: string) => {
+  const match = xml.match(/<(?:\w+:)?vNF>([^<]+)<\/(?:\w+:)?vNF>/i);
+  return parseDecimal(match?.[1]);
+};
 
 export default function NotaFiscalList() {
+  const router = useRouter();
+
   // Paginação no front
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<10 | 20 | 50>(10);
@@ -33,28 +60,50 @@ export default function NotaFiscalList() {
   // Dados e estado
   const [items, setItems] = useState<NotaFiscalRow[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // Selection
-  const [selectedChaves, setSelectedChaves] = useState<Set<string>>(new Set());
-  const [analyzing, setAnalyzing] = useState(false);
-  const [results, setResults] = useState<StCalculationResult[] | null>(null);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [confirmSyncModalOpen, setConfirmSyncModalOpen] = useState(false);
+  const [syncJobId, setSyncJobId] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{
+    status: 'running' | 'completed' | 'failed';
+    totalEncontradas: number;
+    processadas: number;
+    inseridas: number;
+    ignoradas: number;
+    progresso: number;
+    logs: string[];
+    errorMessage?: string;
+  } | null>(null);
 
   // Persistence State
-  const [statusMap, setStatusMap] = useState<Record<string, { status: string, valor: number }>>({});
-
-  // Flow State
-  const [viewState, setViewState] = useState<'LIST' | 'UNMATCHED_SELECTION' | 'RESULTS'>('LIST');
-  const [tempResults, setTempResults] = useState<{ matched: StCalculationResult[], unmatched: StCalculationResult[] } | null>(null);
+  const [statusMap, setStatusMap] = useState<Record<string, {
+    status: string,
+    valor: number,
+    guiaGerada?: boolean,
+    guiaPath?: string,
+    status_conferencia_produtos?: 'OK' | 'ERRO' | 'SEM_RELACIONAMENTO' | 'PENDENTE',
+  }>>({});
+  const [returnFocusChave, setReturnFocusChave] = useState<string>("");
+  const [stateRestored, setStateRestored] = useState(false);
 
   // Filters
   const [dataSource, setDataSource] = useState<'DATABASE' | 'UPLOAD'>('DATABASE');
   const [showLaunched, setShowLaunched] = useState(false);
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 90);
+    return {
+      start: toInputDate(start),
+      end: toInputDate(end),
+    };
+  });
 
   // New Filters
   const [filterNumero, setFilterNumero] = useState("");
   const [filterEmitente, setFilterEmitente] = useState("");
   const [filterImposto, setFilterImposto] = useState("");
+  const [filterEstado, setFilterEstado] = useState<"TODOS" | "DENTRO" | "FORA">("TODOS");
+  const [filterModelo, setFilterModelo] = useState<"55" | "TODOS">("55");
 
   // Dropdown PageSize
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
@@ -84,6 +133,73 @@ export default function NotaFiscalList() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const rawState = window.sessionStorage.getItem(LIST_STATE_KEY);
+      if (rawState) {
+        const parsed = JSON.parse(rawState);
+        if (parsed && typeof parsed === "object") {
+          if (parsed.pageSize === 10 || parsed.pageSize === 20 || parsed.pageSize === 50) {
+            setPageSize(parsed.pageSize);
+          }
+          if (typeof parsed.page === "number" && parsed.page > 0) {
+            setPage(parsed.page);
+          }
+          if (parsed.dataSource === "DATABASE" || parsed.dataSource === "UPLOAD") {
+            setDataSource(parsed.dataSource);
+          }
+          if (typeof parsed.showLaunched === "boolean") {
+            setShowLaunched(parsed.showLaunched);
+          }
+          if (parsed.dateRange && typeof parsed.dateRange === "object") {
+            if (typeof parsed.dateRange.start === "string" && typeof parsed.dateRange.end === "string") {
+              setDateRange({ start: parsed.dateRange.start, end: parsed.dateRange.end });
+            }
+          }
+          if (typeof parsed.filterNumero === "string") setFilterNumero(parsed.filterNumero);
+          if (typeof parsed.filterEmitente === "string") setFilterEmitente(parsed.filterEmitente);
+          if (typeof parsed.filterImposto === "string") setFilterImposto(parsed.filterImposto);
+          if (parsed.filterEstado === "TODOS" || parsed.filterEstado === "DENTRO" || parsed.filterEstado === "FORA") {
+            setFilterEstado(parsed.filterEstado);
+          }
+          if (parsed.filterModelo === "55" || parsed.filterModelo === "TODOS") {
+            setFilterModelo(parsed.filterModelo);
+          }
+        }
+      }
+
+      const lastViewed = String(window.sessionStorage.getItem(LIST_LAST_VIEWED_KEY) || "").trim();
+      if (lastViewed) {
+        setReturnFocusChave(lastViewed);
+      }
+    } catch {
+      // Non-blocking: if state restore fails, screen continues with defaults.
+    } finally {
+      setStateRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !stateRestored) return;
+
+    const stateToPersist = {
+      page,
+      pageSize,
+      dataSource,
+      showLaunched,
+      dateRange,
+      filterNumero,
+      filterEmitente,
+      filterImposto,
+      filterEstado,
+      filterModelo,
+    };
+
+    window.sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(stateToPersist));
+  }, [stateRestored, page, pageSize, dataSource, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado, filterModelo]);
+
   // ---------- CARREGAMENTO ----------
   const fetchAll = useCallback(async () => {
     if (dataSource === 'UPLOAD') {
@@ -100,7 +216,12 @@ export default function NotaFiscalList() {
 
     setLoading(true);
     try {
-      const res = await fetch(API_BASE, {
+      const params = new URLSearchParams();
+      if (dateRange.start) params.set("start", dateRange.start);
+      if (dateRange.end) params.set("end", dateRange.end);
+      const endpoint = params.toString() ? `${API_BASE}?${params.toString()}` : API_BASE;
+
+      const res = await fetch(endpoint, {
         method: "GET",
         headers: { Accept: "application/json" },
         signal: ctrl.signal,
@@ -140,12 +261,23 @@ export default function NotaFiscalList() {
     } finally {
       setLoading(false);
     }
-  }, [dataSource]);
+  }, [dataSource, dateRange.start, dateRange.end]);
 
   // carrega ao montar
   useEffect(() => {
+    if (!stateRestored) return;
     fetchAll();
-  }, [fetchAll]);
+  }, [stateRestored, fetchAll]);
+
+  const compareInvoiceOrder = useCallback((a: NotaFiscalRow, b: NotaFiscalRow) => {
+    const dateA = new Date(a.DATA_EMISSAO || 0).getTime();
+    const dateB = new Date(b.DATA_EMISSAO || 0).getTime();
+    if (dateB !== dateA) return dateB - dateA;
+
+    const chaveA = String(a.CHAVE_NFE || "");
+    const chaveB = String(b.CHAVE_NFE || "");
+    return chaveB.localeCompare(chaveA);
+  }, []);
 
   // paginação no front
   const filteredItems = useMemo(() => {
@@ -156,10 +288,33 @@ export default function NotaFiscalList() {
       // Filter by Date
       if (!dateRange.start && !dateRange.end) return true;
       const d = new Date(i.DATA_EMISSAO);
-      if (dateRange.start && d < new Date(dateRange.start)) return false;
-      if (dateRange.end && d > new Date(dateRange.end)) return false;
+      if (dateRange.start) {
+        const startDate = new Date(`${dateRange.start}T00:00:00`);
+        if (d < startDate) return false;
+      }
+      if (dateRange.end) {
+        const endDate = new Date(`${dateRange.end}T23:59:59.999`);
+        if (d > endDate) return false;
+      }
       return true;
     });
+
+    if (filterModelo !== 'TODOS') {
+      filtered = filtered.filter(i => {
+        const chave = i.CHAVE_NFE || '';
+        // Modelo do documento na chave de acesso (posições 21-22, 1-based)
+        const modelo = chave.length >= 22 ? chave.substring(20, 22) : '';
+        return modelo === filterModelo;
+      });
+    }
+
+    if (filterEstado !== 'TODOS') {
+      filtered = filtered.filter(i => {
+        const ufEmitente = i.CHAVE_NFE?.slice(0, 2) || '';
+        const dentroMt = ufEmitente === '51';
+        return filterEstado === 'DENTRO' ? dentroMt : !dentroMt;
+      });
+    }
 
     if (filterNumero) {
       filtered = filtered.filter(i => {
@@ -187,8 +342,10 @@ export default function NotaFiscalList() {
       });
     }
 
+    filtered.sort(compareInvoiceOrder);
+
     return filtered;
-  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto]);
+  }, [items, showLaunched, dateRange, filterNumero, filterEmitente, filterImposto, filterEstado, filterModelo, compareInvoiceOrder]);
 
   const total = filteredItems.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -212,25 +369,14 @@ export default function NotaFiscalList() {
     return d.toLocaleDateString("pt-BR");
   };
 
-  // --- SELETION LOGIC ---
-  const toggleSelect = (chave: string) => {
-    const next = new Set(selectedChaves);
-    if (next.has(chave)) next.delete(chave);
-    else next.add(chave);
-    setSelectedChaves(next);
-  };
+  const getXmlType = (row: NotaFiscalRow): 'COMPLETO' | 'RESUMO' | 'SEM_XML' => {
+    if (row.XML_TIPO) return row.XML_TIPO;
 
-  const toggleSelectAll = () => {
-    if (selectedChaves.size === paged.length && paged.length > 0) {
-      setSelectedChaves(new Set());
-    } else {
-      const next = new Set<string>();
-      paged.forEach(r => next.add(r.CHAVE_NFE));
-      setSelectedChaves(next);
-    }
+    const xml = String(row.XML_COMPLETO || '').toLowerCase();
+    if (!xml.trim()) return 'SEM_XML';
+    if (xml.includes('<det') && xml.includes('<prod')) return 'COMPLETO';
+    return 'RESUMO';
   };
-
-  const isAllSelected = paged.length > 0 && paged.every(r => selectedChaves.has(r.CHAVE_NFE));
 
   // --- UPLOAD LOGIC ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,7 +415,7 @@ export default function NotaFiscalList() {
           new Date().toISOString();
 
         // Extract valor total da NF-e
-        const valorTotal = parseFloat(xmlText.match(/<vNF>([\d.]+)<\/vNF>/)?.[1] ?? '0');
+        const valorTotal = extractVnfFromXml(xmlText);
 
         loadedItems.push({
           EMPRESA: 0,
@@ -290,8 +436,8 @@ export default function NotaFiscalList() {
         alert('Nenhum arquivo XML com chave NF-e válida encontrado.');
         setDataSource('DATABASE');
       } else {
+        loadedItems.sort(compareInvoiceOrder);
         setItems(loadedItems);
-        setSelectedChaves(new Set());
       }
     } catch (err) {
       console.error('Erro ao carregar arquivos XML:', err);
@@ -300,62 +446,6 @@ export default function NotaFiscalList() {
       setLoading(false);
       e.target.value = '';
     }
-  };
-
-  // --- CALCULATION LOGIC ---
-  const handleCalculate = async () => {
-    setAnalyzing(true);
-    try {
-      const selectedRows = items.filter(r => selectedChaves.has(r.CHAVE_NFE));
-      const xmls = selectedRows.map(r => r.XML_COMPLETO).filter(Boolean) as string[];
-
-      if (xmls.length === 0) {
-        alert("Nenhum XML disponível para as notas selecionadas.");
-        setAnalyzing(false);
-        return;
-      }
-
-      const res = await fetch(CALCULATE_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({ xmls })
-      });
-
-      if (!res.ok) throw new Error("Erro ao calcular.");
-
-      const allData: StCalculationResult[] = await res.json();
-
-      // We no longer bypass items that matched. EVERY item goes to selection.
-      setTempResults({ matched: [], unmatched: allData });
-      setViewState('UNMATCHED_SELECTION');
-
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao calcular.");
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
-  const handleConfirmUnmatched = (selectedIndices: Set<number>, taxTypes: Record<number, 'ST' | 'DIFAL' | 'TRIBUTADA'>) => {
-    if (!tempResults) return;
-
-    // tempResults.unmatched arrays holds ALL items now (we passed allData into it)
-    const finalized = tempResults.unmatched.reduce((acc, item, idx) => {
-      if (selectedIndices.has(idx)) {
-        acc.push({ ...item, impostoEscolhido: taxTypes[idx] });
-      }
-      return acc;
-    }, [] as StCalculationResult[]);
-
-    setResults(finalized);
-    setViewState('RESULTS');
-  };
-
-  const handleBackToList = () => {
-    setResults(null);
-    setTempResults(null);
-    setViewState('LIST');
   };
 
   // --- DOWNLOAD PDF LOGIC ---
@@ -387,17 +477,168 @@ export default function NotaFiscalList() {
     }
   };
 
+  const handleOpenInvoiceDetails = (row: NotaFiscalRow) => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(LIST_LAST_VIEWED_KEY, row.CHAVE_NFE);
+    }
+    router.push(`/compras/notaFiscal/notaFiscal/${row.CHAVE_NFE}`);
+  };
+
+  useEffect(() => {
+    if (!returnFocusChave) return;
+
+    const itemIndex = filteredItems.findIndex((item) => item.CHAVE_NFE === returnFocusChave);
+    if (itemIndex < 0) return;
+
+    const targetPage = Math.floor(itemIndex / pageSize) + 1;
+    if (page !== targetPage) {
+      setPage(targetPage);
+      return;
+    }
+
+    const rowEl = document.querySelector(`[data-nf-chave="${returnFocusChave}"]`) as HTMLElement | null;
+    if (rowEl) {
+      rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(LIST_LAST_VIEWED_KEY);
+    }
+    setReturnFocusChave("");
+  }, [returnFocusChave, filteredItems, pageSize, page]);
+
+  const handleSyncLaunchedInvoices = async () => {
+    try {
+      setConfirmSyncModalOpen(false);
+      setSyncModalOpen(true);
+      setSyncStatus({
+        status: 'running',
+        totalEncontradas: 0,
+        processadas: 0,
+        inseridas: 0,
+        ignoradas: 0,
+        progresso: 0,
+        logs: ['Iniciando sincronização...'],
+      });
+
+      const res = await fetch(LAUNCHED_SYNC_ENDPOINT, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        let msg = `Erro HTTP: ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = Array.isArray(j.message) ? j.message.join(", ") : j.message;
+        } catch { }
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      if (!data?.jobId) {
+        throw new Error('Não foi possível iniciar o job de sincronização.');
+      }
+      setSyncJobId(data.jobId);
+    } catch (err: any) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Erro ao buscar NFs lançadas:", msg);
+      setSyncStatus({
+        status: 'failed',
+        totalEncontradas: 0,
+        processadas: 0,
+        inseridas: 0,
+        ignoradas: 0,
+        progresso: 0,
+        logs: ['Falha ao iniciar sincronização.'],
+        errorMessage: msg,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!syncJobId) return;
+
+    let canceled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${LAUNCHED_SYNC_ENDPOINT}/${syncJobId}`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+
+        if (!res.ok) throw new Error(`Erro ao consultar status: ${res.status}`);
+
+        const statusData = await res.json();
+        if (canceled) return;
+
+        if (statusData?.status) {
+          setSyncStatus(statusData);
+
+          if (statusData.status === 'running') {
+            timer = setTimeout(poll, 1000);
+          } else {
+            await fetchAll();
+          }
+        } else {
+          const notFoundMessage = statusData?.message || 'Status do job não disponível.';
+          setSyncStatus(prev => ({
+            status: 'failed',
+            totalEncontradas: prev?.totalEncontradas ?? 0,
+            processadas: prev?.processadas ?? 0,
+            inseridas: prev?.inseridas ?? 0,
+            ignoradas: prev?.ignoradas ?? 0,
+            progresso: prev?.progresso ?? 0,
+            logs: [...(prev?.logs ?? []), `Falha ao consultar status: ${notFoundMessage}`],
+            errorMessage: notFoundMessage,
+          }));
+          setSyncJobId(null);
+        }
+      } catch (error) {
+        if (canceled) return;
+        setSyncStatus(prev => ({
+          status: 'failed',
+          totalEncontradas: prev?.totalEncontradas ?? 0,
+          processadas: prev?.processadas ?? 0,
+          inseridas: prev?.inseridas ?? 0,
+          ignoradas: prev?.ignoradas ?? 0,
+          progresso: prev?.progresso ?? 0,
+          logs: [...(prev?.logs ?? []), 'Falha ao consultar status da sincronização.'],
+          errorMessage: error instanceof Error ? error.message : String(error),
+        }));
+        setSyncJobId(null);
+      }
+    };
+
+    poll();
+
+    return () => {
+      canceled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [syncJobId, fetchAll]);
+
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-      {/* Header visible only in LIST or maybe always? keeping explicit for now */}
-      {viewState === 'LIST' && (
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <div>
-            <h3 className="text-2xl font-semibold mb-1 text-black dark:text-white">ICMS ST - Portaria 195/2019</h3>
+            <h3 className="text-2xl font-semibold mb-1 text-black dark:text-white">Notas Fiscais de Entrada</h3>
             <p className="text-sm text-gray-500">Conciliação de Notas Fiscais e Cálculo de Guia Complementar</p>
           </div>
 
           <div className="flex items-center gap-2 mt-4 md:mt-0">
+            <button
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 hover:text-gray-700 transition-all active:scale-95 disabled:opacity-50 dark:bg-meta-4 dark:text-gray-300 dark:border-strokedark"
+              onClick={() => setConfirmSyncModalOpen(true)}
+              disabled={dataSource === 'UPLOAD' || syncStatus?.status === 'running'}
+              title="Buscar NFs lançadas na NF_ENTRADA_XML"
+            >
+              <FaFilter size={14} />
+              <span className="text-sm">Buscar NFs lançadas</span>
+            </button>
+
             <div className="flex bg-gray-100 dark:bg-meta-4 rounded-lg p-1 mr-4">
               <button
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${dataSource === 'DATABASE' ? 'bg-white shadow text-primary dark:bg-boxdark dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
@@ -413,17 +654,6 @@ export default function NotaFiscalList() {
                 <input type="file" id="file-upload" multiple accept=".xml" className="hidden" onChange={handleFileUpload} />
               </button>
             </div>
-
-            {selectedChaves.size > 0 && (
-              <button
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all active:scale-95"
-                onClick={handleCalculate}
-                disabled={analyzing}
-              >
-                <FaCalculator size={16} />
-                <span>Calcular ({selectedChaves.size})</span>
-              </button>
-            )}
 
             <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-600 dark:text-gray-300 mr-4">
               <div className="relative">
@@ -448,41 +678,39 @@ export default function NotaFiscalList() {
               <FaSync className={loading ? "animate-spin" : ""} size={18} />
             </button>
           </div>
-        </div>
-      )}
+      </div>
 
       <div id="list">
         <div className="w-full">
-          {viewState === 'LIST' && (
-            <>
+          <>
               {/* FILTERS BAR */}
-              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-4 mb-6 border border-gray-100 dark:border-strokedark flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+              <div className="bg-white dark:bg-boxdark rounded-xl shadow-sm p-3 mb-6 border border-gray-100 dark:border-strokedark overflow-hidden">
+                <div className="flex flex-nowrap items-center gap-2 w-full">
                   {/* Search Nota */}
-                  <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
-                    <div className="pl-3 pr-2 text-gray-400">
-                      <FaSearch size={14} />
+                  <div className="flex items-center h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                    <div className="pl-2 pr-1.5 text-gray-400">
+                      <FaSearch size={12} />
                     </div>
                     <input
                       type="text"
-                      placeholder="Nº da Nota ou Chave..."
+                      placeholder="Nº/Chave"
                       value={filterNumero}
                       onChange={(e) => setFilterNumero(e.target.value)}
-                      className="w-full h-full bg-transparent outline-none text-sm text-black dark:text-white placeholder:text-gray-400 min-w-0"
+                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
                     />
                   </div>
 
                   {/* Search Emitente */}
-                  <div className="flex items-center h-10 w-full sm:w-64 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
-                    <div className="pl-3 pr-2 text-gray-400">
-                      <FaSearch size={14} />
+                  <div className="flex items-center h-9 w-[14%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 overflow-hidden shadow-sm transition-all">
+                    <div className="pl-2 pr-1.5 text-gray-400">
+                      <FaSearch size={12} />
                     </div>
                     <input
                       type="text"
-                      placeholder="Emitente ou CNPJ..."
+                      placeholder="Emitente/CNPJ"
                       value={filterEmitente}
                       onChange={(e) => setFilterEmitente(e.target.value)}
-                      className="w-full h-full bg-transparent outline-none text-sm text-black dark:text-white placeholder:text-gray-400 min-w-0"
+                      className="w-full h-full bg-transparent outline-none text-xs text-black dark:text-white placeholder:text-gray-400 min-w-0"
                     />
                   </div>
 
@@ -490,7 +718,7 @@ export default function NotaFiscalList() {
                   <select
                     value={filterImposto}
                     onChange={(e) => setFilterImposto(e.target.value)}
-                    className="h-10 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-sm px-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white"
+                    className="h-9 w-[13%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
                   >
                     <option value="">Filtro Imposto: Todos</option>
                     <option value="ST">Somente ICMS ST</option>
@@ -498,13 +726,50 @@ export default function NotaFiscalList() {
                     <option value="TRIBUTADA">Tributada</option>
                     <option value="NENHUM">Não Selecionado / Sem Imposto</option>
                   </select>
+
+                  <select
+                    value={filterModelo}
+                    onChange={(e) => setFilterModelo(e.target.value as "55" | "TODOS")}
+                    className="h-9 w-[12%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                  >
+                    <option value="55">Modelo 55</option>
+                    <option value="TODOS">Todos modelos</option>
+                  </select>
+
+                  <select
+                    value={filterEstado}
+                    onChange={(e) => setFilterEstado(e.target.value as "TODOS" | "DENTRO" | "FORA")}
+                    className="h-9 w-[17%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                  >
+                    <option value="TODOS">Estado: Todos</option>
+                    <option value="DENTRO">Somente Dentro do Estado (MT)</option>
+                    <option value="FORA">Somente Fora do Estado</option>
+                  </select>
+
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
+                    className="h-9 w-[15%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    title="Data de emissão inicial"
+                    aria-label="Data de emissão inicial"
+                  />
+
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
+                    className="h-9 w-[15%] min-w-0 border border-gray-200 dark:border-form-strokedark rounded-lg bg-gray-50 dark:bg-meta-4/30 text-xs px-2 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 shadow-sm text-black dark:text-white transition-all"
+                    title="Data de emissão final"
+                    aria-label="Data de emissão final"
+                  />
                 </div>
               </div>
 
               <div className="bg-white dark:bg-boxdark rounded-xl shadow-md border border-gray-100 dark:border-strokedark">
                 <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-strokedark bg-gray-50/50 dark:bg-meta-4/20 rounded-t-xl">
                   <div className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-                    {dataSource === 'DATABASE' ? 'Notas Recentes (Entrada Própria)' : 'Arquivos Carregados'}
+                    {dataSource === 'DATABASE' ? 'Notas Fiscais de Entrada' : 'Arquivos Carregados'}
                   </div>
                   <div className="relative" ref={pageSizeRef}>
                     <button
@@ -538,11 +803,6 @@ export default function NotaFiscalList() {
                   <table className="text-left border-collapse table-fixed min-w-full">
                     <thead className="sticky top-[0px] z-20 shadow-sm bg-gray-50 dark:bg-meta-4 text-gray-600 dark:text-gray-300 text-xs uppercase font-semibold">
                       <tr>
-                        <th className="py-4 px-4 w-[50px] text-center border-b border-gray-200 dark:border-strokedark">
-                          <button onClick={toggleSelectAll} className="text-gray-600 dark:text-gray-300 hover:text-blue-600 transition-colors">
-                            {isAllSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
-                          </button>
-                        </th>
                         <th className="w-[140px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Status Cálculo</th>
                         <th className="w-[120px] py-4 px-4 text-right border-b border-gray-200 dark:border-strokedark">Valor Guia</th>
                         <th className="w-[200px] py-4 px-4 border-b border-gray-200 dark:border-strokedark">Nota Fiscal / Chave</th>
@@ -556,39 +816,73 @@ export default function NotaFiscalList() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-strokedark text-sm">
                       {paged.map((row, idx) => {
-                        const isSelected = selectedChaves.has(row.CHAVE_NFE);
+                        const isReturnFocused = row.CHAVE_NFE === returnFocusChave;
+                        const rowStatus = statusMap[row.CHAVE_NFE];
+                        const rowStatusText = String(rowStatus?.status || "").trim();
+                        const rowProductStatus = String(rowStatus?.status_conferencia_produtos || "PENDENTE").toUpperCase();
                         const numNota = row.CHAVE_NFE ? row.CHAVE_NFE.substring(25, 34).replace(/^0+/, '') : "N/A";
+                        const xmlType = getXmlType(row);
 
                         return (
-                          <tr key={row.CHAVE_NFE ?? idx} className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark ${isSelected ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}>
-                            <td className="py-3 px-4 text-center align-top pt-4">
-                              <button onClick={() => toggleSelect(row.CHAVE_NFE)} className={`transition-colors ${isSelected ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
-                                {isSelected ? <FaCheckSquare size={16} /> : <FaSquare size={16} />}
-                              </button>
-                            </td>
+                          <tr
+                            key={row.CHAVE_NFE ?? idx}
+                            data-nf-chave={row.CHAVE_NFE}
+                            onClick={() => handleOpenInvoiceDetails(row)}
+                            className={`group transition-colors relative border-b border-gray-50 dark:border-strokedark cursor-pointer ${isReturnFocused ? 'bg-blue-50/60 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-meta-4'}`}
+                            title="Clique para abrir detalhes da nota"
+                          >
                             <td className="py-3 px-4 align-top pt-4">
                               <div className="flex flex-col gap-1.5 items-start">
-                                {statusMap[row.CHAVE_NFE] ? (
-                                  <span title={statusMap[row.CHAVE_NFE].status} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border cursor-help 
-                                            ${statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30' :
-                                      statusMap[row.CHAVE_NFE].status.includes('Tributado') ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30' : 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/10'}`}>
-                                    {statusMap[row.CHAVE_NFE].status.includes('Tem Guia') ? <><div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>Tem Guia</> :
-                                      statusMap[row.CHAVE_NFE].status.includes('Tributado') ? <><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>Tributado</> : <><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>Verificado</>}
+                                {rowStatus ? (
+                                  <span title={rowStatusText || 'Guia Anexada'} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border cursor-help 
+                                            ${rowStatusText.includes('Tem Guia') ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30' :
+                                      rowStatusText.includes('Tributado') ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30' :
+                                        rowStatusText ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/10' : 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20'}`}>
+                                    {rowStatusText.includes('Tem Guia') ? <><div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>Tem Guia</> :
+                                      rowStatusText.includes('Tributado') ? <><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>Tributado</> :
+                                        rowStatusText ? <><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>Verificado</> : <><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>Guia Anexada</>}
                                   </span>
                                 ) : (
                                   <span className="text-xs text-gray-400 italic">Pendente</span>
                                 )}
+
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold border whitespace-nowrap ${
+                                    rowProductStatus === 'OK'
+                                      ? 'bg-green-50 text-green-700 border-green-200 text-[10px]'
+                                      : rowProductStatus === 'ERRO'
+                                        ? 'bg-red-50 text-red-700 border-red-200 text-[10px]'
+                                        : rowProductStatus === 'SEM_RELACIONAMENTO'
+                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200 text-[9px]'
+                                          : 'bg-gray-50 text-gray-600 border-gray-200 text-[10px]'
+                                  }`}
+                                  title="Status da conferência dos produtos"
+                                >
+                                  {rowProductStatus === 'OK'
+                                    ? 'Produtos OK'
+                                    : rowProductStatus === 'ERRO'
+                                      ? 'Produtos com Erro'
+                                      : rowProductStatus === 'SEM_RELACIONAMENTO'
+                                        ? 'Sem Relacionamento'
+                                        : 'Produtos Pendente'}
+                                </span>
                               </div>
                             </td>
                             <td className="py-3 px-4 text-right align-top pt-4">
                               <div className="flex flex-col items-end">
-                                {statusMap[row.CHAVE_NFE] && statusMap[row.CHAVE_NFE].valor > 0 ? (
+                                {rowStatus && rowStatus.valor > 0 ? (
                                   <span className="text-sm font-mono text-red-600 dark:text-red-400 font-bold">
-                                    R$ {statusMap[row.CHAVE_NFE].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    R$ {rowStatus.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                   </span>
                                 ) : (
                                   <span className="text-sm text-gray-400 font-medium">-</span>
                                 )}
+
+                                {rowStatus?.guiaGerada ? (
+                                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700 border border-yellow-200">
+                                    Guia Gerada
+                                  </span>
+                                ) : null}
                               </div>
                             </td>
                             <td className="py-3 px-4 align-top pt-4">
@@ -598,6 +892,16 @@ export default function NotaFiscalList() {
                                 </span>
                                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono tracking-wider" title={row.CHAVE_NFE}>
                                   {row.CHAVE_NFE.substring(0, 4)} {row.CHAVE_NFE.substring(4, 20)}...
+                                </span>
+                                <span
+                                  className={`inline-flex w-fit items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold border ${xmlType === 'COMPLETO'
+                                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                    : xmlType === 'RESUMO'
+                                      ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300'
+                                      : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300'}`}
+                                  title={xmlType === 'COMPLETO' ? 'XML completo disponível' : xmlType === 'RESUMO' ? 'Apenas XML resumo disponível' : 'XML não disponível'}
+                                >
+                                  {xmlType === 'COMPLETO' ? 'XML completo' : xmlType === 'RESUMO' ? 'Somente resumo' : 'Sem XML'}
                                 </span>
                                 {row.VALOR_TOTAL ? <span className="text-xs text-green-600 dark:text-green-400 font-semibold mt-0.5">Vlr NFe: R$ {row.VALOR_TOTAL.toFixed(2)}</span> : null}
                               </div>
@@ -634,7 +938,16 @@ export default function NotaFiscalList() {
                             </td>
                             <td className="py-3 px-4 text-center align-top pt-4">
                               <div className="flex justify-center">
-                                <button onClick={() => handleDownloadPdf(row)} className="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Baixar PDF DANFE"><FaFilePdf className="w-5 h-5" /></button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadPdf(row);
+                                  }}
+                                  className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+                                  title="Baixar PDF DANFE"
+                                >
+                                  <FaFilePdf className="w-5 h-5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -642,7 +955,7 @@ export default function NotaFiscalList() {
                       })}
                       {!loading && paged.length === 0 && (
                         <tr>
-                          <td colSpan={10} className="py-12 px-4 text-center text-gray-500">
+                          <td colSpan={9} className="py-12 px-4 text-center text-gray-500">
                             <div className="flex flex-col items-center justify-center">
                               <div className="bg-gray-100 dark:bg-meta-4/50 p-4 rounded-full mb-3">
                                 <FaSearch size={24} className="text-gray-400" />
@@ -656,7 +969,7 @@ export default function NotaFiscalList() {
                         </tr>
                       )}
                       {loading && (
-                        <tr><td colSpan={10} className="py-10 px-4 text-center text-gray-500">
+                        <tr><td colSpan={9} className="py-10 px-4 text-center text-gray-500">
                           <div className="flex flex-col items-center justify-center gap-3">
                             <FaSync className="animate-spin text-primary" size={24} />
                             <p>Carregando notas fiscais...</p>
@@ -675,31 +988,118 @@ export default function NotaFiscalList() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
-
-          {viewState === 'UNMATCHED_SELECTION' && tempResults && (
-            <UnmatchedSelection
-              unmatchedItems={tempResults.unmatched}
-              onConfirm={handleConfirmUnmatched}
-              onCancel={handleBackToList}
-            />
-          )}
-
-          {viewState === 'RESULTS' && results && (
-            <StCalculationResults
-              results={results}
-              originalItems={items}
-              selectedInvoices={selectedChaves}
-              onBack={handleBackToList}
-              onSuccess={() => {
-                handleBackToList();
-                fetchAll();
-              }}
-            />
-          )}
+          </>
         </div>
       </div>
+
+      {syncModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-boxdark border border-gray-100 dark:border-strokedark shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-strokedark">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Log da Busca de NFs Lançadas</h4>
+              <button
+                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-strokedark text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                onClick={() => {
+                  if (syncStatus?.status !== 'running') {
+                    setSyncModalOpen(false);
+                    setSyncJobId(null);
+                  }
+                }}
+                disabled={syncStatus?.status === 'running'}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Encontradas</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{syncStatus?.totalEncontradas ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Processadas</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{syncStatus?.processadas ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Inseridas</p>
+                  <p className="text-lg font-semibold text-emerald-600">{syncStatus?.inseridas ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark p-3">
+                  <p className="text-xs text-gray-500">Ignoradas</p>
+                  <p className="text-lg font-semibold text-amber-600">{syncStatus?.ignoradas ?? 0}</p>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progresso</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{syncStatus?.progresso ?? 0}%</span>
+                </div>
+                <div className="h-3 w-full rounded-full bg-gray-200 dark:bg-meta-4 overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${Math.max(0, Math.min(100, syncStatus?.progresso ?? 0))}%` }}
+                  />
+                </div>
+              </div>
+
+              {syncStatus?.errorMessage && (
+                <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">
+                  {syncStatus.errorMessage}
+                </div>
+              )}
+
+              <div className="rounded-lg border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4/20 p-3 h-52 overflow-auto">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Eventos</p>
+                <div className="space-y-1">
+                  {(syncStatus?.logs ?? []).map((log, idx) => (
+                    <p key={`${idx}-${log}`} className="text-xs font-mono text-gray-700 dark:text-gray-300">{log}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmSyncModalOpen && (
+        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white dark:bg-boxdark border border-gray-100 dark:border-strokedark shadow-2xl">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-strokedark">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Confirmar busca de NFs lançadas</h4>
+            </div>
+
+            <div className="px-5 py-4 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+              <p>
+                Essa consulta pode demorar alguns minutos, dependendo do volume de notas no ERP.
+              </p>
+              <p className="font-medium text-amber-700 dark:text-amber-300">
+                Após iniciar, o processo não poderá ser cancelado.
+              </p>
+              <p>
+                Deseja continuar?
+              </p>
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100 dark:border-strokedark flex items-center justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-strokedark text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-meta-4"
+                onClick={() => setConfirmSyncModalOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
+                onClick={handleSyncLaunchedInvoices}
+                disabled={syncStatus?.status === 'running'}
+              >
+                Iniciar busca
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
