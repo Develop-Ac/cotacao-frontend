@@ -102,7 +102,7 @@ const parseAnexos = (payload: unknown): Anexo[] =>
           }
           return null;
         })
-        .filter((item): item is Anexo => Boolean(item))
+        .filter((item): item is Anexo => item !== null)
     : [];
 
 const ensureDate = (value: unknown): Date => {
