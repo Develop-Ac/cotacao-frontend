@@ -218,7 +218,7 @@ export default function RootLayout({
         return [
           { label: 'Usuários', href: '/sistema' },
           ...(canViewUsuarios ? [{ label: 'E-mails', href: '/sistema/email' }] : []),
-          { label: 'Usuários (Legado)', href: '/usuario' },
+          // { label: 'Usuários (Legado)', href: '/usuario' },
         ];
       default:
         return [];
