@@ -968,7 +968,7 @@ export default function NotaFiscalDetailsPage() {
     const rows = itensComErro
       .map((item) => {
         const divergencias = item.divergencias
-          .map((div) => `<li>${escapeHtml(normalizeValidationMessage(div))}</li>`)
+          .map((div) => `<li>${escapeHtml(normalizeValidationMessage(div, item.impostoEscolhido))}</li>`)
           .join("");
 
         return `
@@ -1161,13 +1161,13 @@ export default function NotaFiscalDetailsPage() {
     return "bg-gray-100 text-gray-600";
   }, [paymentStatus?.status_conferencia_produtos]);
 
-  const normalizeValidationMessage = (message: string) => {
+  const normalizeValidationMessage = (message: string, imposto?: ImpostoEscolhido) => {
     const raw = String(message || "").trim();
     if (!raw) return "";
 
     const cstStInvalid = raw.match(/ST_CODIGO inválido para item com ICMS ST: esperado\s+([^\s.]+)\s+e encontrado\s+([^.]+)\./i);
     if (cstStInvalid) {
-      const expected = String(cstStInvalid[1] || "ST0-X").trim();
+      const expected = imposto === "TRIBUTADA" ? "TR0-X" : String(cstStInvalid[1] || "ST0-X").trim();
       const found = String(cstStInvalid[2] || "vazio").trim();
       return `Código da Sit. Tributária: Encontrado ${found}, modificar para ${expected}.`;
     }
@@ -1228,12 +1228,12 @@ export default function NotaFiscalDetailsPage() {
 
   const getConferenceMessages = (item: FiscalCheckItemResult, imposto?: ImpostoEscolhido): ConferenceMessage[] => {
     const conformidadesConferencia = getConferenceConformidades(item, imposto)
-      .map((msg) => normalizeValidationMessage(msg))
+      .map((msg) => normalizeValidationMessage(msg, imposto))
       .filter(Boolean)
       .map((text) => ({ text, type: "ok" as const }));
 
     const divergenciasConferencia = (item.divergencias || [])
-      .map((msg) => normalizeValidationMessage(msg))
+      .map((msg) => normalizeValidationMessage(msg, imposto))
       .filter(Boolean)
       .map((text) => ({ text, type: "error" as const }));
 
