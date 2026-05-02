@@ -31,6 +31,7 @@ export interface TimelineHistoricoItem extends TimelineBase {
 
 export interface TimelineEmailItem extends TimelineBase {
   kind: "email";
+  messageId?: string | null;
   assunto: string;
   remetente: string;
   destinatarios: string;

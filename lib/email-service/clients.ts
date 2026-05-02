@@ -5,6 +5,7 @@ import {
   MailAccount,
   MailAttachment,
   MailMessage,
+  MailMessageResolution,
   MailParticipant,
   MailThread,
   PaginationParams,
@@ -106,6 +107,18 @@ const toAccount = (item: Record<string, unknown>): MailAccount => ({
   updatedAt: String(item.updatedAt ?? item.updated_at ?? new Date().toISOString()),
 });
 
+const toMessageResolution = (item: Record<string, unknown>): MailMessageResolution => ({
+  messageId: item.message_id == null ? null : Number(item.message_id),
+  accountId: item.account_id == null ? null : Number(item.account_id),
+  threadId: item.thread_id == null ? null : Number(item.thread_id),
+  parentMessageId: item.parent_message_id == null ? null : Number(item.parent_message_id),
+  internetMessageId: (item.internet_message_id ?? null) as string | null,
+  providerMessageId: (item.provider_message_id ?? null) as string | null,
+  outboundMessageId: item.outbound_message_id == null ? null : Number(item.outbound_message_id),
+  subject: (item.subject ?? null) as string | null,
+  direction: (item.direction ?? null) as string | null,
+});
+
 export const mailAccountsClient = {
   async list(): Promise<MailAccount[]> {
     const res = await emailApiFetch('/api/mail-accounts');
@@ -171,6 +184,14 @@ export const mailMessagesClient = {
     const data = await res.json();
     if (!data || typeof data !== 'object') return null;
     return toMessage(data as Record<string, unknown>);
+  },
+
+  async resolve(messageRef: string): Promise<MailMessageResolution | null> {
+    const qs = toQueryString({ messageRef });
+    const res = await emailApiFetch(`/internal/email/messages/resolve/by-reference${qs}`);
+    const data = await res.json();
+    if (!data || typeof data !== 'object') return null;
+    return toMessageResolution(data as Record<string, unknown>);
   },
 
   async delete(messageId: number): Promise<{ ok: boolean; messageId: number }> {

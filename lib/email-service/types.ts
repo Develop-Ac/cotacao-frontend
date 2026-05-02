@@ -101,6 +101,18 @@ export interface MailThread {
   lastMessageAt?: string | null;
 }
 
+export interface MailMessageResolution {
+  messageId?: number | null;
+  accountId?: number | null;
+  threadId?: number | null;
+  parentMessageId?: number | null;
+  internetMessageId?: string | null;
+  providerMessageId?: string | null;
+  outboundMessageId?: number | null;
+  subject?: string | null;
+  direction?: string | null;
+}
+
 export interface CreateManualLinkPayload {
   targetType: 'THREAD' | 'MESSAGE';
   targetId: number;

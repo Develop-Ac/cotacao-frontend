@@ -135,6 +135,7 @@ const makeEmailItem = (entry: Record<string, unknown>): TimelineEmailItem => {
     id: toNumber(entry.id) ?? Number(data),
     dataOcorrencia: data.toISOString(),
     isoData: data,
+    messageId: (entry.message_id ?? entry.messageId ?? null) as string | null,
     titulo: String(entry.assunto ?? "Interação por e-mail"),
     assunto: String(entry.assunto ?? "Interação por e-mail"),
     remetente: String(entry.remetente ?? entry.de ?? root.email_fornecedor ?? "Fornecedor"),

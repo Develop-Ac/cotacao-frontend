@@ -30,6 +30,8 @@ import { InfoLine } from "@/components/qualidade/InfoLine";
 import { FormModal } from "@/components/qualidade/FormModal";
 import { NovaGarantiaForm } from "@/components/qualidade/NovaGarantiaForm";
 import { QualidadeApi } from "@/lib/qualidade/api";
+import { mailAccountsClient, mailMessagesClient, mailOutboundClient } from "@/lib/email-service/clients";
+import { MailAccount, MailAttachment, MailMessage, MailMessageResolution, MailParticipant } from "@/lib/email-service/types";
 import { Garantia, TimelineEmailItem, TimelineItem, UploadAttachment } from "@/lib/qualidade/types";
 import { STATUS_CODES, STATUS_FLOW, getStatusDefinition } from "@/lib/qualidade/status";
 import { formatCurrency, formatDate, formatDateTime, parseBrDate, parseCurrencyInput, stripHtml } from "@/lib/qualidade/formatters";
@@ -63,6 +65,21 @@ type ColetaFormState = {
   codigo: string;
   obs: string;
 };
+
+type ComposeMode = "new" | "reply" | "replyAll" | "forward";
+
+type HistoricoEmailAttachment = {
+  key: string;
+  id: number;
+  fileName: string;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  contentId?: string | null;
+  storageKey?: string | null;
+  garantiaAnexo?: Garantia["anexos"][number];
+};
+
+const QUALIDADE_BOX = "QUALIDADE";
 
 const toggleButtonClasses = (active: boolean) =>
   `keep-color px-3 py-1.5 rounded-full border transition-colors duration-200 ${active
@@ -175,6 +192,98 @@ const summarizeEmailText = (html?: string | null, maxChars = 120): string => {
   const clean = stripHtml(html ?? "").replace(/\s+/g, " ").trim();
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, maxChars).trim()}...`;
+};
+
+const parseEmails = (value: string): Array<{ email: string }> =>
+  value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((email) => ({ email }));
+
+const parseMailParticipants = (value?: string | null): MailParticipant[] =>
+  value
+    ? value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((email) => ({ email }))
+    : [];
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const formatMailParticipant = (participant: MailParticipant): string =>
+  participant.name?.trim() ? `${participant.name.trim()} <${participant.email}>` : participant.email;
+
+const joinParticipants = (participants?: MailParticipant[] | null): string =>
+  (participants ?? []).map((participant) => formatMailParticipant(participant)).join(", ");
+
+const toSubject = (mode: ComposeMode, original?: string | null): string => {
+  const base = original?.trim() ?? "";
+  if (!base) return "";
+  if (mode === "reply" || mode === "replyAll") {
+    return /^re:/i.test(base) ? base : `Re: ${base}`;
+  }
+  if (mode === "forward") {
+    return /^enc:/i.test(base) ? base : `Enc: ${base}`;
+  }
+  return base;
+};
+
+const modeLabel = (mode: ComposeMode): string => {
+  if (mode === "reply") return "Responder";
+  if (mode === "replyAll") return "Responder todos";
+  if (mode === "forward") return "Encaminhar";
+  return "Novo e-mail";
+};
+
+const buildQuotedText = (mode: ComposeMode, source?: MailMessage | null, replyText?: string): string => {
+  const currentText = replyText?.trim() ?? "";
+  if (!source) return currentText;
+
+  const header =
+    mode === "forward"
+      ? `---------- Mensagem encaminhada ----------\nDe: ${source.fromAddress ?? ""}\nPara: ${joinParticipants(
+        source.to,
+      )}\nAssunto: ${source.subject ?? ""}`
+      : "----- Mensagem original -----";
+
+  const originalText = (source.bodyText || stripHtml(source.bodyHtml) || "").trim();
+  return [currentText, header, originalText].filter(Boolean).join("\n\n");
+};
+
+const buildQuotedHtml = (
+  mode: ComposeMode,
+  source?: MailMessage | null,
+  replyText?: string,
+  quotedHtml?: string,
+): string | undefined => {
+  const currentHtml = (replyText ?? "").trim() ? escapeHtml(replyText ?? "").replace(/\n/g, "<br />") : "";
+  if (!source) return currentHtml || undefined;
+
+  const originalHtml = quotedHtml || escapeHtml(source.bodyText ?? "").replace(/\n/g, "<br />");
+  const header =
+    mode === "forward"
+      ? `<div style="margin-bottom:12px;color:#475569;font-size:12px;line-height:1.5;"><div><strong>De:</strong> ${escapeHtml(
+        source.fromAddress ?? "",
+      )}</div><div><strong>Para:</strong> ${escapeHtml(joinParticipants(source.to))}</div><div><strong>Assunto:</strong> ${escapeHtml(
+        source.subject ?? "",
+      )}</div></div>`
+      : "";
+
+  const quoted = `<div style="margin-top:16px;padding-left:12px;border-left:3px solid #d1d5db;">${header}${originalHtml}</div>`;
+  return `${currentHtml}${currentHtml ? "<br /><br />" : ""}${quoted}`;
+};
+
+const isPreviewableHistoricoAttachment = (attachment: HistoricoEmailAttachment): boolean => {
+  const mimeType = (attachment.mimeType ?? "").toLowerCase();
+  return mimeType.startsWith("image/") || mimeType === "application/pdf" || mimeType.startsWith("text/");
 };
 
 const FINAL_STATUS_CODES = new Set<number>([
@@ -382,8 +491,22 @@ export default function GarantiaDetalhePage() {
   const [envioFrete, setEnvioFrete] = useState<"fornecedor" | "loja">("fornecedor");
   const [envioCorreio, setEnvioCorreio] = useState(false);
   const [codigoObjeto, setCodigoObjeto] = useState("");
+  const [mailAccounts, setMailAccounts] = useState<MailAccount[]>([]);
   const [emailHistoricoAberto, setEmailHistoricoAberto] = useState<TimelineEmailItem | null>(null);
   const [emailHistoricoHtml, setEmailHistoricoHtml] = useState("");
+  const [emailHistoricoErro, setEmailHistoricoErro] = useState<string | null>(null);
+  const [emailHistoricoLoading, setEmailHistoricoLoading] = useState(false);
+  const [emailHistoricoResolucao, setEmailHistoricoResolucao] = useState<MailMessageResolution | null>(null);
+  const [emailHistoricoDetalhe, setEmailHistoricoDetalhe] = useState<MailMessage | null>(null);
+  const [emailHistoricoAttachmentActionKey, setEmailHistoricoAttachmentActionKey] = useState<string | null>(null);
+  const [emailHistoricoAttachmentUrls, setEmailHistoricoAttachmentUrls] = useState<Record<string, string>>({});
+  const emailHistoricoAttachmentUrlsRef = useRef<Record<string, string>>({});
+  const [emailHistoricoComposeMode, setEmailHistoricoComposeMode] = useState<ComposeMode | null>(null);
+  const [emailHistoricoComposeTo, setEmailHistoricoComposeTo] = useState("");
+  const [emailHistoricoComposeCc, setEmailHistoricoComposeCc] = useState("");
+  const [emailHistoricoComposeSubject, setEmailHistoricoComposeSubject] = useState("");
+  const [emailHistoricoComposeBody, setEmailHistoricoComposeBody] = useState("");
+  const [emailHistoricoSending, setEmailHistoricoSending] = useState(false);
   const [anexoViewerOpen, setAnexoViewerOpen] = useState(false);
   const [anexoViewerIndex, setAnexoViewerIndex] = useState(0);
   const [anexoViewerLoading, setAnexoViewerLoading] = useState(false);
@@ -464,26 +587,219 @@ export default function GarantiaDetalhePage() {
     return QualidadeApi.gerarLinkArquivo(caminho);
   }, []);
 
+  const activeQualidadeAccount = useMemo(
+    () =>
+      mailAccounts.find(
+        (account) => account.tenantKey.toUpperCase() === QUALIDADE_BOX && account.statusCode === "ACTIVE",
+      ) ?? null,
+    [mailAccounts],
+  );
+
+  useEffect(() => {
+    emailHistoricoAttachmentUrlsRef.current = emailHistoricoAttachmentUrls;
+  }, [emailHistoricoAttachmentUrls]);
+
+  useEffect(() => {
+    let active = true;
+
+    void mailAccountsClient
+      .list()
+      .then((accounts) => {
+        if (active) {
+          setMailAccounts(accounts);
+        }
+      })
+      .catch(() => {
+        // Mantem fallback local quando a caixa nao puder ser carregada.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const closeEmailHistorico = useCallback(() => {
+    setEmailHistoricoAberto(null);
+    setEmailHistoricoHtml("");
+    setEmailHistoricoErro(null);
+    setEmailHistoricoResolucao(null);
+    setEmailHistoricoDetalhe(null);
+    setEmailHistoricoComposeMode(null);
+    setEmailHistoricoComposeTo("");
+    setEmailHistoricoComposeCc("");
+    setEmailHistoricoComposeSubject("");
+    setEmailHistoricoComposeBody("");
+  }, []);
+
+  const emailHistoricoAttachments = useMemo<HistoricoEmailAttachment[]>(() => {
+    if (emailHistoricoDetalhe?.attachments?.length) {
+      return emailHistoricoDetalhe.attachments.map((attachment) => ({
+        key: `mail:${attachment.id}`,
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        contentId: attachment.contentId,
+        storageKey: attachment.storageKey ?? null,
+      }));
+    }
+
+    const resolvedMessageId = emailHistoricoResolucao?.messageId;
+    const garantiaAttachments = (garantia?.anexos ?? []).filter((anexo) => {
+      if (resolvedMessageId != null) {
+        return anexo.emailId === resolvedMessageId;
+      }
+      return Boolean(anexo.isInline && anexo.caminho?.trim());
+    });
+
+    return garantiaAttachments.map((anexo) => ({
+      key: `garantia:${anexo.id}`,
+      id: anexo.id,
+      fileName: anexo.nome,
+      mimeType: anexo.mimeType,
+      sizeBytes: anexo.sizeBytes,
+      contentId: anexo.contentId,
+      storageKey: anexo.storageKey ?? anexo.caminho,
+      garantiaAnexo: anexo,
+    }));
+  }, [emailHistoricoDetalhe?.attachments, emailHistoricoResolucao?.messageId, garantia?.anexos]);
+
+  const emailHistoricoSourceMessage = useMemo<MailMessage | null>(() => {
+    if (!emailHistoricoAberto) {
+      return null;
+    }
+    if (emailHistoricoDetalhe) {
+      return emailHistoricoDetalhe;
+    }
+
+    return {
+      id: emailHistoricoResolucao?.messageId ?? 0,
+      accountId: emailHistoricoResolucao?.accountId ?? activeQualidadeAccount?.id ?? 0,
+      threadId: emailHistoricoResolucao?.threadId ?? null,
+      internetMessageId: emailHistoricoAberto.messageId ?? null,
+      subject: emailHistoricoAberto.assunto,
+      normalizedSubject: null,
+      fromAddress: emailHistoricoAberto.remetente,
+      fromName: null,
+      replyToAddress: null,
+      senderAddress: null,
+      bodyText: stripHtml(emailHistoricoAberto.corpoHtml),
+      bodyHtml: emailHistoricoAberto.corpoHtml,
+      parsingStatus: "LINKED_AUTO",
+      direction: emailHistoricoAberto.foiEnviado ? "OUTBOUND" : "INBOUND",
+      internalDate: emailHistoricoAberto.dataOcorrencia,
+      receivedAt: emailHistoricoAberto.dataOcorrencia,
+      hasAttachments: emailHistoricoAttachments.length > 0,
+      to: parseMailParticipants(emailHistoricoAberto.destinatarios),
+      cc: parseMailParticipants(emailHistoricoAberto.copias),
+      bcc: [],
+      replyTo: [],
+      attachments: emailHistoricoAttachments.map((attachment) => ({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        contentId: attachment.contentId,
+        isInline: Boolean(attachment.contentId),
+        storageBucket: attachment.garantiaAnexo?.storageBucket ?? null,
+        storageKey: attachment.storageKey ?? null,
+      })),
+    };
+  }, [activeQualidadeAccount?.id, emailHistoricoAberto, emailHistoricoDetalhe, emailHistoricoResolucao, emailHistoricoAttachments]);
+
+  const resolveHistoricoAttachmentUrl = useCallback(
+    async (attachment: HistoricoEmailAttachment) => {
+      const cached = emailHistoricoAttachmentUrlsRef.current[attachment.key];
+      if (cached) {
+        return cached;
+      }
+
+      let url = "";
+      if (attachment.garantiaAnexo) {
+        url = await resolveAnexoUrl(attachment.garantiaAnexo);
+      } else {
+        const storageKey = attachment.storageKey?.trim();
+        if (!storageKey) {
+          throw new Error("Anexo sem caminho disponivel.");
+        }
+        url = /^https?:\/\//i.test(storageKey) ? storageKey : await QualidadeApi.gerarLinkArquivo(storageKey);
+      }
+
+      setEmailHistoricoAttachmentUrls((prev) => (prev[attachment.key] ? prev : { ...prev, [attachment.key]: url }));
+      return url;
+    },
+    [resolveAnexoUrl],
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    const loadHistoricoMessage = async () => {
+      if (!emailHistoricoAberto) {
+        setEmailHistoricoResolucao(null);
+        setEmailHistoricoDetalhe(null);
+        setEmailHistoricoErro(null);
+        setEmailHistoricoLoading(false);
+        return;
+      }
+
+      setEmailHistoricoResolucao(null);
+      setEmailHistoricoDetalhe(null);
+      setEmailHistoricoErro(null);
+
+      if (!emailHistoricoAberto.messageId) {
+        setEmailHistoricoLoading(false);
+        return;
+      }
+
+      setEmailHistoricoLoading(true);
+      try {
+        const resolved = await mailMessagesClient.resolve(emailHistoricoAberto.messageId);
+        if (!active) return;
+        setEmailHistoricoResolucao(resolved);
+
+        if (resolved?.messageId) {
+          const detail = await mailMessagesClient.get(resolved.messageId);
+          if (!active) return;
+          setEmailHistoricoDetalhe(detail);
+        }
+      } catch (err) {
+        if (!active) return;
+        setEmailHistoricoErro(err instanceof Error ? err.message : "Erro ao resolver o e-mail do histórico.");
+      } finally {
+        if (active) {
+          setEmailHistoricoLoading(false);
+        }
+      }
+    };
+
+    void loadHistoricoMessage();
+
+    return () => {
+      active = false;
+    };
+  }, [emailHistoricoAberto]);
+
   useEffect(() => {
     if (!emailHistoricoAberto) {
       setEmailHistoricoHtml("");
       return;
     }
 
-    const sanitized = sanitizeEmailHtml(emailHistoricoAberto.corpoHtml);
+    const htmlBase = emailHistoricoDetalhe?.bodyHtml ?? emailHistoricoAberto.corpoHtml;
+    const sanitized = sanitizeEmailHtml(htmlBase);
     const cidMatches = Array.from(sanitized.matchAll(/cid:([^"'\s>]+)/gi));
     const cidRefs = Array.from(new Set(cidMatches.map((match) => normalizeContentId(match[1])).filter(Boolean)));
 
-    if (!cidRefs.length || !garantia?.anexos?.length) {
+    if (!cidRefs.length || emailHistoricoAttachments.length === 0) {
       setEmailHistoricoHtml(sanitized);
       return;
     }
 
     const inlineByCid = new Map(
-      garantia.anexos
-        .filter((anexo) => Boolean(anexo.caminho?.trim()))
-        .map((anexo) => [normalizeContentId(anexo.contentId), anexo] as const)
-        .filter(([cid]) => Boolean(cid)),
+      emailHistoricoAttachments
+        .map((attachment) => [normalizeContentId(attachment.contentId), attachment] as const)
+        .filter(([cid, attachment]) => Boolean(cid) && Boolean(attachment.storageKey || attachment.garantiaAnexo?.caminho)),
     );
 
     let cancelled = false;
@@ -491,17 +807,17 @@ export default function GarantiaDetalhePage() {
     (async () => {
       let rendered = sanitized;
       for (const cidRef of cidRefs) {
-        const anexo = inlineByCid.get(cidRef);
-        if (!anexo) {
+        const attachment = inlineByCid.get(cidRef);
+        if (!attachment) {
           continue;
         }
         try {
-          const url = await resolveAnexoUrl(anexo);
+          const url = await resolveHistoricoAttachmentUrl(attachment);
           if (cancelled) return;
           const escapedCid = cidRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           rendered = rendered.replace(new RegExp(`cid:${escapedCid}`, "gi"), url);
         } catch {
-          // Keep original cid URL when the signed URL cannot be generated.
+          // Mantem o cid original se o link nao puder ser gerado.
         }
       }
       if (!cancelled) {
@@ -512,7 +828,149 @@ export default function GarantiaDetalhePage() {
     return () => {
       cancelled = true;
     };
-  }, [emailHistoricoAberto, garantia?.anexos, resolveAnexoUrl]);
+  }, [emailHistoricoAberto, emailHistoricoDetalhe, emailHistoricoAttachments, resolveHistoricoAttachmentUrl]);
+
+  const handlePreviewHistoricoAttachment = useCallback(
+    async (attachment: HistoricoEmailAttachment) => {
+      setEmailHistoricoAttachmentActionKey(`preview:${attachment.key}`);
+      try {
+        const url = await resolveHistoricoAttachmentUrl(attachment);
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch (err) {
+        setEmailHistoricoErro(err instanceof Error ? err.message : "Erro ao abrir anexo do e-mail.");
+      } finally {
+        setEmailHistoricoAttachmentActionKey(null);
+      }
+    },
+    [resolveHistoricoAttachmentUrl],
+  );
+
+  const handleDownloadHistoricoAttachment = useCallback(
+    async (attachment: HistoricoEmailAttachment) => {
+      setEmailHistoricoAttachmentActionKey(`download:${attachment.key}`);
+      try {
+        const url = await resolveHistoricoAttachmentUrl(attachment);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.download = attachment.fileName || "anexo";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+      } catch (err) {
+        setEmailHistoricoErro(err instanceof Error ? err.message : "Erro ao baixar anexo do e-mail.");
+      } finally {
+        setEmailHistoricoAttachmentActionKey(null);
+      }
+    },
+    [resolveHistoricoAttachmentUrl],
+  );
+
+  const openHistoricoComposer = useCallback(
+    (mode: ComposeMode) => {
+      if (!activeQualidadeAccount) {
+        setEmailHistoricoErro("Nao existe conta ativa para envio desta caixa.");
+        return;
+      }
+
+      const current = emailHistoricoSourceMessage;
+      if (!current) {
+        setEmailHistoricoErro("Nao foi possivel montar o contexto do e-mail.");
+        return;
+      }
+
+      const accountEmail = activeQualidadeAccount.emailAddress.trim().toLowerCase();
+      const senderEmail = current.replyToAddress?.trim() || current.fromAddress?.trim() || "";
+      const toCandidates = current.to?.map((participant) => participant.email.trim()) ?? [];
+      const ccCandidates = current.cc?.map((participant) => participant.email.trim()) ?? [];
+
+      const to =
+        mode === "replyAll"
+          ? Array.from(new Set([senderEmail, ...toCandidates].filter((email) => email && email.toLowerCase() !== accountEmail))).join(", ")
+          : senderEmail;
+
+      const cc =
+        mode === "replyAll"
+          ? Array.from(new Set(ccCandidates.filter((email) => email && email.toLowerCase() !== accountEmail))).join(", ")
+          : "";
+
+      setEmailHistoricoComposeMode(mode);
+      setEmailHistoricoComposeTo(mode === "forward" ? "" : to);
+      setEmailHistoricoComposeCc(mode === "forward" ? "" : cc);
+      setEmailHistoricoComposeSubject(toSubject(mode, current.subject));
+      setEmailHistoricoComposeBody("");
+      setEmailHistoricoErro(null);
+    },
+    [activeQualidadeAccount, emailHistoricoSourceMessage],
+  );
+
+  const closeHistoricoComposer = useCallback(() => {
+    setEmailHistoricoComposeMode(null);
+    setEmailHistoricoComposeTo("");
+    setEmailHistoricoComposeCc("");
+    setEmailHistoricoComposeSubject("");
+    setEmailHistoricoComposeBody("");
+  }, []);
+
+  const handleSendHistoricoEmail = useCallback(async () => {
+    if (!activeQualidadeAccount) {
+      setEmailHistoricoErro("Nao existe conta ativa para envio desta caixa.");
+      return;
+    }
+
+    if (!emailHistoricoComposeMode) {
+      return;
+    }
+
+    const recipients = parseEmails(emailHistoricoComposeTo);
+    if (recipients.length === 0) {
+      setEmailHistoricoErro("Informe ao menos um destinatario.");
+      return;
+    }
+
+    const sourceMessage = emailHistoricoSourceMessage;
+    setEmailHistoricoSending(true);
+    setEmailHistoricoErro(null);
+
+    try {
+      await mailOutboundClient.send({
+        accountId: activeQualidadeAccount.id,
+        threadId: emailHistoricoComposeMode === "forward" ? undefined : (sourceMessage?.threadId ?? emailHistoricoResolucao?.threadId ?? undefined),
+        parentMessageId:
+          emailHistoricoComposeMode === "forward"
+            ? undefined
+            : sourceMessage && sourceMessage.id > 0
+              ? sourceMessage.id
+              : (emailHistoricoResolucao?.parentMessageId ?? undefined),
+        recipients,
+        cc: parseEmails(emailHistoricoComposeCc),
+        subject: emailHistoricoComposeSubject.trim(),
+        bodyText: buildQuotedText(emailHistoricoComposeMode, sourceMessage, emailHistoricoComposeBody),
+        bodyHtml: buildQuotedHtml(emailHistoricoComposeMode, sourceMessage, emailHistoricoComposeBody, emailHistoricoHtml),
+      });
+
+      closeHistoricoComposer();
+      await carregar();
+    } catch (err) {
+      setEmailHistoricoErro(err instanceof Error ? err.message : "Erro ao enviar resposta do histórico.");
+    } finally {
+      setEmailHistoricoSending(false);
+    }
+  }, [
+    activeQualidadeAccount,
+    carregar,
+    closeHistoricoComposer,
+    emailHistoricoComposeBody,
+    emailHistoricoComposeCc,
+    emailHistoricoComposeMode,
+    emailHistoricoComposeSubject,
+    emailHistoricoComposeTo,
+    emailHistoricoHtml,
+    emailHistoricoResolucao?.parentMessageId,
+    emailHistoricoResolucao?.threadId,
+    emailHistoricoSourceMessage,
+  ]);
 
   const openAnexoModal = useCallback(
     (index: number) => {
@@ -1415,54 +1873,218 @@ export default function GarantiaDetalhePage() {
 
       {emailHistoricoAberto && (
         <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg overflow-hidden">
+          <div className="w-full max-w-6xl rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark shadow-lg overflow-hidden max-h-[92vh] flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark flex items-start justify-between gap-3">
               <div className="space-y-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{emailHistoricoAberto.assunto || "(sem assunto)"}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
-                  De: {emailHistoricoAberto.remetente}
+                <p className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                  {emailHistoricoSourceMessage?.subject || emailHistoricoAberto.assunto || "(sem assunto)"}
                 </p>
-                <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
-                  Para: {emailHistoricoAberto.destinatarios || "Não informado"}
+                <p className="text-xs text-gray-600 dark:text-gray-300 break-all">
+                  De: {emailHistoricoSourceMessage?.fromAddress || emailHistoricoAberto.remetente}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  Resumo: {summarizeEmailText(emailHistoricoAberto.corpoHtml, 120) || "Sem conteúdo exibível."}
+                <p className="text-xs text-gray-600 dark:text-gray-300 break-all">
+                  Para: {joinParticipants(emailHistoricoSourceMessage?.to) || emailHistoricoAberto.destinatarios || "Nao informado"}
                 </p>
+                {(emailHistoricoSourceMessage?.cc?.length ?? 0) > 0 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 break-all">
+                    CC: {joinParticipants(emailHistoricoSourceMessage?.cc)}
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Recebido em: {formatDateTime(emailHistoricoSourceMessage?.receivedAt || emailHistoricoAberto.dataOcorrencia)}
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="inline-flex rounded-full border border-gray-200 dark:border-strokedark px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                    {emailHistoricoSourceMessage?.direction === "OUTBOUND" ? "Enviado" : "Recebido"}
+                  </span>
+                  {emailHistoricoAttachments.length > 0 && (
+                    <span className="inline-flex rounded-full border border-blue-200 dark:border-blue-900/40 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                      Com anexo
+                    </span>
+                  )}
+                  {emailHistoricoResolucao?.threadId && (
+                    <span className="inline-flex rounded-full border border-emerald-200 dark:border-emerald-900/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                      Thread resolvida
+                    </span>
+                  )}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setEmailHistoricoAberto(null)}
-                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200"
-              >
-                Fechar
-              </button>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <ActionButton
+                  label="Responder"
+                  variant="ghost"
+                  icon={<MdRefresh size={16} />}
+                  onClick={() => openHistoricoComposer("reply")}
+                  disabled={!activeQualidadeAccount}
+                  className="px-3 py-2"
+                />
+                <ActionButton
+                  label="Responder todos"
+                  variant="ghost"
+                  icon={<MdAdd size={16} />}
+                  onClick={() => openHistoricoComposer("replyAll")}
+                  disabled={!activeQualidadeAccount}
+                  className="px-3 py-2"
+                />
+                <ActionButton
+                  label="Encaminhar"
+                  variant="ghost"
+                  icon={<MdArrowBack size={16} />}
+                  onClick={() => openHistoricoComposer("forward")}
+                  disabled={!activeQualidadeAccount}
+                  className="px-3 py-2"
+                />
+                <button
+                  type="button"
+                  onClick={closeEmailHistorico}
+                  className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-strokedark text-gray-700 dark:text-gray-200"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
-            <div className="h-[70vh] bg-white">
-              <iframe
-                title={`historico-email-${emailHistoricoAberto.id}`}
-                sandbox="allow-same-origin"
-                className="block h-full w-full bg-white"
-                srcDoc={`
-                  <html>
-                    <head>
-                      <meta charset="utf-8" />
-                      <style>
-                        body {
-                          margin: 0;
-                          padding: 16px;
-                          font-family: Segoe UI, Arial, sans-serif;
-                          color: #1f2937;
-                          line-height: 1.5;
-                          word-break: break-word;
+
+            {(emailHistoricoErro || emailHistoricoLoading) && (
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-strokedark text-sm">
+                {emailHistoricoLoading && <p className="text-gray-500 dark:text-gray-400">Resolvendo mensagem e anexos do histórico...</p>}
+                {emailHistoricoErro && <p className="text-red-600 dark:text-red-400">{emailHistoricoErro}</p>}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {emailHistoricoAttachments.length > 0 && (
+                <div className="rounded-lg border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3 text-xs text-gray-600 dark:text-gray-300">
+                  <div className="mb-2 flex items-center gap-1 font-semibold text-gray-700 dark:text-gray-200">
+                    <MdAttachFile size={14} /> Anexos
+                  </div>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", maxWidth: "100%" }}>
+                    {emailHistoricoAttachments.map((attachment) => {
+                      const previewKey = `preview:${attachment.key}`;
+                      const downloadKey = `download:${attachment.key}`;
+                      const mime = (attachment.mimeType ?? "").toLowerCase();
+                      const isImage = mime.startsWith("image/");
+                      const isPdf = mime === "application/pdf";
+                      const icon = isImage ? "🖼️" : isPdf ? "📄" : mime.includes("word") || mime.includes("document") ? "📝" : mime.includes("sheet") || mime.includes("excel") ? "📊" : mime.includes("zip") || mime.includes("compressed") ? "🗜️" : "📎";
+                      return (
+                        <div
+                          key={attachment.key}
+                          className="flex flex-col justify-between rounded-lg border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark p-2 gap-2 min-w-0"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-base leading-none mb-1">{icon}</div>
+                            <p className="truncate text-xs font-semibold text-gray-900 dark:text-white leading-tight" title={attachment.fileName}>{attachment.fileName}</p>
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{formatAttachmentSize(attachment.sizeBytes)}</p>
+                          </div>
+                          <div className="flex gap-1 flex-wrap">
+                            {isPreviewableHistoricoAttachment(attachment) && (
+                              <button
+                                type="button"
+                                onClick={() => void handlePreviewHistoricoAttachment(attachment)}
+                                disabled={emailHistoricoAttachmentActionKey === previewKey}
+                                className="rounded border border-gray-300 dark:border-strokedark px-2 py-0.5 text-[10px] font-semibold text-gray-700 dark:text-gray-300 transition hover:bg-gray-100 dark:hover:bg-meta-4 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {emailHistoricoAttachmentActionKey === previewKey ? "..." : "Ver"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => void handleDownloadHistoricoAttachment(attachment)}
+                              disabled={emailHistoricoAttachmentActionKey === downloadKey}
+                              className="rounded border border-gray-300 dark:border-strokedark px-2 py-0.5 text-[10px] font-semibold text-gray-700 dark:text-gray-300 transition hover:bg-gray-100 dark:hover:bg-meta-4 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {emailHistoricoAttachmentActionKey === downloadKey ? "..." : "Baixar"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-gray-200 dark:border-strokedark p-4 bg-white dark:bg-boxdark">
+                {emailHistoricoHtml ? (
+                  <iframe
+                    title={`historico-email-${emailHistoricoAberto.id}`}
+                    sandbox="allow-same-origin"
+                    className="w-full border-0 bg-white"
+                    style={{ height: "600px" }}
+                    srcDoc={`
+                      <html>
+                        <head>
+                          <meta charset="utf-8" />
+                          <style>
+                            body {
+                              margin: 0;
+                              padding: 16px;
+                              font-family: Segoe UI, Arial, sans-serif;
+                              color: #1f2937;
+                              line-height: 1.5;
+                              word-break: break-word;
+                            }
+                            img { max-width: 100%; height: auto; }
+                            table { max-width: 100%; }
+                          </style>
+                        </head>
+                        <body>${emailHistoricoHtml}</body>
+                      </html>
+                    `}
+                    onLoad={(event) => {
+                      const iframe = event.currentTarget;
+                      const doc = iframe.contentDocument;
+                      if (doc?.body) {
+                        const height = doc.body.scrollHeight;
+                        if (height > 0) {
+                          iframe.style.height = `${height + 32}px`;
                         }
-                        img { max-width: 100%; height: auto; }
-                        table { max-width: 100%; }
-                      </style>
-                    </head>
-                    <body>${emailHistoricoHtml || sanitizeEmailHtml(emailHistoricoAberto.corpoHtml)}</body>
-                  </html>
-                `}
-              />
+                      }
+                    }}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+                    {emailHistoricoSourceMessage?.bodyText || summarizeEmailText(emailHistoricoAberto.corpoHtml, 500) || "Sem conteudo."}
+                  </p>
+                )}
+              </div>
+
+              {emailHistoricoComposeMode && (
+                <div className="rounded-lg border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-900/10 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-300">{modeLabel(emailHistoricoComposeMode)}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton label="Enviar" icon={<MdAttachFile size={16} />} loading={emailHistoricoSending} onClick={() => void handleSendHistoricoEmail()} />
+                      <ActionButton label="Cancelar" variant="ghost" onClick={closeHistoricoComposer} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      value={emailHistoricoComposeTo}
+                      onChange={(event) => setEmailHistoricoComposeTo(event.target.value)}
+                      placeholder="Para"
+                      className="w-full rounded-lg border border-gray-300 dark:border-strokedark bg-white dark:bg-form-input px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    />
+                    <input
+                      value={emailHistoricoComposeCc}
+                      onChange={(event) => setEmailHistoricoComposeCc(event.target.value)}
+                      placeholder="CC"
+                      className="w-full rounded-lg border border-gray-300 dark:border-strokedark bg-white dark:bg-form-input px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    />
+                    <input
+                      value={emailHistoricoComposeSubject}
+                      onChange={(event) => setEmailHistoricoComposeSubject(event.target.value)}
+                      placeholder="Assunto"
+                      className="w-full rounded-lg border border-gray-300 dark:border-strokedark bg-white dark:bg-form-input px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    />
+                    <textarea
+                      value={emailHistoricoComposeBody}
+                      onChange={(event) => setEmailHistoricoComposeBody(event.target.value)}
+                      rows={8}
+                      placeholder="Escreva sua mensagem"
+                      className="w-full rounded-lg border border-gray-300 dark:border-strokedark bg-white dark:bg-form-input px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
