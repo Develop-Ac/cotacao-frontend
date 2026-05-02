@@ -33,7 +33,20 @@ import { QualidadeApi } from "@/lib/qualidade/api";
 import { Garantia, TimelineEmailItem, TimelineItem, UploadAttachment } from "@/lib/qualidade/types";
 import { STATUS_CODES, STATUS_FLOW, getStatusDefinition } from "@/lib/qualidade/status";
 import { formatCurrency, formatDate, formatDateTime, parseBrDate, parseCurrencyInput, stripHtml } from "@/lib/qualidade/formatters";
-import { FaChevronLeft, FaChevronRight, FaDownload, FaTimes } from "react-icons/fa";
+import {
+  FaChevronLeft,
+  FaChevronRight,
+  FaDownload,
+  FaFile,
+  FaFileAlt,
+  FaFileArchive,
+  FaFileExcel,
+  FaFileImage,
+  FaFilePdf,
+  FaFileWord,
+  FaPaperclip,
+  FaTimes,
+} from "react-icons/fa";
 
 type AbatimentoRow = { nf: string; parcela: string; vencimento: string; valor: string };
 const newAbatimentoRow = (): AbatimentoRow => ({ nf: "", parcela: "", vencimento: "", valor: "" });
@@ -63,6 +76,70 @@ const fileToAttachment = (file: File): UploadAttachment => ({
   type: file.type,
 });
 
+const normalizeContentId = (value?: string | null): string =>
+  String(value ?? "")
+    .trim()
+    .replace(/^<|>$/g, "")
+    .toLowerCase();
+
+const getAttachmentExtension = (name?: string | null, path?: string | null): string => {
+  const source = (name || path || "").toLowerCase();
+  const clean = source.split("?")[0].split("#")[0];
+  const idx = clean.lastIndexOf(".");
+  if (idx < 0 || idx === clean.length - 1) return "";
+  return clean.slice(idx + 1);
+};
+
+const formatAttachmentSize = (value?: number | null): string => {
+  if (!value || value <= 0) return "Tamanho n/d";
+  const units = ["B", "KB", "MB", "GB"];
+  let amount = value;
+  let unitIdx = 0;
+  while (amount >= 1024 && unitIdx < units.length - 1) {
+    amount /= 1024;
+    unitIdx += 1;
+  }
+  const digits = amount >= 10 || unitIdx === 0 ? 0 : 1;
+  return `${amount.toFixed(digits)} ${units[unitIdx]}`;
+};
+
+const getAttachmentTypeLabel = (anexo?: Garantia["anexos"][number]): string => {
+  if (!anexo) return "Arquivo";
+  const mime = (anexo.mimeType ?? "").toLowerCase();
+  const ext = getAttachmentExtension(anexo.nome, anexo.caminho);
+  if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"].includes(ext)) return "Imagem";
+  if (mime.includes("pdf") || ext === "pdf") return "PDF";
+  if (mime.includes("word") || ["doc", "docx"].includes(ext)) return "Word";
+  if (mime.includes("excel") || mime.includes("spreadsheet") || ["xls", "xlsx", "csv"].includes(ext)) return "Planilha";
+  if (mime.includes("zip") || mime.includes("rar") || ["zip", "rar", "7z"].includes(ext)) return "Compactado";
+  if (mime.startsWith("text/") || ["txt", "log", "xml", "json", "csv"].includes(ext)) return "Texto";
+  return "Arquivo";
+};
+
+const renderAttachmentIcon = (anexo?: Garantia["anexos"][number]) => {
+  const mime = (anexo?.mimeType ?? "").toLowerCase();
+  const ext = getAttachmentExtension(anexo?.nome, anexo?.caminho);
+  if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"].includes(ext)) {
+    return <FaFileImage className="text-emerald-500" />;
+  }
+  if (mime.includes("pdf") || ext === "pdf") {
+    return <FaFilePdf className="text-rose-500" />;
+  }
+  if (mime.includes("word") || ["doc", "docx"].includes(ext)) {
+    return <FaFileWord className="text-blue-500" />;
+  }
+  if (mime.includes("excel") || mime.includes("spreadsheet") || ["xls", "xlsx", "csv"].includes(ext)) {
+    return <FaFileExcel className="text-green-600" />;
+  }
+  if (mime.includes("zip") || mime.includes("rar") || ["zip", "rar", "7z"].includes(ext)) {
+    return <FaFileArchive className="text-amber-600" />;
+  }
+  if (mime.startsWith("text/") || ["txt", "log", "xml", "json", "csv"].includes(ext)) {
+    return <FaFileAlt className="text-slate-500" />;
+  }
+  return <FaFile className="text-gray-500" />;
+};
+
 const formatDateMask = (value: string): string => {
   const digits = value.replace(/\D+/g, "").slice(0, 8);
   if (digits.length <= 2) return digits;
@@ -79,6 +156,8 @@ const formatCurrencyMask = (value: string): string => {
 
 const isImageAttachment = (anexo?: Garantia["anexos"][number]) => {
   if (!anexo) return false;
+  const mime = (anexo.mimeType ?? "").toLowerCase();
+  if (mime.startsWith("image/")) return true;
   const name = anexo.nome?.toLowerCase() ?? "";
   const caminho = anexo.caminho?.toLowerCase() ?? "";
   return /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(name) || /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(caminho);
@@ -304,6 +383,7 @@ export default function GarantiaDetalhePage() {
   const [envioCorreio, setEnvioCorreio] = useState(false);
   const [codigoObjeto, setCodigoObjeto] = useState("");
   const [emailHistoricoAberto, setEmailHistoricoAberto] = useState<TimelineEmailItem | null>(null);
+  const [emailHistoricoHtml, setEmailHistoricoHtml] = useState("");
   const [anexoViewerOpen, setAnexoViewerOpen] = useState(false);
   const [anexoViewerIndex, setAnexoViewerIndex] = useState(0);
   const [anexoViewerLoading, setAnexoViewerLoading] = useState(false);
@@ -383,6 +463,56 @@ export default function GarantiaDetalhePage() {
     }
     return QualidadeApi.gerarLinkArquivo(caminho);
   }, []);
+
+  useEffect(() => {
+    if (!emailHistoricoAberto) {
+      setEmailHistoricoHtml("");
+      return;
+    }
+
+    const sanitized = sanitizeEmailHtml(emailHistoricoAberto.corpoHtml);
+    const cidMatches = Array.from(sanitized.matchAll(/cid:([^"'\s>]+)/gi));
+    const cidRefs = Array.from(new Set(cidMatches.map((match) => normalizeContentId(match[1])).filter(Boolean)));
+
+    if (!cidRefs.length || !garantia?.anexos?.length) {
+      setEmailHistoricoHtml(sanitized);
+      return;
+    }
+
+    const inlineByCid = new Map(
+      garantia.anexos
+        .filter((anexo) => Boolean(anexo.caminho?.trim()))
+        .map((anexo) => [normalizeContentId(anexo.contentId), anexo] as const)
+        .filter(([cid]) => Boolean(cid)),
+    );
+
+    let cancelled = false;
+
+    (async () => {
+      let rendered = sanitized;
+      for (const cidRef of cidRefs) {
+        const anexo = inlineByCid.get(cidRef);
+        if (!anexo) {
+          continue;
+        }
+        try {
+          const url = await resolveAnexoUrl(anexo);
+          if (cancelled) return;
+          const escapedCid = cidRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          rendered = rendered.replace(new RegExp(`cid:${escapedCid}`, "gi"), url);
+        } catch {
+          // Keep original cid URL when the signed URL cannot be generated.
+        }
+      }
+      if (!cancelled) {
+        setEmailHistoricoHtml(rendered);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emailHistoricoAberto, garantia?.anexos, resolveAnexoUrl]);
 
   const openAnexoModal = useCallback(
     (index: number) => {
@@ -1233,15 +1363,32 @@ export default function GarantiaDetalhePage() {
               <div className="flex flex-col gap-2">
                 {garantia.anexos.map((anexo, index) => {
                   const hasPath = Boolean(anexo.caminho?.trim());
+                  const sizeLabel = formatAttachmentSize(anexo.sizeBytes);
+                  const typeLabel = getAttachmentTypeLabel(anexo);
                   return (
                     <button
                       key={anexo.id}
                       type="button"
-                      className="keep-color text-left text-primary underline disabled:opacity-60"
+                      className="keep-color group w-full rounded-xl border border-gray-200 dark:border-strokedark bg-white dark:bg-boxdark px-3 py-2 text-left hover:border-primary/40 disabled:opacity-60"
                       onClick={() => hasPath && openAnexoModal(index)}
                       disabled={!hasPath}
                     >
-                      {anexo.nome}
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg" aria-hidden="true">{renderAttachmentIcon(anexo)}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{anexo.nome}</p>
+                          <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                            {typeLabel} • {sizeLabel}
+                            {anexo.source ? ` • ${anexo.source}` : ""}
+                            {anexo.isInline ? " • Inline" : ""}
+                          </p>
+                        </div>
+                        {anexo.isInline ? (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Inline</span>
+                        ) : (
+                          <FaPaperclip className="text-gray-400 group-hover:text-primary" />
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -1312,7 +1459,7 @@ export default function GarantiaDetalhePage() {
                         table { max-width: 100%; }
                       </style>
                     </head>
-                    <body>${sanitizeEmailHtml(emailHistoricoAberto.corpoHtml)}</body>
+                    <body>${emailHistoricoHtml || sanitizeEmailHtml(emailHistoricoAberto.corpoHtml)}</body>
                   </html>
                 `}
               />
@@ -1404,8 +1551,29 @@ export default function GarantiaDetalhePage() {
                     <div className="rounded-xl border border-gray-200 dark:border-strokedark bg-gray-50 dark:bg-meta-4 p-3">
                       <p className="text-sm font-semibold text-gray-700 dark:text-white">{currentAnexo.nome}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Tipo: {currentAnexoEhImagem ? "Imagem" : "Arquivo"}
+                        Tipo: {getAttachmentTypeLabel(currentAnexo)}
                       </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Tamanho: {formatAttachmentSize(currentAnexo.sizeBytes)}
+                      </p>
+                      {currentAnexo.mimeType && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          MIME: {currentAnexo.mimeType}
+                        </p>
+                      )}
+                      {currentAnexo.contentId && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-all">
+                          CID: {currentAnexo.contentId}
+                        </p>
+                      )}
+                      {currentAnexo.source && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Origem: {currentAnexo.source}
+                        </p>
+                      )}
+                      {currentAnexo.isInline && (
+                        <p className="text-xs text-blue-700 mt-1 font-semibold">Anexo inline</p>
+                      )}
                       {currentAnexo.caminho && (
                         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 break-all">{currentAnexo.caminho}</p>
                       )}

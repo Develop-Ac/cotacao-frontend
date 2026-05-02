@@ -2,6 +2,14 @@ export interface Anexo {
   id: number;
   nome: string;
   caminho: string;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  contentId?: string | null;
+  isInline?: boolean;
+  storageBucket?: string | null;
+  storageKey?: string | null;
+  source?: string | null;
+  emailId?: number | null;
 }
 
 export type TimelineItem = TimelineHistoricoItem | TimelineEmailItem;

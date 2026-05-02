@@ -79,10 +79,25 @@ const parseAnexos = (payload: unknown): Anexo[] =>
         .map((item) => {
           if (item && typeof item === "object") {
             const cast = item as Record<string, unknown>;
+            const caminho =
+              cast.path_ficheiro ??
+              cast.caminho ??
+              cast.storage_key ??
+              cast.storageKey ??
+              cast.url ??
+              "";
             return {
               id: toNumber(cast.id) ?? 0,
               nome: String(cast.nome_ficheiro ?? cast.nome ?? cast.filename ?? "Arquivo"),
-              caminho: String(cast.path_ficheiro ?? cast.caminho ?? cast.url ?? ""),
+              caminho: String(caminho),
+              mimeType: cast.mime_type?.toString() ?? cast.mimeType?.toString() ?? null,
+              sizeBytes: toNumber(cast.size_bytes ?? cast.sizeBytes) ?? null,
+              contentId: cast.content_id?.toString() ?? cast.contentId?.toString() ?? null,
+              isInline: toBoolean(cast.is_inline ?? cast.isInline),
+              storageBucket: cast.storage_bucket?.toString() ?? cast.storageBucket?.toString() ?? null,
+              storageKey: cast.storage_key?.toString() ?? cast.storageKey?.toString() ?? null,
+              source: cast.source?.toString() ?? null,
+              emailId: toNumber(cast.email_id ?? cast.emailId) ?? null,
             };
           }
           return null;
