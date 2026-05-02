@@ -76,17 +76,22 @@ const toIsoString = (value: unknown): string | null => {
 const parseAnexos = (payload: unknown): Anexo[] =>
   Array.isArray(payload)
     ? payload
-        .map((item) => {
-          if (item && typeof item === "object") {
-            const cast = item as Record<string, unknown>;
-            const caminho =
-              cast.path_ficheiro ??
-              cast.caminho ??
-              cast.storage_key ??
-              cast.storageKey ??
-              cast.url ??
-              "";
-            return {
+        .flatMap((item): Anexo[] => {
+          if (!item || typeof item !== "object") {
+            return [];
+          }
+
+          const cast = item as Record<string, unknown>;
+          const caminho =
+            cast.path_ficheiro ??
+            cast.caminho ??
+            cast.storage_key ??
+            cast.storageKey ??
+            cast.url ??
+            "";
+
+          return [
+            {
               id: toNumber(cast.id) ?? 0,
               nome: String(cast.nome_ficheiro ?? cast.nome ?? cast.filename ?? "Arquivo"),
               caminho: String(caminho),
@@ -98,11 +103,9 @@ const parseAnexos = (payload: unknown): Anexo[] =>
               storageKey: cast.storage_key?.toString() ?? cast.storageKey?.toString() ?? null,
               source: cast.source?.toString() ?? null,
               emailId: toNumber(cast.email_id ?? cast.emailId) ?? null,
-            };
-          }
-          return null;
+            },
+          ];
         })
-        .filter((item): item is Anexo => item !== null)
     : [];
 
 const ensureDate = (value: unknown): Date => {
